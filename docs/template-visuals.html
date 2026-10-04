@@ -1,0 +1,1502 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>TilePilot Default Template Concepts</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f1e8;
+      --ink: #1f2328;
+      --muted: #666b73;
+      --line: rgba(31, 35, 40, 0.16);
+      --panel: rgba(255, 255, 255, 0.68);
+      --panel-solid: #fbfaf6;
+      --primary: #1664d9;
+      --primary-soft: #dbe8ff;
+      --secondary: #16835f;
+      --secondary-soft: #d9f1e8;
+      --rail: #c27a06;
+      --rail-soft: #ffe9be;
+      --context: #68717d;
+      --context-soft: #e3e6ea;
+      --overlay: #d9481f;
+      --overlay-soft: #ffd9cc;
+      --shadow: 0 18px 50px rgba(31, 35, 40, 0.10);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(22, 100, 217, 0.14), transparent 30rem),
+        radial-gradient(circle at 88% 20%, rgba(194, 122, 6, 0.14), transparent 32rem),
+        linear-gradient(135deg, #fbf7ec 0%, var(--paper) 45%, #ece8dd 100%);
+      line-height: 1.45;
+    }
+
+    .page {
+      width: min(1680px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 44px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+      gap: 28px;
+      align-items: end;
+      padding: 36px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.56);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 780px;
+      font-family: "Iowan Old Style", "Georgia", serif;
+      font-size: clamp(42px, 6vw, 86px);
+      line-height: 0.94;
+      letter-spacing: -0.055em;
+    }
+
+    .deck {
+      max-width: 720px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .callout {
+      border-left: 6px solid var(--primary);
+      padding: 18px 20px;
+      border-radius: 16px;
+      background: var(--panel-solid);
+      color: #333841;
+      font-weight: 650;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .legend-item,
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #363b42;
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: 0.02em;
+      padding: 7px 10px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+
+    .dot.primary { background: var(--primary); }
+    .dot.secondary { background: var(--secondary); }
+    .dot.rail { background: var(--rail); }
+    .dot.context { background: var(--context); }
+    .dot.overlay { background: var(--overlay); }
+
+    .section {
+      margin-top: 34px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 14px;
+      padding: 0 4px;
+    }
+
+    h2 {
+      font-family: "Iowan Old Style", "Georgia", serif;
+      font-size: clamp(28px, 3vw, 46px);
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+
+    h2 .fit-pill {
+      display: inline-flex;
+      vertical-align: middle;
+      margin-left: 10px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--muted);
+      font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+      font-size: 12px;
+      font-weight: 820;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .section-note {
+      max-width: 520px;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .template-card {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.36fr) minmax(620px, 0.64fr);
+      gap: 22px;
+      min-height: 430px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 12px 36px rgba(31, 35, 40, 0.07);
+      break-inside: avoid;
+    }
+
+    .template-card.wide {
+      grid-column: 1 / -1;
+      grid-template-columns: minmax(300px, 0.34fr) minmax(720px, 0.66fr);
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 820;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h3 {
+      margin-top: 4px;
+      font-size: 26px;
+      line-height: 1.02;
+      letter-spacing: -0.035em;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .chip {
+      padding: 6px 9px;
+      background: rgba(255, 255, 255, 0.56);
+      font-size: 11px;
+    }
+
+    .rationale {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .roles {
+      display: grid;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 18px;
+      font-size: 12px;
+    }
+
+    .role-line {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+    }
+
+    .role-name {
+      font-weight: 840;
+      color: #343941;
+    }
+
+    .role-desc {
+      color: var(--muted);
+    }
+
+    .visual {
+      display: grid;
+      align-content: stretch;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .screen {
+      position: relative;
+      width: 100%;
+      border: 6px solid #23272e;
+      border-radius: 10px;
+      background:
+        linear-gradient(90deg, rgba(31, 35, 40, 0.055) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(31, 35, 40, 0.055) 1px, transparent 1px),
+        #ede9df;
+      background-size: 9% 100%, 100% 11%;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+        0 14px 30px rgba(31, 35, 40, 0.14);
+      overflow: hidden;
+    }
+
+    .aspect-laptop { aspect-ratio: 1.55 / 1; }
+    .aspect-wide { aspect-ratio: 16 / 9; }
+    .aspect-ultra { aspect-ratio: 21 / 9; }
+    .aspect-super { aspect-ratio: 32 / 9; }
+    .aspect-portrait { aspect-ratio: 9 / 16; max-height: 560px; margin: 0 auto; width: min(100%, 360px); }
+
+    .slot {
+      position: absolute;
+      left: calc(var(--x) * 1% - 0.45%);
+      top: calc(var(--y) * 1% - 0.45%);
+      width: calc(var(--w) * 1% + 0.9%);
+      height: calc(var(--h) * 1% + 0.9%);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px;
+      border: 2px solid currentColor;
+      border-radius: 5px;
+      color: var(--slot-color);
+      background: var(--slot-bg);
+      box-shadow: 0 8px 18px rgba(31, 35, 40, 0.10);
+      z-index: var(--z, 1);
+    }
+
+    .screen.edge-fit .slot {
+      left: calc(var(--x) * 1%);
+      top: calc(var(--y) * 1%);
+      width: calc(var(--w) * 1%);
+      height: calc(var(--h) * 1%);
+    }
+
+    .slot.primary {
+      --slot-color: var(--primary);
+      --slot-bg: color-mix(in srgb, var(--primary-soft) 86%, white);
+    }
+
+    .slot.secondary {
+      --slot-color: var(--secondary);
+      --slot-bg: color-mix(in srgb, var(--secondary-soft) 82%, white);
+    }
+
+    .slot.rail {
+      --slot-color: var(--rail);
+      --slot-bg: color-mix(in srgb, var(--rail-soft) 82%, white);
+    }
+
+    .slot.context {
+      --slot-color: var(--context);
+      --slot-bg: color-mix(in srgb, var(--context-soft) 84%, white);
+    }
+
+    .slot.overlay {
+      --slot-color: var(--overlay);
+      --slot-bg: color-mix(in srgb, var(--overlay-soft) 84%, white);
+      box-shadow:
+        0 14px 34px rgba(217, 72, 31, 0.24),
+        0 6px 16px rgba(31, 35, 40, 0.16);
+    }
+
+    .slot strong {
+      display: block;
+      overflow: hidden;
+      color: currentColor;
+      font-size: clamp(10px, 1.2vw, 13px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+    }
+
+    .slot em {
+      display: block;
+      margin-top: 3px;
+      color: rgba(31, 35, 40, 0.58);
+      font-size: 10px;
+      font-style: normal;
+      font-weight: 720;
+      line-height: 1.1;
+    }
+
+    .index {
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--slot-color);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .index span {
+      color: #fff;
+    }
+
+    .slot.app-window {
+      align-items: stretch;
+      padding: 0;
+      background: #fbfcff;
+      border-color: color-mix(in srgb, var(--slot-color) 80%, #111);
+      overflow: hidden;
+    }
+
+    .app-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(31, 35, 40, 0.12);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(238, 241, 247, 0.92));
+    }
+
+    .app-icon {
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 4px 10px rgba(31, 35, 40, 0.18);
+    }
+
+    .app-icon.chrome { background: conic-gradient(#e94435 0 33%, #f8c33a 0 66%, #35a853 0 82%, #4285f4 0); }
+    .app-icon.code { background: linear-gradient(135deg, #0a7cff, #003b8f); }
+    .app-icon.term { background: linear-gradient(135deg, #101417, #47515f); }
+    .app-icon.chat { background: linear-gradient(135deg, #18c46f, #0b7d47); }
+    .app-icon.calendar { background: linear-gradient(135deg, #f04438, #f79009); }
+    .app-icon.slack { background: linear-gradient(135deg, #611f69, #36c5f0); }
+    .app-icon.spotify { background: linear-gradient(135deg, #1db954, #0b4d25); }
+    .app-icon.monitor { background: linear-gradient(135deg, #111827, #14b8a6); }
+    .app-icon.figma { background: linear-gradient(135deg, #f24e1e, #a259ff 48%, #0acf83); }
+    .app-icon.notes { background: linear-gradient(135deg, #f9d949, #f59f00); color: #3b2f00; }
+
+    .app-copy {
+      min-width: 0;
+      color: #222831;
+    }
+
+    .app-copy strong {
+      color: #222831;
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .app-copy em {
+      color: #68717d;
+      font-size: 10px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .app-content {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+    }
+
+    .fake-line {
+      height: 8px;
+      border-radius: 2px;
+      background: rgba(31, 35, 40, 0.10);
+    }
+
+    .fake-line.short { width: 56%; }
+    .fake-line.medium { width: 76%; }
+    .fake-line.long { width: 92%; }
+
+    .slot.rail .app-content,
+    .slot.context .app-content {
+      gap: 6px;
+      padding: 8px;
+    }
+
+    .dual-screen {
+      display: grid;
+      grid-template-columns: 1.08fr 0.72fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .dual-screen .screen {
+      min-height: 260px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .summary-box {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.58);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .summary-box strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .definition-strip {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr);
+      gap: 16px;
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid color-mix(in srgb, var(--rail) 32%, transparent);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(135deg, rgba(255, 233, 190, 0.70), rgba(255, 255, 255, 0.62)),
+        var(--panel-solid);
+      box-shadow: 0 10px 28px rgba(194, 122, 6, 0.10);
+    }
+
+    .definition-strip h2 {
+      color: #6d4100;
+      font-size: clamp(26px, 3vw, 40px);
+    }
+
+    .definition-strip p {
+      color: #554535;
+      font-size: 16px;
+      font-weight: 620;
+    }
+
+    .rail-examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .fit-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .fit-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.62);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .fit-card strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .generated-mockup {
+      margin: 18px 0 16px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.62);
+      box-shadow: 0 12px 34px rgba(31, 35, 40, 0.08);
+    }
+
+    .generated-mockup img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+      border: 1px solid rgba(31, 35, 40, 0.14);
+    }
+
+    .generated-mockup figcaption {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .render-gallery {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0 24px;
+    }
+
+    .render-card {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.66);
+      box-shadow: 0 8px 22px rgba(31, 35, 40, 0.06);
+    }
+
+    .render-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid rgba(31, 35, 40, 0.14);
+      border-radius: 7px;
+      background: #ede9df;
+    }
+
+    .render-card span {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 820;
+      line-height: 1.15;
+    }
+
+    @media (max-width: 1100px) {
+      .hero,
+      .template-card,
+      .template-card.wide {
+        grid-template-columns: 1fr;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .section-note {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        width: min(100vw - 24px, 720px);
+        padding-top: 18px;
+      }
+
+      .hero {
+        padding: 22px;
+      }
+
+      .legend,
+      .definition-strip,
+      .fit-strip,
+      .render-gallery,
+      .summary-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .section-note {
+        margin-top: 8px;
+      }
+
+      .template-card {
+        padding: 14px;
+      }
+
+      .dual-screen {
+        grid-template-columns: 1fr;
+      }
+
+      .definition-strip {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page {
+        width: 100%;
+        padding: 0;
+      }
+
+      .hero,
+      .template-card {
+        box-shadow: none;
+        background: #fff;
+      }
+
+      .section {
+        page-break-before: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">TilePilot template direction</p>
+        <h1>Default Template Concepts</h1>
+        <p class="deck">A practical template library should protect readable work areas, keep support windows visible, and avoid turning every display into a dense grid.</p>
+      </div>
+      <aside>
+        <div class="callout">Most defaults should be work-shaped: one clear center of gravity, stable support slots, and predictable keyboard movement.</div>
+        <div class="legend" aria-label="Slot role legend">
+          <span class="legend-item"><span class="dot primary"></span>Primary</span>
+          <span class="legend-item"><span class="dot secondary"></span>Secondary</span>
+          <span class="legend-item"><span class="dot rail"></span>Rail</span>
+          <span class="legend-item"><span class="dot context"></span>Context</span>
+          <span class="legend-item"><span class="dot overlay"></span>Overlay</span>
+        </div>
+      </aside>
+    </header>
+
+    <section class="definition-strip" aria-label="Rail definition">
+      <div>
+        <p class="eyebrow">Plain language</p>
+        <h2>What are rails?</h2>
+      </div>
+      <div>
+        <p>Rails are narrow support zones at the edge of a layout. They hold apps you glance at or touch briefly, not the main thing you are reading, writing, coding, or designing.</p>
+        <div class="rail-examples">
+          <span class="chip">Chat</span>
+          <span class="chip">Calendar</span>
+          <span class="chip">Task list</span>
+          <span class="chip">Logs</span>
+          <span class="chip">Inspector</span>
+          <span class="chip">Mini player</span>
+          <span class="chip">Dashboard</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="fit-strip" aria-label="Relative screen size guide">
+      <div class="fit-card"><strong>Compact</strong>Small laptop. 2-3 windows.</div>
+      <div class="fit-card"><strong>Standard</strong>Normal external. 2-4 windows.</div>
+      <div class="fit-card"><strong>Roomy</strong>Large 4K monitor. 3-6 windows.</div>
+      <div class="fit-card"><strong>Huge</strong>TV-scale 16:9. 5-9 windows.</div>
+      <div class="fit-card"><strong>Wide</strong>Ultrawide. Center plus wings.</div>
+      <div class="fit-card"><strong>Paired</strong>Two displays, separate roles.</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>App Examples <span class="fit-pill">Visual mockups</span></h2>
+        <p class="section-note">These mockups show what the templates look like once actual apps are assigned to slots.</p>
+      </div>
+      <figure class="generated-mockup">
+        <img src="assets/template-mockup.png" alt="Generated mockup showing a large TV workspace with app icons and a 6 plus 2 command-center layout">
+        <figcaption>Generated mockup: app icons make the layout intent easier to read than abstract colored boxes alone.</figcaption>
+      </figure>
+      <!-- GENERATED_TEMPLATE_IMAGE_GALLERY_START -->
+      <div class="render-gallery" aria-label="Generated image preview for each template">
+        <figure class="render-card"><img src="assets/template-images/01-coding-theater-with-apps.png" alt="Generated preview of Coding Theater With Apps"><span>Coding Theater With Apps</span></figure>
+        <figure class="render-card"><img src="assets/template-images/02-6-plus-2-with-real-apps.png" alt="Generated preview of 6 + 2 With Real Apps"><span>6 + 2 With Real Apps</span></figure>
+        <figure class="render-card"><img src="assets/template-images/03-focus-split.png" alt="Generated preview of Focus Split"><span>Focus Split</span></figure>
+        <figure class="render-card"><img src="assets/template-images/04-editor-stack.png" alt="Generated preview of Editor Stack"><span>Editor Stack</span></figure>
+        <figure class="render-card"><img src="assets/template-images/05-desk-triad.png" alt="Generated preview of Desk Triad"><span>Desk Triad</span></figure>
+        <figure class="render-card"><img src="assets/template-images/06-equal-pair.png" alt="Generated preview of Equal Pair"><span>Equal Pair</span></figure>
+        <figure class="render-card"><img src="assets/template-images/07-comms-rail.png" alt="Generated preview of Comms Rail"><span>Comms Rail</span></figure>
+        <figure class="render-card"><img src="assets/template-images/08-studio-canvas.png" alt="Generated preview of Studio Canvas"><span>Studio Canvas</span></figure>
+        <figure class="render-card"><img src="assets/template-images/09-ops-grid.png" alt="Generated preview of Ops Grid"><span>Ops Grid</span></figure>
+        <figure class="render-card"><img src="assets/template-images/10-6-plus-2-command-center.png" alt="Generated preview of 6 + 2 Command Center"><span>6 + 2 Command Center</span></figure>
+        <figure class="render-card"><img src="assets/template-images/11-tv-hero-plus-quad-context.png" alt="Generated preview of TV Hero + Quad Context"><span>TV Hero + Quad Context</span></figure>
+        <figure class="render-card"><img src="assets/template-images/12-tv-dual-focus-plus-rails.png" alt="Generated preview of TV Dual Focus + Rails"><span>TV Dual Focus + Rails</span></figure>
+        <figure class="render-card"><img src="assets/template-images/13-tv-four-up-workbench.png" alt="Generated preview of TV Four-Up Workbench"><span>TV Four-Up Workbench</span></figure>
+        <figure class="render-card"><img src="assets/template-images/14-tv-six-pack-review.png" alt="Generated preview of TV Six-Pack Review"><span>TV Six-Pack Review</span></figure>
+        <figure class="render-card"><img src="assets/template-images/15-tv-coding-theater.png" alt="Generated preview of TV Coding Theater"><span>TV Coding Theater</span></figure>
+        <figure class="render-card"><img src="assets/template-images/16-tv-meeting-war-room.png" alt="Generated preview of TV Meeting War Room"><span>TV Meeting War Room</span></figure>
+        <figure class="render-card"><img src="assets/template-images/17-tv-ops-wall-3x3.png" alt="Generated preview of TV Ops Wall 3x3"><span>TV Ops Wall 3x3</span></figure>
+        <figure class="render-card"><img src="assets/template-images/18-tv-center-stage-plus-scratchpad.png" alt="Generated preview of TV Center Stage + Scratchpad"><span>TV Center Stage + Scratchpad</span></figure>
+        <figure class="render-card"><img src="assets/template-images/19-ultrawide-hero.png" alt="Generated preview of Ultrawide Hero"><span>Ultrawide Hero</span></figure>
+        <figure class="render-card"><img src="assets/template-images/20-ultrawide-dual-workbench.png" alt="Generated preview of Ultrawide Dual Workbench"><span>Ultrawide Dual Workbench</span></figure>
+        <figure class="render-card"><img src="assets/template-images/21-superwide-command-center.png" alt="Generated preview of Superwide Command Center"><span>Superwide Command Center</span></figure>
+        <figure class="render-card"><img src="assets/template-images/22-portrait-stack.png" alt="Generated preview of Portrait Stack"><span>Portrait Stack</span></figure>
+        <figure class="render-card"><img src="assets/template-images/23-dual-display-focus-plus-periphery.png" alt="Generated preview of Dual Display Focus + Periphery"><span>Dual Display Focus + Periphery</span></figure>
+      </div>
+      <!-- GENERATED_TEMPLATE_IMAGE_GALLERY_END -->
+      <div class="cards">
+        <article class="template-card wide">
+          <div class="meta">
+            <p class="eyebrow">Large 50 inch TV example</p>
+            <h3>Coding Theater With Apps</h3>
+            <div class="tags">
+              <span class="chip">6 windows</span>
+              <span class="chip">Editor center</span>
+              <span class="chip">Rails at edges</span>
+              <span class="chip">Terminal bottom</span>
+            </div>
+            <p class="rationale">The icons make the intent obvious: code in the center, docs and chat on the left, preview on the right, terminal/test output along the bottom.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Center</span><span class="role-desc">VS Code gets the largest readable slot.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Chrome docs, WhatsApp, and preview stay visible but secondary.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot rail app-window" style="--x:2;--y:4;--w:19;--h:44;--z:1">
+                <div>
+                  <div class="app-titlebar"><span class="app-icon chrome">Ch</span><span class="app-copy"><strong>Chrome</strong><em>API docs</em></span></div>
+                  <div class="app-content"><span class="fake-line long"></span><span class="fake-line medium"></span><span class="fake-line short"></span></div>
+                </div>
+              </div>
+              <div class="slot rail app-window" style="--x:2;--y:52;--w:19;--h:44;--z:1">
+                <div>
+                  <div class="app-titlebar"><span class="app-icon chat">WA</span><span class="app-copy"><strong>WhatsApp</strong><em>Team chat</em></span></div>
+                  <div class="app-content"><span class="fake-line medium"></span><span class="fake-line long"></span><span class="fake-line short"></span></div>
+                </div>
+              </div>
+              <div class="slot primary app-window" style="--x:24;--y:4;--w:52;--h:63;--z:1">
+                <div>
+                  <div class="app-titlebar"><span class="app-icon code">VS</span><span class="app-copy"><strong>VS Code</strong><em>TilePilot workspace</em></span></div>
+                  <div class="app-content"><span class="fake-line long"></span><span class="fake-line long"></span><span class="fake-line medium"></span><span class="fake-line long"></span><span class="fake-line short"></span></div>
+                </div>
+              </div>
+              <div class="slot secondary app-window" style="--x:24;--y:71;--w:25;--h:25;--z:1">
+                <div>
+                  <div class="app-titlebar"><span class="app-icon term">$_</span><span class="app-copy"><strong>Terminal</strong><em>Build</em></span></div>
+                  <div class="app-content"><span class="fake-line long"></span><span class="fake-line medium"></span></div>
+                </div>
+              </div>
+              <div class="slot secondary app-window" style="--x:51;--y:71;--w:25;--h:25;--z:1">
+                <div>
+                  <div class="app-titlebar"><span class="app-icon monitor">AM</span><span class="app-copy"><strong>Activity</strong><em>Tests</em></span></div>
+                  <div class="app-content"><span class="fake-line long"></span><span class="fake-line short"></span></div>
+                </div>
+              </div>
+              <div class="slot rail app-window" style="--x:79;--y:4;--w:19;--h:92;--z:1">
+                <div>
+                  <div class="app-titlebar"><span class="app-icon chrome">Ch</span><span class="app-copy"><strong>Preview</strong><em>Local app</em></span></div>
+                  <div class="app-content"><span class="fake-line long"></span><span class="fake-line medium"></span><span class="fake-line medium"></span><span class="fake-line short"></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card wide">
+          <div class="meta">
+            <p class="eyebrow">Layered command-center example</p>
+            <h3>6 + 2 With Real Apps</h3>
+            <div class="tags">
+              <span class="chip">8 windows</span>
+              <span class="chip">2 foreground</span>
+              <span class="chip">6 context</span>
+              <span class="chip">Overlap</span>
+            </div>
+            <p class="rationale">Two foreground apps are the current task. Six background apps stay parked as context and can still be recognized by icon.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Front</span><span class="role-desc">VS Code and Chrome are active.</span></div>
+              <div class="role-line"><span class="role-name">Back</span><span class="role-desc">Chat, calendar, notes, music, terminal, monitor stay available.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide edge-fit">
+              <div class="slot context app-window" style="--x:0;--y:0;--w:33.333;--h:50;--z:1"><div><div class="app-titlebar"><span class="app-icon chat">WA</span><span class="app-copy"><strong>WhatsApp</strong><em>Messages</em></span></div><div class="app-content"><span class="fake-line medium"></span><span class="fake-line long"></span></div></div></div>
+              <div class="slot context app-window" style="--x:33.333;--y:0;--w:33.334;--h:50;--z:1"><div><div class="app-titlebar"><span class="app-icon calendar">Cal</span><span class="app-copy"><strong>Calendar</strong><em>Today</em></span></div><div class="app-content"><span class="fake-line long"></span><span class="fake-line short"></span></div></div></div>
+              <div class="slot context app-window" style="--x:66.667;--y:0;--w:33.333;--h:50;--z:1"><div><div class="app-titlebar"><span class="app-icon notes">No</span><span class="app-copy"><strong>Notes</strong><em>Scratch</em></span></div><div class="app-content"><span class="fake-line medium"></span><span class="fake-line long"></span></div></div></div>
+              <div class="slot context app-window" style="--x:0;--y:50;--w:33.333;--h:50;--z:1"><div><div class="app-titlebar"><span class="app-icon spotify">Sp</span><span class="app-copy"><strong>Spotify</strong><em>Focus</em></span></div><div class="app-content"><span class="fake-line short"></span><span class="fake-line medium"></span></div></div></div>
+              <div class="slot context app-window" style="--x:33.333;--y:50;--w:33.334;--h:50;--z:1"><div><div class="app-titlebar"><span class="app-icon term">$_</span><span class="app-copy"><strong>Terminal</strong><em>Logs</em></span></div><div class="app-content"><span class="fake-line long"></span><span class="fake-line long"></span></div></div></div>
+              <div class="slot context app-window" style="--x:66.667;--y:50;--w:33.333;--h:50;--z:1"><div><div class="app-titlebar"><span class="app-icon monitor">AM</span><span class="app-copy"><strong>Activity</strong><em>System</em></span></div><div class="app-content"><span class="fake-line medium"></span><span class="fake-line short"></span></div></div></div>
+              <div class="slot overlay app-window" style="--x:18.6;--y:14;--w:30.8;--h:72;--z:4"><div><div class="app-titlebar"><span class="app-icon code">VS</span><span class="app-copy"><strong>VS Code</strong><em>Implementation</em></span></div><div class="app-content"><span class="fake-line long"></span><span class="fake-line medium"></span><span class="fake-line long"></span></div></div></div>
+              <div class="slot overlay app-window" style="--x:50.6;--y:14;--w:30.8;--h:72;--z:5"><div><div class="app-titlebar"><span class="app-icon chrome">Ch</span><span class="app-copy"><strong>Chrome</strong><em>Research</em></span></div><div class="app-content"><span class="fake-line long"></span><span class="fake-line short"></span><span class="fake-line medium"></span></div></div></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Tall Laptop <span class="fit-pill">Compact</span></h2>
+        <p class="section-note">13-16 inch MacBook-class screens need fewer, stronger panes. Two is ideal; three is already busy.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Tall laptop / compact</p>
+            <h3>Focus Split</h3>
+            <div class="tags">
+              <span class="chip">2 slots</span>
+              <span class="chip">Coding</span>
+              <span class="chip">Writing</span>
+              <span class="chip">Admin</span>
+            </div>
+            <p class="rationale">Safest compact default: one real focus area and one companion pane that stays visible without crushing the main task.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Editor, browser, document, sheet.</span></div>
+              <div class="role-line"><span class="role-name">Support</span><span class="role-desc">Notes, reference, chat, calendar.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-laptop">
+              <div class="slot primary" style="--x:2;--y:3;--w:60;--h:94;--z:1"><div><strong>Primary</strong><em>Deep work</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:64;--y:3;--w:34;--h:94;--z:1"><div><strong>Support</strong><em>Reference</em></div><b class="index"><span>2</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Tall laptop / portrait-friendly</p>
+            <h3>Editor Stack</h3>
+            <div class="tags">
+              <span class="chip">2 slots</span>
+              <span class="chip">Terminal</span>
+              <span class="chip">Logs</span>
+              <span class="chip">REPL</span>
+            </div>
+            <p class="rationale">Tall displays handle vertical stacking better than narrow side-by-side compression, especially for code plus terminal output.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Editor or IDE above.</span></div>
+              <div class="role-line"><span class="role-name">Secondary</span><span class="role-desc">Terminal, tests, logs, console below.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-laptop">
+              <div class="slot primary" style="--x:2;--y:3;--w:96;--h:61;--z:1"><div><strong>Editor</strong><em>Main work</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:2;--y:67;--w:96;--h:30;--z:1"><div><strong>Terminal</strong><em>Feedback</em></div><b class="index"><span>2</span></b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>16:9 External <span class="fit-pill">Standard / Roomy</span></h2>
+        <p class="section-note">27 inch QHD and 32 inch 4K screens can support more context, but the primary pane still needs hierarchy.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Standard wide</p>
+            <h3>Desk Triad</h3>
+            <div class="tags">
+              <span class="chip">3 slots</span>
+              <span class="chip">Research</span>
+              <span class="chip">Meetings</span>
+              <span class="chip">Admin</span>
+            </div>
+            <p class="rationale">One active task plus two references is a common desk pattern: draft, source, and communication.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Draft, editor, browser, meeting content.</span></div>
+              <div class="role-line"><span class="role-name">Support</span><span class="role-desc">Source doc, notes, calendar, call/chat.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:2;--y:4;--w:61;--h:92;--z:1"><div><strong>Hero</strong><em>Main task</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:66;--y:4;--w:32;--h:44;--z:1"><div><strong>Support</strong><em>Reference</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot secondary" style="--x:66;--y:52;--w:32;--h:44;--z:1"><div><strong>Support</strong><em>Notes</em></div><b class="index"><span>3</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Standard wide / compare</p>
+            <h3>Equal Pair</h3>
+            <div class="tags">
+              <span class="chip">2 slots</span>
+              <span class="chip">Compare</span>
+              <span class="chip">Review</span>
+              <span class="chip">Pairing</span>
+            </div>
+            <p class="rationale">Use this when both windows matter equally and each still has enough width to be read or edited.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Co-primary</span><span class="role-desc">Two documents, browser/editor, sheet/sheet.</span></div>
+              <div class="role-line"><span class="role-name">No rails</span><span class="role-desc">This is intentionally not a hierarchy layout.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:2;--y:4;--w:47;--h:92;--z:1"><div><strong>Compare A</strong><em>Co-primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot primary" style="--x:51;--y:4;--w:47;--h:92;--z:1"><div><strong>Compare B</strong><em>Co-primary</em></div><b class="index"><span>2</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Standard wide / communication</p>
+            <h3>Comms Rail</h3>
+            <div class="tags">
+              <span class="chip">4 slots</span>
+              <span class="chip">Chat</span>
+              <span class="chip">Calendar</span>
+              <span class="chip">Tasks</span>
+            </div>
+            <p class="rationale">Keeps communication visible without letting it colonize the whole display.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Main task stays flexible.</span></div>
+              <div class="role-line"><span class="role-name">Rail</span><span class="role-desc">Chat, email, calendar, task list, call state.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:2;--y:4;--w:67;--h:92;--z:1"><div><strong>Primary</strong><em>Work area</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot rail" style="--x:72;--y:4;--w:26;--h:28;--z:1"><div><strong>Chat</strong><em>Rail</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot rail" style="--x:72;--y:36;--w:26;--h:28;--z:1"><div><strong>Calendar</strong><em>Rail</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot rail" style="--x:72;--y:68;--w:26;--h:28;--z:1"><div><strong>Tasks</strong><em>Rail</em></div><b class="index"><span>4</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Standard wide / creative</p>
+            <h3>Studio Canvas</h3>
+            <div class="tags">
+              <span class="chip">3 slots</span>
+              <span class="chip">Design</span>
+              <span class="chip">Media</span>
+              <span class="chip">Preview</span>
+            </div>
+            <p class="rationale">Mirrors canvas apps: central work surface with navigation, assets, inspector, or preview rails.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Canvas, editor, media timeline.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Assets, inspector, export, preview.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot rail" style="--x:2;--y:4;--w:20;--h:92;--z:1"><div><strong>Assets</strong><em>Rail</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot primary" style="--x:25;--y:4;--w:50;--h:92;--z:1"><div><strong>Canvas</strong><em>Primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot rail" style="--x:78;--y:4;--w:20;--h:92;--z:1"><div><strong>Inspect</strong><em>Rail</em></div><b class="index"><span>3</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Standard wide / monitoring</p>
+            <h3>Ops Grid</h3>
+            <div class="tags">
+              <span class="chip">4 slots</span>
+              <span class="chip">Dashboards</span>
+              <span class="chip">Logs</span>
+              <span class="chip">Queues</span>
+            </div>
+            <p class="rationale">Equal grids make sense when panes are glanceable and co-equal rather than read deeply for long stretches.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Co-equal</span><span class="role-desc">Dashboards, alerts, queues, ticket lists.</span></div>
+              <div class="role-line"><span class="role-name">No hero</span><span class="role-desc">Everything has the same importance.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot context" style="--x:2;--y:4;--w:47;--h:44;--z:1"><div><strong>Ops A</strong><em>Equal</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot context" style="--x:51;--y:4;--w:47;--h:44;--z:1"><div><strong>Ops B</strong><em>Equal</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot context" style="--x:2;--y:52;--w:47;--h:44;--z:1"><div><strong>Ops C</strong><em>Equal</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot context" style="--x:51;--y:52;--w:47;--h:44;--z:1"><div><strong>Ops D</strong><em>Equal</em></div><b class="index"><span>4</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card wide">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / advanced overlap</p>
+            <h3>6 + 2 Command Center</h3>
+            <div class="tags">
+              <span class="chip">8 slots</span>
+              <span class="chip">Foreground pair</span>
+              <span class="chip">Context grid</span>
+              <span class="chip">Overlap</span>
+            </div>
+            <p class="rationale">Six stable context windows stay parked behind two foreground work windows. This is powerful on large displays, but should remain an explicit command-center template.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Overlay</span><span class="role-desc">Two active foreground windows.</span></div>
+              <div class="role-line"><span class="role-name">Context</span><span class="role-desc">Six parked reference, chat, logs, docs, or dashboards.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide edge-fit">
+              <div class="slot context" style="--x:0;--y:0;--w:33.333;--h:50;--z:1"><div><strong>Context</strong><em>Back</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot context" style="--x:33.333;--y:0;--w:33.334;--h:50;--z:1"><div><strong>Context</strong><em>Back</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot context" style="--x:66.667;--y:0;--w:33.333;--h:50;--z:1"><div><strong>Context</strong><em>Back</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot context" style="--x:0;--y:50;--w:33.333;--h:50;--z:1"><div><strong>Context</strong><em>Back</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot context" style="--x:33.333;--y:50;--w:33.334;--h:50;--z:1"><div><strong>Context</strong><em>Back</em></div><b class="index"><span>5</span></b></div>
+              <div class="slot context" style="--x:66.667;--y:50;--w:33.333;--h:50;--z:1"><div><strong>Context</strong><em>Back</em></div><b class="index"><span>6</span></b></div>
+              <div class="slot overlay" style="--x:18.6;--y:14;--w:30.8;--h:72;--z:4"><div><strong>Foreground</strong><em>Active A</em></div><b class="index"><span>7</span></b></div>
+              <div class="slot overlay" style="--x:50.6;--y:14;--w:30.8;--h:72;--z:5"><div><strong>Foreground</strong><em>Active B</em></div><b class="index"><span>8</span></b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Large TV / 16:9 <span class="fit-pill">Huge</span></h2>
+        <p class="section-note">TV-scale 4K monitors can hold more live windows, but the best layouts still need clear foreground, context, and rails.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / flexible desk</p>
+            <h3>TV Hero + Quad Context</h3>
+            <div class="tags">
+              <span class="chip">5 slots</span>
+              <span class="chip">Research</span>
+              <span class="chip">Writing</span>
+              <span class="chip">Context grid</span>
+            </div>
+            <p class="rationale">One large working surface stays readable while four smaller panes remain visible for sources, notes, chat, and references.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Draft, editor, browser, notebook.</span></div>
+              <div class="role-line"><span class="role-name">Context</span><span class="role-desc">Sources, notes, calendar, chat.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:2;--y:4;--w:55;--h:92;--z:1"><div><strong>Hero</strong><em>Readable</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot context" style="--x:60;--y:4;--w:18;--h:44;--z:1"><div><strong>Source</strong><em>Context</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot context" style="--x:80;--y:4;--w:18;--h:44;--z:1"><div><strong>Notes</strong><em>Context</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot rail" style="--x:60;--y:52;--w:18;--h:44;--z:1"><div><strong>Chat</strong><em>Rail</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot context" style="--x:80;--y:52;--w:18;--h:44;--z:1"><div><strong>Ref</strong><em>Context</em></div><b class="index"><span>5</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / two active panes</p>
+            <h3>TV Dual Focus + Rails</h3>
+            <div class="tags">
+              <span class="chip">5 slots</span>
+              <span class="chip">Pair work</span>
+              <span class="chip">Coding</span>
+              <span class="chip">Comms</span>
+            </div>
+            <p class="rationale">Two main panes get real width, while a right rail keeps chat, tasks, and monitoring close without interrupting work.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Co-primary</span><span class="role-desc">Editor/browser, doc/sheet, terminal/editor.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Chat, tasks, logs.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:2;--y:4;--w:35;--h:92;--z:1"><div><strong>Main A</strong><em>Focus</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot primary" style="--x:39;--y:4;--w:35;--h:92;--z:1"><div><strong>Main B</strong><em>Focus</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot rail" style="--x:77;--y:4;--w:21;--h:28;--z:1"><div><strong>Chat</strong><em>Rail</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot rail" style="--x:77;--y:36;--w:21;--h:28;--z:1"><div><strong>Tasks</strong><em>Rail</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot rail" style="--x:77;--y:68;--w:21;--h:28;--z:1"><div><strong>Logs</strong><em>Rail</em></div><b class="index"><span>5</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / review wall</p>
+            <h3>TV Four-Up Workbench</h3>
+            <div class="tags">
+              <span class="chip">4 slots</span>
+              <span class="chip">Review</span>
+              <span class="chip">Compare</span>
+              <span class="chip">Large equal</span>
+            </div>
+            <p class="rationale">On a 50 inch display, a 2x2 grid can still be comfortable. Use it when all four windows matter equally.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Co-equal</span><span class="role-desc">Compare docs, dashboards, browser sessions.</span></div>
+              <div class="role-line"><span class="role-name">No rail</span><span class="role-desc">Everything is part of the active surface.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:2;--y:4;--w:47;--h:44;--z:1"><div><strong>Work A</strong><em>Equal</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot primary" style="--x:51;--y:4;--w:47;--h:44;--z:1"><div><strong>Work B</strong><em>Equal</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot primary" style="--x:2;--y:52;--w:47;--h:44;--z:1"><div><strong>Work C</strong><em>Equal</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot primary" style="--x:51;--y:52;--w:47;--h:44;--z:1"><div><strong>Work D</strong><em>Equal</em></div><b class="index"><span>4</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / dense but readable</p>
+            <h3>TV Six-Pack Review</h3>
+            <div class="tags">
+              <span class="chip">6 slots</span>
+              <span class="chip">Triage</span>
+              <span class="chip">Research</span>
+              <span class="chip">Dashboards</span>
+            </div>
+            <p class="rationale">A 3x2 grid is viable at TV scale for windows that are scanned, compared, or monitored rather than deeply edited.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Context</span><span class="role-desc">Browser tabs, dashboards, tickets, queues.</span></div>
+              <div class="role-line"><span class="role-name">Equal</span><span class="role-desc">No single primary window.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot context" style="--x:2;--y:4;--w:30;--h:44;--z:1"><div><strong>Pane 1</strong><em>Scan</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot context" style="--x:35;--y:4;--w:30;--h:44;--z:1"><div><strong>Pane 2</strong><em>Scan</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot context" style="--x:68;--y:4;--w:30;--h:44;--z:1"><div><strong>Pane 3</strong><em>Scan</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot context" style="--x:2;--y:52;--w:30;--h:44;--z:1"><div><strong>Pane 4</strong><em>Scan</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot context" style="--x:35;--y:52;--w:30;--h:44;--z:1"><div><strong>Pane 5</strong><em>Scan</em></div><b class="index"><span>5</span></b></div>
+              <div class="slot context" style="--x:68;--y:52;--w:30;--h:44;--z:1"><div><strong>Pane 6</strong><em>Scan</em></div><b class="index"><span>6</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / code wall</p>
+            <h3>TV Coding Theater</h3>
+            <div class="tags">
+              <span class="chip">6 slots</span>
+              <span class="chip">Editor</span>
+              <span class="chip">Terminals</span>
+              <span class="chip">Docs</span>
+            </div>
+            <p class="rationale">The editor remains dominant, while terminals, docs, test output, and chat stay visible without fighting for center stage.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">IDE/editor in the center.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Terminal, tests, docs, chat.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot rail" style="--x:2;--y:4;--w:19;--h:44;--z:1"><div><strong>Docs</strong><em>Rail</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot rail" style="--x:2;--y:52;--w:19;--h:44;--z:1"><div><strong>Chat</strong><em>Rail</em></div><b class="index"><span>5</span></b></div>
+              <div class="slot primary" style="--x:24;--y:4;--w:52;--h:63;--z:1"><div><strong>Editor</strong><em>Primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:24;--y:71;--w:25;--h:25;--z:1"><div><strong>Terminal</strong><em>Run</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot secondary" style="--x:51;--y:71;--w:25;--h:25;--z:1"><div><strong>Tests</strong><em>Output</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot rail" style="--x:79;--y:4;--w:19;--h:92;--z:1"><div><strong>Preview</strong><em>Rail</em></div><b class="index"><span>6</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / meeting desk</p>
+            <h3>TV Meeting War Room</h3>
+            <div class="tags">
+              <span class="chip">6 slots</span>
+              <span class="chip">Calls</span>
+              <span class="chip">Notes</span>
+              <span class="chip">Coordination</span>
+            </div>
+            <p class="rationale">Useful for meetings where the call, notes, agenda, chat, calendar, and shared doc all need to be visible.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Call or shared document.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Agenda, chat, notes, calendar.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot primary" style="--x:22;--y:4;--w:56;--h:57;--z:1"><div><strong>Call / Doc</strong><em>Primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot rail" style="--x:2;--y:4;--w:17;--h:28;--z:1"><div><strong>Agenda</strong><em>Rail</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot rail" style="--x:2;--y:36;--w:17;--h:60;--z:1"><div><strong>Notes</strong><em>Rail</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot rail" style="--x:81;--y:4;--w:17;--h:28;--z:1"><div><strong>Chat</strong><em>Rail</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot rail" style="--x:81;--y:36;--w:17;--h:28;--z:1"><div><strong>Calendar</strong><em>Rail</em></div><b class="index"><span>5</span></b></div>
+              <div class="slot secondary" style="--x:22;--y:65;--w:56;--h:31;--z:1"><div><strong>Action Items</strong><em>Secondary</em></div><b class="index"><span>6</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / live operations</p>
+            <h3>TV Ops Wall 3x3</h3>
+            <div class="tags">
+              <span class="chip">9 slots</span>
+              <span class="chip">Monitoring</span>
+              <span class="chip">Queues</span>
+              <span class="chip">Alerts</span>
+            </div>
+            <p class="rationale">A 3x3 wall is too dense for normal work, but a 50 inch TV can make it useful for glanceable status and operations.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Context</span><span class="role-desc">Dashboards, alerts, tickets, queues.</span></div>
+              <div class="role-line"><span class="role-name">Equal</span><span class="role-desc">Monitoring only, not deep editing.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot context" style="--x:2;--y:4;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>1</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot context" style="--x:35;--y:4;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>2</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot context" style="--x:68;--y:4;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>3</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot context" style="--x:2;--y:36;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>4</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot context" style="--x:35;--y:36;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>5</em></div><b class="index"><span>5</span></b></div>
+              <div class="slot context" style="--x:68;--y:36;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>6</em></div><b class="index"><span>6</span></b></div>
+              <div class="slot context" style="--x:2;--y:68;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>7</em></div><b class="index"><span>7</span></b></div>
+              <div class="slot context" style="--x:35;--y:68;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>8</em></div><b class="index"><span>8</span></b></div>
+              <div class="slot context" style="--x:68;--y:68;--w:30;--h:28;--z:1"><div><strong>Ops</strong><em>9</em></div><b class="index"><span>9</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card wide">
+          <div class="meta">
+            <p class="eyebrow">Large 16:9 / layered command desk</p>
+            <h3>TV Center Stage + Scratchpad</h3>
+            <div class="tags">
+              <span class="chip">7 slots</span>
+              <span class="chip">Foreground</span>
+              <span class="chip">Rails</span>
+              <span class="chip">Scratchpad</span>
+            </div>
+            <p class="rationale">A central active window gets priority, side rails stay visible, and one small overlay can be brought forward temporarily.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Main task in the center.</span></div>
+              <div class="role-line"><span class="role-name">Overlay</span><span class="role-desc">Temporary tool, note, timer, mini control.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Comms, logs, references, dashboards.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-wide">
+              <div class="slot rail" style="--x:2;--y:4;--w:18;--h:28;--z:1"><div><strong>Chat</strong><em>Rail</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot rail" style="--x:2;--y:36;--w:18;--h:28;--z:1"><div><strong>Logs</strong><em>Rail</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot rail" style="--x:2;--y:68;--w:18;--h:28;--z:1"><div><strong>Tasks</strong><em>Rail</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot primary" style="--x:23;--y:8;--w:54;--h:84;--z:2"><div><strong>Center Stage</strong><em>Primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot context" style="--x:80;--y:4;--w:18;--h:28;--z:1"><div><strong>Ref</strong><em>Context</em></div><b class="index"><span>5</span></b></div>
+              <div class="slot context" style="--x:80;--y:36;--w:18;--h:28;--z:1"><div><strong>Dash</strong><em>Context</em></div><b class="index"><span>6</span></b></div>
+              <div class="slot overlay" style="--x:62;--y:62;--w:25;--h:28;--z:5"><div><strong>Scratch</strong><em>Overlay</em></div><b class="index"><span>7</span></b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>21:9 Ultrawide <span class="fit-pill">Wide</span></h2>
+        <p class="section-note">Ultrawide defaults should avoid many skinny columns. Keep one or two real work areas plus nearby context.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">34-40 inch ultrawide</p>
+            <h3>Ultrawide Hero</h3>
+            <div class="tags">
+              <span class="chip">3 slots</span>
+              <span class="chip">Research</span>
+              <span class="chip">Coding</span>
+              <span class="chip">Command center</span>
+            </div>
+            <p class="rationale">Most ultrawide users get more value from a strong center and close support wings than from narrow tiled strips.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Center hero for the current task.</span></div>
+              <div class="role-line"><span class="role-name">Wings</span><span class="role-desc">Docs, logs, browser, chat, reference.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-ultra">
+              <div class="slot secondary" style="--x:2;--y:6;--w:23;--h:88;--z:1"><div><strong>Wing</strong><em>Support</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot primary" style="--x:27;--y:6;--w:46;--h:88;--z:1"><div><strong>Hero</strong><em>Center</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:75;--y:6;--w:23;--h:88;--z:1"><div><strong>Wing</strong><em>Support</em></div><b class="index"><span>3</span></b></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">34-40 inch ultrawide</p>
+            <h3>Ultrawide Dual Workbench</h3>
+            <div class="tags">
+              <span class="chip">3 slots</span>
+              <span class="chip">Two mains</span>
+              <span class="chip">Review</span>
+              <span class="chip">Data</span>
+            </div>
+            <p class="rationale">Best when two real apps deserve equal attention but a rail still needs to stay available.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Co-primary</span><span class="role-desc">Two wide workbench panes.</span></div>
+              <div class="role-line"><span class="role-name">Rail</span><span class="role-desc">Terminal, chat, reference, queue.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-ultra">
+              <div class="slot rail" style="--x:2;--y:6;--w:18;--h:88;--z:1"><div><strong>Rail</strong><em>Context</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot primary" style="--x:22;--y:6;--w:37;--h:88;--z:1"><div><strong>Main A</strong><em>Co-primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot primary" style="--x:61;--y:6;--w:37;--h:88;--z:1"><div><strong>Main B</strong><em>Co-primary</em></div><b class="index"><span>2</span></b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>32:9 Superwide <span class="fit-pill">Massive Wide</span></h2>
+        <p class="section-note">Superwide behaves more like multiple work zones than one giant single-task display.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card wide">
+          <div class="meta">
+            <p class="eyebrow">49 inch super-ultrawide</p>
+            <h3>Superwide Command Center</h3>
+            <div class="tags">
+              <span class="chip">5 slots</span>
+              <span class="chip">Center primary</span>
+              <span class="chip">Outer rails</span>
+              <span class="chip">Monitoring</span>
+            </div>
+            <p class="rationale">A 32:9 screen works best when the center stays meaningful and the far edges become peripheral awareness zones.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Main task in the visual center.</span></div>
+              <div class="role-line"><span class="role-name">Wings</span><span class="role-desc">Docs, references, secondary work.</span></div>
+              <div class="role-line"><span class="role-name">Rails</span><span class="role-desc">Comms, alerts, timers, utilities.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-super">
+              <div class="slot rail" style="--x:1;--y:7;--w:14;--h:86;--z:1"><div><strong>Outer</strong><em>Rail</em></div><b class="index"><span>4</span></b></div>
+              <div class="slot secondary" style="--x:17;--y:7;--w:22;--h:86;--z:1"><div><strong>Wing</strong><em>Support</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot primary" style="--x:41;--y:7;--w:18;--h:86;--z:1"><div><strong>Center</strong><em>Primary</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:61;--y:7;--w:22;--h:86;--z:1"><div><strong>Wing</strong><em>Support</em></div><b class="index"><span>3</span></b></div>
+              <div class="slot rail" style="--x:85;--y:7;--w:14;--h:86;--z:1"><div><strong>Outer</strong><em>Rail</em></div><b class="index"><span>5</span></b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Portrait <span class="fit-pill">Tall</span></h2>
+        <p class="section-note">Portrait displays are legitimate work surfaces for long documents, logs, lists, and communication.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card">
+          <div class="meta">
+            <p class="eyebrow">Rotated display / vertical side screen</p>
+            <h3>Portrait Stack</h3>
+            <div class="tags">
+              <span class="chip">3 slots</span>
+              <span class="chip">Reading</span>
+              <span class="chip">Logs</span>
+              <span class="chip">Chat</span>
+            </div>
+            <p class="rationale">Vertical continuity matters more than width here. Good for documents, log tails, message streams, and note lists.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Primary</span><span class="role-desc">Long doc, browser, source, log.</span></div>
+              <div class="role-line"><span class="role-name">Support</span><span class="role-desc">Notes, references, inbox, chat.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="screen aspect-portrait">
+              <div class="slot primary" style="--x:5;--y:3;--w:90;--h:49;--z:1"><div><strong>Primary</strong><em>Long form</em></div><b class="index"><span>1</span></b></div>
+              <div class="slot secondary" style="--x:5;--y:55;--w:90;--h:24;--z:1"><div><strong>Support</strong><em>Reference</em></div><b class="index"><span>2</span></b></div>
+              <div class="slot rail" style="--x:5;--y:82;--w:90;--h:15;--z:1"><div><strong>Rail</strong><em>Comms</em></div><b class="index"><span>3</span></b></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Dual Display <span class="fit-pill">Paired</span></h2>
+        <p class="section-note">Dual-display defaults should use each monitor as a meaningful partition: focus here, context there.</p>
+      </div>
+      <div class="cards">
+        <article class="template-card wide">
+          <div class="meta">
+            <p class="eyebrow">Laptop + external / two monitors</p>
+            <h3>Dual Display Focus + Periphery</h3>
+            <div class="tags">
+              <span class="chip">4-5 slots</span>
+              <span class="chip">Per-monitor</span>
+              <span class="chip">Comms</span>
+              <span class="chip">Research</span>
+            </div>
+            <p class="rationale">Matches how people actually use two displays: the centered main display holds the task, the side display carries context and awareness.</p>
+            <div class="roles">
+              <div class="role-line"><span class="role-name">Main</span><span class="role-desc">One or two focus slots.</span></div>
+              <div class="role-line"><span class="role-name">Secondary</span><span class="role-desc">Two or three peripheral/context slots.</span></div>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="dual-screen">
+              <div class="screen aspect-wide">
+                <div class="slot primary" style="--x:2;--y:5;--w:62;--h:90;--z:1"><div><strong>Main</strong><em>Focus</em></div><b class="index"><span>1</span></b></div>
+                <div class="slot secondary" style="--x:67;--y:5;--w:31;--h:90;--z:1"><div><strong>Companion</strong><em>Reference</em></div><b class="index"><span>2</span></b></div>
+              </div>
+              <div class="screen aspect-laptop">
+                <div class="slot rail" style="--x:4;--y:4;--w:92;--h:28;--z:1"><div><strong>Chat</strong><em>Periphery</em></div><b class="index"><span>3</span></b></div>
+                <div class="slot rail" style="--x:4;--y:36;--w:92;--h:28;--z:1"><div><strong>Calendar</strong><em>Periphery</em></div><b class="index"><span>4</span></b></div>
+                <div class="slot context" style="--x:4;--y:68;--w:92;--h:28;--z:1"><div><strong>Monitor</strong><em>Context</em></div><b class="index"><span>5</span></b></div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="summary-grid">
+        <div class="summary-box"><strong>Default bias</strong>Hero plus support beats maximum density for most knowledge work.</div>
+        <div class="summary-box"><strong>Grid exception</strong>Use equal grids for compare, review, ops, and monitoring.</div>
+        <div class="summary-box"><strong>Constraints</strong>Constrain rails first. Keep primary slots flexible.</div>
+        <div class="summary-box"><strong>Keyboard path</strong>Stable slot identity matters more than shortcut count.</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
