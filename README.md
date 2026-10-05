@@ -6,6 +6,8 @@
 
 TilePilot is a native macOS productivity tool inspired by i3.
 
+**Website:** [autonomath.github.io/TilePilot](https://autonomath.github.io/TilePilot/) · **Download:** [latest release](https://github.com/autonomath/TilePilot/releases/latest)
+
 It helps regular Mac users move toward a predictable, keyboard-driven window workflow without starting from a terminal-first setup. Under the hood it uses `yabai` and `skhd`, but the product goal is broader than “make the helpers run”: TilePilot is meant to make an i3-style way of working feel learnable on macOS.
 
 ## What That Means
@@ -97,12 +99,6 @@ If you want to use TilePilot the way it is intended, the path looks like this:
 ### Actions & Shortcuts
 
 ![Actions & Shortcuts](assets/screenshots/actions-shortcuts.png)
-
-### Pick Windows to Tile
-
-<p align="center">
-  <img src="assets/screenshots/pick-windows-to-tile.png" alt="Pick Windows to Tile" width="58%">
-</p>
 
 ### Behaviors and How It Works
 
