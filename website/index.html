@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TilePilot — Tiling windows for macOS, with a GUI that teaches the keys</title>
+  <meta name="description" content="TilePilot is a free Mac app that makes yabai and skhd tiling approachable. Tile or float windows, apply exact layout templates, save Work Sets, and learn keyboard shortcuts from a native interface.">
+  <meta name="theme-color" content="#0a111d">
+  <link rel="canonical" href="https://autonomath.github.io/TilePilot/">
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/icon-64.png">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="preload" href="assets/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="TilePilot">
+  <meta property="og:title" content="TilePilot — Tile your Mac like i3. Learn it like a Mac app.">
+  <meta property="og:description" content="A free macOS app for tiling, floating layouts, templates, Work Sets, and learnable keyboard shortcuts, built on yabai and skhd.">
+  <meta property="og:url" content="https://autonomath.github.io/TilePilot/">
+  <meta property="og:image" content="https://autonomath.github.io/TilePilot/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "TilePilot",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "macOS 13 or later on Apple silicon",
+    "description": "A native macOS app that makes yabai and skhd window tiling approachable, with floating layout templates, Work Sets, and a shortcut learning surface.",
+    "softwareVersion": "0.4.16",
+    "downloadUrl": "https://github.com/autonomath/TilePilot/releases/download/v0.4.16/TilePilot-v0.4.16.dmg",
+    "url": "https://autonomath.github.io/TilePilot/",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "publisher": { "@type": "Organization", "name": "Autonomath", "url": "https://autonomath.github.io/" }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="./" aria-label="TilePilot home">
+        <img src="assets/icon-64.png" width="32" height="32" alt="">
+        <span>TilePilot</span>
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#keys">Shortcuts</a>
+        <a href="#trust">Your setup</a>
+        <a href="#install">Install</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="btn btn-small" data-release="dmg" href="https://github.com/autonomath/TilePilot/releases/download/v0.4.16/TilePilot-v0.4.16.dmg">Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="shell">
+        <div class="hero-copy">
+          <p class="eyebrow">Free · macOS 13 or later · Apple silicon</p>
+          <h1>Tile your Mac like i3.<br><em>Learn it like a Mac app.</em></h1>
+          <p class="lede">TilePilot is a native app built on yabai and skhd. Tile, float, and arrange windows from a clear interface while you learn the shortcuts. Once the keys become habit, you can leave the mouse alone.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" data-release="dmg" href="https://github.com/autonomath/TilePilot/releases/download/v0.4.16/TilePilot-v0.4.16.dmg">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v11m0 0-4.5-4.5M10 13l4.5-4.5M3 17h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Download for Mac
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/autonomath/TilePilot">Source on GitHub</a>
+          </div>
+          <p class="fine"><span data-release="version">v0.4.16</span> · <span data-release="size">4.8 MB</span> disk image · signed with Developer ID and notarized by Apple</p>
+        </div>
+
+        <figure class="demo" id="demo" aria-labelledby="demo-caption">
+          <div class="demo-screen">
+            <div class="menubar" aria-hidden="true">
+              <span class="menubar-left"><b>Desktop 1</b><span class="state-pill" id="demo-pill">Tiling Off</span></span>
+              <span class="menubar-right"><img src="assets/icon-64.png" width="14" height="14" alt=""></span>
+            </div>
+            <div class="stage" id="stage" data-layout="float" aria-hidden="true">
+              <div class="slot" style="--x:22;--y:2.5;--w:56;--h:95"></div>
+              <div class="slot" style="--x:1.5;--y:2.5;--w:19;--h:46.5"></div>
+              <div class="slot" style="--x:1.5;--y:51;--w:19;--h:46.5"></div>
+              <div class="slot" style="--x:79.5;--y:2.5;--w:19;--h:46.5"></div>
+              <div class="slot" style="--x:79.5;--y:51;--w:19;--h:46.5"></div>
+
+              <div class="win win-editor" data-win="editor">
+                <div class="win-bar"><i></i><i></i><i></i><span>Editor</span></div>
+                <div class="win-body"><p class="code"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></p></div>
+              </div>
+              <div class="win win-browser" data-win="browser">
+                <div class="win-bar"><i></i><i></i><i></i><span>Browser</span></div>
+                <div class="win-body"><div class="page-hero"></div><div class="page-cols"><span></span><span></span><span></span></div></div>
+              </div>
+              <div class="win win-terminal" data-win="terminal">
+                <div class="win-bar"><i></i><i></i><i></i><span>Terminal</span></div>
+                <div class="win-body"><p class="term"><span>$ make test</span><span>ok 42 passed</span><span>$ _</span></p></div>
+              </div>
+              <div class="win win-notes" data-win="notes">
+                <div class="win-bar"><i></i><i></i><i></i><span>Notes</span></div>
+                <div class="win-body"><p class="lines"><span></span><span></span><span></span><span></span></p></div>
+              </div>
+              <div class="win win-calc" data-win="calc">
+                <div class="win-bar"><i></i><i></i><i></i><span>Calculator</span></div>
+                <div class="win-body"><div class="keys-grid"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+                <span class="win-tag">Never Auto-Tile</span>
+              </div>
+            </div>
+          </div>
+          <div class="demo-actions" role="group" aria-label="Try a layout action">
+            <button type="button" data-layout="float" aria-pressed="true">
+              <span class="act">Float All Windows on This Desktop</span>
+              <kbd>⌃⌥⇧D</kbd>
+            </button>
+            <button type="button" data-layout="tile" aria-pressed="false">
+              <span class="act">Tile All Windows on This Desktop</span>
+              <kbd>⌃⌥⇧E</kbd>
+            </button>
+            <button type="button" data-layout="grid" aria-pressed="false">
+              <span class="act">Arrange Windows into a Floating Grid</span>
+              <kbd>⌃⌥⇧P</kbd>
+            </button>
+            <button type="button" data-layout="template" aria-pressed="false">
+              <span class="act">Apply a Template</span>
+              <kbd class="kbd-soft">Templates</kbd>
+            </button>
+          </div>
+          <figcaption id="demo-caption"><span id="demo-status">Five floating windows, stacked wherever they were last dropped.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="states" aria-labelledby="states-title">
+      <div class="shell">
+        <h2 id="states-title" class="section-title">Every window is tiled or floating.<br>TilePilot always tells you which.</h2>
+        <div class="state-cards">
+          <article class="state-card is-tiled">
+            <div class="swatch" aria-hidden="true"><span></span><span></span><span></span></div>
+            <h3>Tiled</h3>
+            <p>yabai places the window in the desktop's layout. Tiled windows share the screen without overlapping, and the layout rebalances as windows open and close.</p>
+          </article>
+          <article class="state-card is-floating">
+            <div class="swatch" aria-hidden="true"><span></span><span></span><span></span></div>
+            <h3>Floating</h3>
+            <p>You decide where the window goes, or a Template or Work Set does. Floating windows keep their exact size and can overlap.</p>
+          </article>
+          <article class="state-card is-exception">
+            <div class="swatch" aria-hidden="true"><span></span><span></span><span></span></div>
+            <h3>Never Auto-Tile</h3>
+            <p>Some apps don't tile well. Mark them once and they stay floating, even when you tile everything else on the desktop.</p>
+          </article>
+        </div>
+        <p class="states-note">Each desktop has its own tiling switch, and optional badges and outlines show each window's state right on screen.</p>
+      </div>
+    </section>
+
+    <section id="features" class="features" aria-labelledby="features-title">
+      <div class="shell">
+        <p class="eyebrow">A tour of the app</p>
+        <h2 id="features-title" class="section-title">Everything your windows are doing, in one place.</h2>
+
+        <article class="feature">
+          <div class="feature-text">
+            <p class="tab-label">Overview</p>
+            <h3>See every desktop at once.</h3>
+            <p>A live mini-map shows each display and desktop, with every window drawn in its tiled or floating color. Jump to a desktop or flip its tiling switch from the same screen.</p>
+            <ul>
+              <li>Focused and visible desktops are labeled at a glance.</li>
+              <li>MegaMap opens a larger view built from real desktop screenshots.</li>
+              <li>Those screenshots stay in memory and are never written to disk.</li>
+            </ul>
+          </div>
+          <figure class="shot"><a href="assets/shots/overview.webp"><img src="assets/shots/overview.webp" width="1120" height="726" loading="lazy" decoding="async" alt="TilePilot Overview tab showing a desktop mini-map for two displays, with per-desktop tiling switches and Jump buttons."></a></figure>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-text">
+            <p class="tab-label">Pick Windows to Tile</p>
+            <h3>Tile just the windows you're working with.</h3>
+            <p>When the whole desktop is too much, open the picker. It lists this desktop's windows in front-to-back order and preselects your usual count, so the last few windows you used are ready to go.</p>
+            <ul>
+              <li>Click rows to include or skip windows, and drag to set their order.</li>
+              <li>Preview the final placement with numbered spots before anything moves.</li>
+              <li>Place them in a floating grid that fills spare cells, or in a saved Template.</li>
+            </ul>
+          </div>
+          <figure class="shot shot-mock" aria-label="Illustration of the Pick Windows to Tile picker">
+            <div class="picker" aria-hidden="true">
+              <p class="picker-title">Pick Windows to Tile</p>
+              <p class="picker-sub">Click to select. Drag rows to change placement order.</p>
+              <div class="picker-seg"><span class="on">Floating Grid</span><span>Template</span></div>
+              <div class="picker-preview">
+                <span class="p1"><b>1</b></span><span class="p2"><b>2</b></span><span class="p3"><b>3</b></span><span class="p4"><b>4</b></span><span class="p5"><b>5</b></span>
+              </div>
+              <ol class="picker-rows">
+                <li class="sel"><b>1</b><span>Editor<small>roadmap.md</small></span><em>Floating</em></li>
+                <li class="sel"><b>2</b><span>Browser<small>Docs · Getting started</small></span><em>Floating</em></li>
+                <li class="sel"><b>3</b><span>Terminal<small>make test</small></span><em>Floating</em></li>
+                <li class="sel"><b>4</b><span>Notes<small>Weekly plan</small></span><em>Floating</em></li>
+                <li class="sel"><b>5</b><span>Music</span><em>Floating</em></li>
+                <li><b>6</b><span>Calculator</span><em>Floating</em></li>
+              </ol>
+              <div class="picker-foot"><span>5 selected</span><span class="ghost">Cancel</span><span class="go">Tile Selected Windows</span></div>
+            </div>
+            <figcaption>Illustration of the picker's layout.</figcaption>
+          </figure>
+        </article>
+
+        <article class="feature">
+          <div class="feature-text">
+            <p class="tab-label">Templates</p>
+            <h3>Exact layouts for each screen shape.</h3>
+            <p>Templates are floating layouts you design once per display. Draw slots, split and duplicate them, or import the layout you already have on screen, then apply it to any desktop.</p>
+            <ul>
+              <li>Limit a slot to specific apps, so your browser always lands in the same place.</li>
+              <li>A starter library covers laptop, wide, ultrawide, superwide, portrait, and dual-display setups.</li>
+              <li>Templates adapt when a display's shape changes slightly.</li>
+            </ul>
+          </div>
+          <figure class="shot"><a href="assets/shots/templates.webp"><img src="assets/shots/templates.webp" width="1120" height="620" loading="lazy" decoding="async" alt="TilePilot Templates tab with a nine-slot template canvas, app icons assigned to slots, and an Apply Template button."></a></figure>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-text">
+            <p class="tab-label">Work Sets</p>
+            <h3>Bring a whole task back to the front.</h3>
+            <p>A Work Set remembers the exact windows for one job on one desktop, in front-to-back order. Activate it and the whole pile comes forward together.</p>
+            <ul>
+              <li>Restores minimized members and can launch apps that aren't open.</li>
+              <li>Lays the set out floating, tiled, or by Template.</li>
+              <li>Add an optional colored backdrop behind the set to block out the rest.</li>
+            </ul>
+          </div>
+          <figure class="shot"><a href="assets/shots/work-sets.webp"><img src="assets/shots/work-sets.webp" width="1120" height="505" loading="lazy" decoding="async" alt="TilePilot Work Sets tab with two saved sets, each with an Activate button, layout mode, backdrop color, and a preview of its windows."></a></figure>
+        </article>
+
+        <article class="feature">
+          <div class="feature-text">
+            <p class="tab-label">Actions &amp; Shortcuts</p>
+            <h3>Click it today. Press it tomorrow.</h3>
+            <p>Every action is named for where your windows end up, such as "Tile All Windows on This Desktop." Run it from the app, see its shortcut next to it, and record your own when the default doesn't suit you.</p>
+            <ul>
+              <li>Search every control and shortcut in one list.</li>
+              <li>Pin favorites to the menu bar icon's right-click menu.</li>
+              <li>Test a shortcut before you rely on it.</li>
+            </ul>
+          </div>
+          <figure class="shot"><a href="assets/shots/actions.webp"><img src="assets/shots/actions.webp" width="1120" height="752" loading="lazy" decoding="async" alt="TilePilot Actions and Shortcuts tab listing pinned right-click menu actions with their keyboard shortcuts."></a></figure>
+        </article>
+
+        <article class="feature flip">
+          <div class="feature-text">
+            <p class="tab-label">Behaviors</p>
+            <h3>Set the rules once.</h3>
+            <p>Choose which desktops tile, which apps never auto-tile or stay on top, and how focus and the pointer behave. Mouse modifiers let you move, resize, or swap windows by dragging.</p>
+            <ul>
+              <li>Desktop Scrub: hold a few keys and move the mouse to slide between desktops.</li>
+              <li>Hover focus and cursor-follows-focus, each one switch away.</li>
+              <li>Desktop rules run first, then app rules, so results are predictable.</li>
+            </ul>
+          </div>
+          <figure class="shot"><a href="assets/shots/behaviors.webp"><img src="assets/shots/behaviors.webp" width="1120" height="752" loading="lazy" decoding="async" alt="TilePilot Behaviors tab showing Desktop Scrub trigger keys, mouse drag settings, and per-desktop auto-tiling switches."></a></figure>
+        </article>
+
+        <div class="gallery">
+          <figure>
+            <a href="assets/shots/how-it-works.webp"><img src="assets/shots/how-it-works.webp" width="1120" height="752" loading="lazy" decoding="async" alt="How It Works tab with diagrams of tiled versus floating desktops and app rules."></a>
+            <figcaption><b>How It Works.</b> Diagrams explain tiling, app rules, and focus, so the settings tabs stay short.</figcaption>
+          </figure>
+          <figure>
+            <a href="assets/shots/system.webp"><img src="assets/shots/system.webp" width="1120" height="752" loading="lazy" decoding="async" alt="System tab showing a Ready status, app update check, performance preset, and helper health checks."></a>
+            <figcaption><b>System.</b> Health checks for helpers, permissions, and services, with Guided Setup one click away.</figcaption>
+          </figure>
+          <figure>
+            <a href="assets/shots/appearance.webp"><img src="assets/shots/appearance.webp" width="1120" height="440" loading="lazy" decoding="async" alt="Appearance tab with window badge and outline overlay options, tiled and floating colors, and tiling gap settings."></a>
+            <figcaption><b>Appearance.</b> Badges, outline colors, screen padding, and the gap between tiled windows.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="keys" class="keys" aria-labelledby="keys-title">
+      <div class="shell keys-inner">
+        <div class="keys-copy">
+          <p class="eyebrow">Default shortcuts</p>
+          <h2 id="keys-title" class="section-title">The keys you'll learn first.</h2>
+          <p>New installs start with a small, consistent set. I, J, K, and L work like arrow keys, and the modifier decides what happens.</p>
+          <div class="cluster" aria-hidden="true">
+            <span class="cap cap-i">I<small>up</small></span>
+            <span class="cap cap-j">J<small>left</small></span>
+            <span class="cap cap-k">K<small>down</small></span>
+            <span class="cap cap-l">L<small>right</small></span>
+          </div>
+          <p class="keys-foot">Change any shortcut or record your own in Actions &amp; Shortcuts.</p>
+        </div>
+        <dl class="key-table">
+          <div><dt><kbd>⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Focus the window above, left, below, or right</dd></div>
+          <div><dt><kbd>⇧⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Move the focused window in that direction</dd></div>
+          <div><dt><kbd>⌃⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Grow the window toward that side</dd></div>
+          <div><dt><kbd>⌃⌥⇧E</kbd></dt><dd>Tile all windows on this desktop</dd></div>
+          <div><dt><kbd>⌃⌥⇧D</kbd></dt><dd>Float all windows on this desktop</dd></div>
+          <div><dt><kbd>⌃⌥⇧P</kbd></dt><dd>Arrange windows into a floating grid</dd></div>
+          <div><dt><kbd>⌃⌥⇧O</kbd></dt><dd>Retile into a balanced tiled layout</dd></div>
+          <div><dt><kbd>⌥0</kbd></dt><dd>Rebalance tiled window sizes</dd></div>
+          <div><dt><kbd>⇧⌥R</kbd></dt><dd>Rotate the tiled layout 90°</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="trust" class="trust" aria-labelledby="trust-title">
+      <div class="shell trust-inner">
+        <div class="trust-copy">
+          <p class="eyebrow">Your setup stays yours</p>
+          <h2 id="trust-title" class="section-title">Careful with your config, your permissions, and your screen.</h2>
+          <figure class="config">
+            <figcaption>skhdrc</figcaption>
+<pre><code><span class="c"># your own lines stay exactly as you wrote them</span>
+cmd - return : open -na Terminal
+
+<span class="m"># &gt;&gt;&gt; TILEPILOT MANAGED BEGIN</span>
+<span class="c"># Managed by TilePilot. Unknown lines outside this block are preserved.</span>
+alt - j : yabai -m window --focus west
+alt - l : yabai -m window --focus east
+<span class="m"># &lt;&lt;&lt; TILEPILOT MANAGED END</span></code></pre>
+          </figure>
+        </div>
+        <ul class="trust-list">
+          <li><h3>Edits only its own block</h3><p>TilePilot changes yabairc and skhdrc only between its markers. The Config Files tab keeps backups you can restore.</p></li>
+          <li><h3>Asks before it starts anything</h3><p>The window-control helpers start when you choose to start them. That is the moment macOS asks for Accessibility approval.</p></li>
+          <li><h3>No SIP changes</h3><p>TilePilot works without turning off System Integrity Protection or loading yabai's scripting addition.</p></li>
+          <li><h3>Screenshots stay in memory</h3><p>MegaMap's desktop screenshots live only for the current session. Screen Recording is needed only if you want them.</p></li>
+          <li><h3>Updates you can see</h3><p>At most twice a day it checks GitHub Releases for a newer version and links you to the release page. It never downloads or installs on its own.</p></li>
+          <li><h3>Helpers included</h3><p>Ships pinned builds of yabai 7.1.17 and skhd 0.3.9 and installs them for you. Nothing to set up from the command line.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="install" class="install" aria-labelledby="install-title">
+      <div class="shell install-inner">
+        <div>
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title" class="section-title">Up and tiling in a few minutes.</h2>
+          <ol class="steps">
+            <li><b>Download the disk image</b> and drag TilePilot into Applications.</li>
+            <li><b>Open TilePilot.</b> Guided Setup checks the helpers, permissions, and macOS settings it depends on.</li>
+            <li><b>Start window control</b> when you're ready, and approve yabai and skhd when macOS asks for Accessibility access.</li>
+            <li><b>Press <kbd>⌃⌥⇧E</kbd></b> on a messy desktop and watch it tile.</li>
+          </ol>
+          <div class="cta-row">
+            <a class="btn btn-primary" data-release="dmg" href="https://github.com/autonomath/TilePilot/releases/download/v0.4.16/TilePilot-v0.4.16.dmg">Download <span data-release="version">v0.4.16</span></a>
+            <a class="btn btn-ghost" href="https://github.com/autonomath/TilePilot/releases">All releases and checksums</a>
+          </div>
+        </div>
+        <aside class="install-side">
+          <div class="panel">
+            <h3>Two Mission Control settings</h3>
+            <p>For the most predictable desktops, set these in System Settings → Desktop &amp; Dock → Mission Control.</p>
+            <dl class="settings">
+              <div><dt>Automatically rearrange Spaces based on most recent use</dt><dd class="off">Off</dd></div>
+              <div><dt>Displays have separate Spaces</dt><dd class="on">On</dd></div>
+            </dl>
+          </div>
+          <div class="panel">
+            <h3>Requirements</h3>
+            <ul class="req">
+              <li>macOS 13 Ventura or later</li>
+              <li>A Mac with Apple silicon</li>
+              <li>Optional: Screen Recording for MegaMap screenshots</li>
+              <li>Optional: Start at Login</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="faq" class="faq" aria-labelledby="faq-title">
+      <div class="shell faq-inner">
+        <h2 id="faq-title" class="section-title">Questions</h2>
+        <div class="faq-list">
+          <details>
+            <summary>Do I need to know yabai or skhd first?</summary>
+            <p>No. TilePilot installs and runs both for you, and every action has a button and a plain name. The config files are there when you want them, but you never have to open a terminal.</p>
+          </details>
+          <details>
+            <summary>Do I have to disable System Integrity Protection?</summary>
+            <p>No. TilePilot sticks to features that work with SIP on. Workflows that need yabai's scripting addition are out of scope for now.</p>
+          </details>
+          <details>
+            <summary>I already run yabai and skhd from Homebrew. What happens?</summary>
+            <p>TilePilot detects them and can work with them. If you switch to its bundled helpers, it stops the Homebrew services first. Your Homebrew packages stay installed.</p>
+          </details>
+          <details>
+            <summary>Will it overwrite my yabairc or skhdrc?</summary>
+            <p>No. It edits only the block between its own markers and keeps backups you can restore from the Config Files tab.</p>
+          </details>
+          <details>
+            <summary>Which permissions does it need?</summary>
+            <p>yabai and skhd need Accessibility, which macOS requests when you start window control. Screen Recording is only for MegaMap's real screenshots. Start at Login is optional.</p>
+          </details>
+          <details>
+            <summary>Is this an i3 clone?</summary>
+            <p>No. It borrows i3's habits: stable desktops, a few repeatable actions, tiling as the normal state, and floating as a deliberate exception. Everything else is a native Mac app with setup, visibility, and recovery built in.</p>
+          </details>
+          <details>
+            <summary>Does it run on Intel Macs?</summary>
+            <p>The current release is built for Apple silicon only.</p>
+          </details>
+          <details>
+            <summary>What does it cost?</summary>
+            <p>Nothing. Download it from GitHub Releases.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div class="footer-brand">
+        <img src="assets/icon-64.png" width="28" height="28" alt="">
+        <p><b>TilePilot</b> is made by <a href="https://autonomath.github.io/">Autonomath</a>.</p>
+      </div>
+      <p class="credits">Window control by <a href="https://github.com/koekeishiya/yabai">yabai</a> and hotkeys by <a href="https://github.com/koekeishiya/skhd">skhd</a>, both created by koekeishiya and released under the MIT license.</p>
+      <nav class="footer-links" aria-label="Project links">
+        <a href="https://github.com/autonomath/TilePilot">Source</a>
+        <a href="https://github.com/autonomath/TilePilot/releases">Releases</a>
+        <a href="https://github.com/autonomath/TilePilot/issues">Report an issue</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>

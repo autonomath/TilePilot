@@ -9,3 +9,4 @@ DerivedData/
 
 .venv-icon/
 /dist
+/website/_site/
