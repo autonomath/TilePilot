@@ -49,6 +49,7 @@
         <span>TilePilot</span>
       </a>
       <nav class="nav" aria-label="Primary">
+        <a href="#work-area">Work Area</a>
         <a href="#features">Features</a>
         <a href="#keys">Shortcuts</a>
         <a href="#trust">Your setup</a>
@@ -63,6 +64,7 @@
     <section class="hero">
       <div class="shell">
         <div class="hero-copy">
+          <a class="announce" href="#work-area"><span class="new-tag">New</span>A Work Area for big screens, with the menu bar right above your windows<span class="soon" data-until="v0.4.17">Next release</span></a>
           <p class="eyebrow">Free · macOS 13 or later · Apple silicon</p>
           <h1>Tile your Mac like i3.<br><em>Learn it like a Mac app.</em></h1>
           <p class="lede">TilePilot is a native app built on yabai and skhd. Tile, float, and arrange windows from a clear interface while you learn the shortcuts. Once the keys become habit, you can leave the mouse alone.</p>
@@ -156,6 +158,68 @@
           </article>
         </div>
         <p class="states-note">Each desktop has its own tiling switch, and optional badges and outlines show each window's state right on screen.</p>
+      </div>
+    </section>
+
+    <section id="work-area" class="workarea" aria-labelledby="workarea-title">
+      <div class="shell">
+        <div class="wa-head">
+          <p class="eyebrow"><span class="new-tag">New</span>Work Area and menu bar<span class="soon" data-until="v0.4.17">Coming in the next release</span></p>
+          <h2 id="workarea-title" class="section-title">A giant display that feels like a normal one.</h2>
+          <p class="lede">On a TV or a very wide screen, the corners are far away and the menu bar hugs the top edge. Draw a Work Area and TilePilot keeps every window inside it. Turn on its menu bar and the app menus and menu bar icons sit right above your windows.</p>
+        </div>
+
+        <figure class="wa-demo" id="wa-demo" aria-labelledby="wa-caption">
+          <div class="tv">
+            <div class="tv-screen" id="wa-screen" data-step="whole" aria-hidden="true">
+              <div class="real-bar"><span class="bar-items"><i class="bar-glyph"></i><b>Editor</b><span>File</span><span>Edit</span><span class="bar-more">View</span><span class="bar-more">Window</span><span class="bar-more">Help</span></span><span class="bar-icons"><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M1.5 4.2a9.4 9.4 0 0 1 13 0M3.9 6.6a6 6 0 0 1 8.2 0M6.3 9a2.6 2.6 0 0 1 3.4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><svg viewBox="0 0 22 11" aria-hidden="true"><rect x="0.75" y="0.75" width="18" height="9.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.6" y="2.6" width="11" height="5.8" rx="1.2" fill="currentColor"/><path d="M20.4 3.8v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="bar-clock">Wed 9:41</span></span></div>
+              <span class="wa-note wa-note-real">Real menu bar</span>
+              <div class="wa-area"><span class="wa-note wa-note-area">Work Area</span></div>
+              <span class="wa-note wa-note-mirror">Menu bar, right where you work</span>
+              <div class="mirror-bar"><span class="bar-items"><i class="bar-glyph"></i><b>Editor</b><span class="mirror-file">File<span class="mirror-menu"><span class="hl">New Window<kbd>⌘N</kbd></span><span>Open…<kbd>⌘O</kbd></span><hr><span>Save<kbd>⌘S</kbd></span><span>Close<kbd>⌘W</kbd></span></span></span><span>Edit</span><span class="bar-more">View</span><span class="bar-more">Window</span><span class="bar-more">Help</span></span><span class="bar-icons"><svg viewBox="0 0 16 12" aria-hidden="true"><path d="M1.5 4.2a9.4 9.4 0 0 1 13 0M3.9 6.6a6 6 0 0 1 8.2 0M6.3 9a2.6 2.6 0 0 1 3.4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><svg viewBox="0 0 22 11" aria-hidden="true"><rect x="0.75" y="0.75" width="18" height="9.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="2.6" y="2.6" width="11" height="5.8" rx="1.2" fill="currentColor"/><path d="M20.4 3.8v3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="bar-clock">Wed 9:41</span></span></div>
+
+              <div class="win win-editor" data-win="editor">
+                <div class="win-bar"><i></i><i></i><i></i><span>Editor</span></div>
+                <div class="win-body"><p class="code"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></p></div>
+              </div>
+              <div class="win win-browser" data-win="browser">
+                <div class="win-bar"><i></i><i></i><i></i><span>Browser</span></div>
+                <div class="win-body"><div class="page-hero"></div><div class="page-cols"><span></span><span></span><span></span></div></div>
+              </div>
+              <div class="win win-terminal" data-win="terminal">
+                <div class="win-bar"><i></i><i></i><i></i><span>Terminal</span></div>
+                <div class="win-body"><p class="term"><span>$ make test</span><span>ok 42 passed</span><span>$ _</span></p></div>
+              </div>
+              <div class="win win-notes" data-win="notes">
+                <div class="win-bar"><i></i><i></i><i></i><span>Notes</span></div>
+                <div class="win-body"><p class="lines"><span></span><span></span><span></span><span></span></p></div>
+              </div>
+              <svg class="wa-pointer" viewBox="0 0 16 22"><path d="M1.5 1.5v16.2l4.1-3.9 2.7 6.2 3-1.3-2.7-6.1h5.6z" fill="#fff" stroke="#0a111d" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+          <div class="demo-actions wa-actions" role="group" aria-label="See the Work Area step by step">
+            <button type="button" data-step="whole" aria-pressed="true"><span class="act">The whole screen</span><small>Before</small></button>
+            <button type="button" data-step="area" aria-pressed="false"><span class="act">Draw a Work Area</span><small>Windows stay inside</small></button>
+            <button type="button" data-step="bar" aria-pressed="false"><span class="act">Turn on the menu bar</span><small>Menus right above your windows</small></button>
+          </div>
+          <figcaption id="wa-caption"><span id="wa-status">A 4K TV across the room. Tiled windows stretch to the far corners, and the menu bar sits at the very top edge.</span></figcaption>
+        </figure>
+
+        <article class="feature">
+          <div class="feature-text">
+            <p class="tab-label">Work Area</p>
+            <h3>Set it up once per display.</h3>
+            <p>Draw the area on a preview of the display, type exact numbers, or pick a size such as 2560 × 1440. Nothing changes the display's resolution.</p>
+            <ul>
+              <li>Floating Grid, Templates, Work Sets, and Fill Work Area all use the same rectangle.</li>
+              <li>Double-click a title bar and the window fills the Work Area.</li>
+              <li>The menu bar follows the app you're using. Menus open right under it, and every icon answers clicks and right-clicks the way the real one does.</li>
+              <li>With Screen Recording on, icons are copied pixel for pixel, in memory only. Without it, TilePilot draws symbols and app icons.</li>
+              <li>The Dock, notifications, and the real menu bar keep using the whole display.</li>
+            </ul>
+          </div>
+          <figure class="shot"><a href="assets/shots/work-area.webp"><img src="assets/shots/work-area.webp" width="1120" height="950" loading="lazy" decoding="async" alt="TilePilot Work Area tab with a preview of a 4K display, the Work Area drawn below the top of the screen, and Menu Bar settings for showing the menu bar at the top of the Work Area."></a></figure>
+        </article>
       </div>
     </section>
 
@@ -333,7 +397,7 @@ alt - l : yabai -m window --focus east
           <li><h3>Edits only its own block</h3><p>TilePilot changes yabairc and skhdrc only between its markers. The Config Files tab keeps backups you can restore.</p></li>
           <li><h3>Asks before it starts anything</h3><p>The window-control helpers start when you choose to start them. That is the moment macOS asks for Accessibility approval.</p></li>
           <li><h3>No SIP changes</h3><p>TilePilot works without turning off System Integrity Protection or loading yabai's scripting addition.</p></li>
-          <li><h3>Screenshots stay in memory</h3><p>MegaMap's desktop screenshots live only for the current session. Screen Recording is needed only if you want them.</p></li>
+          <li><h3>Screenshots stay in memory</h3><p>MegaMap's desktop screenshots and the mirrored menu bar's icon images live only for the current session. Screen Recording is needed only if you want them.</p></li>
           <li><h3>Updates you can see</h3><p>At most twice a day it checks GitHub Releases for a newer version and links you to the release page. It never downloads or installs on its own.</p></li>
           <li><h3>Helpers included</h3><p>Ships pinned builds of yabai 7.1.17 and skhd 0.3.9 and installs them for you. Nothing to set up from the command line.</p></li>
         </ul>
@@ -370,7 +434,7 @@ alt - l : yabai -m window --focus east
             <ul class="req">
               <li>macOS 13 Ventura or later</li>
               <li>A Mac with Apple silicon</li>
-              <li>Optional: Screen Recording for MegaMap screenshots</li>
+              <li>Optional: Screen Recording for MegaMap screenshots and matching menu bar icons</li>
               <li>Optional: Start at Login</li>
             </ul>
           </div>
@@ -400,7 +464,15 @@ alt - l : yabai -m window --focus east
           </details>
           <details>
             <summary>Which permissions does it need?</summary>
-            <p>yabai and skhd need Accessibility, which macOS requests when you start window control. Screen Recording is only for MegaMap's real screenshots. Start at Login is optional.</p>
+            <p>yabai and skhd need Accessibility, which macOS requests when you start window control. TilePilot itself uses Accessibility for the mirrored menu bar. Screen Recording is only for MegaMap's real screenshots and matching menu bar icons. Start at Login is optional.</p>
+          </details>
+          <details>
+            <summary>What is a Work Area?</summary>
+            <p>A rectangle you draw on one display, made for TVs and very large or very wide screens. Tiled windows stay inside it through padding, and floating windows that end up outside move back in after you let go of the mouse. The display's resolution doesn't change, and the Dock, notifications, and the real menu bar keep using the whole screen.</p>
+          </details>
+          <details>
+            <summary>How does the menu bar in the Work Area work?</summary>
+            <p>It shows the frontmost app's menus and that display's menu bar icons. Choosing a menu item uses the real menu, so the app you're working in stays in front. Clicking an icon clicks the real one, so it behaves exactly as it does at the top of the screen; panels such as Wi‑Fi or Battery still open at the real menu bar.</p>
           </details>
           <details>
             <summary>Is this an i3 clone?</summary>

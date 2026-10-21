@@ -28,6 +28,25 @@ for (const entry of shipped) {
 
 let html = readFileSync(join(out, 'index.html'), 'utf8');
 
+// Elements marked data-until="vX.Y.Z" announce something that ships in that release ("Coming in the
+// next release"). They hold plain text only, and the build drops them once the published release
+// is that version or newer.
+const untilPattern = /<(span|p|div)\b[^>]*\bdata-until="([^"]*)"[^>]*>[^<]*<\/\1>/g;
+const untilMarks = (html.match(/\bdata-until="/g) || []).length;
+const untilElements = [...html.matchAll(untilPattern)];
+if (untilElements.length !== untilMarks) fail('data-until elements must be span, p, or div with plain text only');
+for (const [, , until] of untilElements) {
+  if (!/^v\d+\.\d+\.\d+$/.test(until)) fail('unexpected data-until version ' + JSON.stringify(until));
+}
+const versionParts = (tag) => tag.slice(1).split('.').map(Number);
+function isAtLeast(tag, until) {
+  const [a, b] = [versionParts(tag), versionParts(until)];
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return true;
+}
+
 const releaseFlag = process.argv.indexOf('--release');
 if (releaseFlag !== -1) {
   const releasePath = process.argv[releaseFlag + 1];
@@ -50,6 +69,14 @@ if (releaseFlag !== -1) {
   html = html.replace(/("downloadUrl": ")[^"]*(")/, '$1' + url + '$2');
   if (downloads < 3) fail('expected at least 3 download links, found ' + downloads);
   console.log('release ' + tag + ': ' + downloads + ' download links -> ' + url + ' (' + size + ')');
+
+  let shipped = 0;
+  html = html.replace(untilPattern, (element, _name, until) => {
+    if (!isAtLeast(tag, until)) return element;
+    shipped += 1;
+    return '';
+  });
+  if (untilElements.length) console.log('coming-soon labels: ' + shipped + ' removed, ' + (untilElements.length - shipped) + ' kept');
 }
 
 // Every local src/href must exist in the built site.
