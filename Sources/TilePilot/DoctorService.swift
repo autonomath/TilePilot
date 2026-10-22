@@ -1,4 +1,5 @@
 import ApplicationServices
+import Darwin
 import Foundation
 
 struct ShellCommand: Sendable {
@@ -18,6 +19,50 @@ struct ShellCommand: Sendable {
 }
 
 final class CommandRunner: @unchecked Sendable {
+    // Drain both streams while the child runs. Waiting for exit before reading
+    // lets a full pipe block the child forever. Nonblocking reads also keep a
+    // descendant that inherited a pipe from holding up command completion.
+    private final class OutputCapture {
+        let pipe = Pipe()
+        private var data = Data()
+        private var buffer = [UInt8](repeating: 0, count: 16_384)
+        private var reachedEOF = false
+
+        var pollDescriptor: Int32 { reachedEOF ? -1 : pipe.fileHandleForReading.fileDescriptor }
+
+        init() throws {
+            let descriptor = pipe.fileHandleForReading.fileDescriptor
+            let flags = fcntl(descriptor, F_GETFL)
+            guard flags != -1, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) != -1 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+            }
+        }
+
+        deinit {
+            try? pipe.fileHandleForReading.close()
+            try? pipe.fileHandleForWriting.close()
+        }
+
+        func drain() {
+            guard !reachedEOF else { return }
+            // Bound each pass so a noisy stream cannot starve the other stream
+            // or prevent the command deadline from being checked.
+            for _ in 0..<64 {
+                let count = Darwin.read(pipe.fileHandleForReading.fileDescriptor, &buffer, buffer.count)
+                if count > 0 {
+                    data.append(contentsOf: buffer.prefix(count))
+                } else if count == -1 && errno == EINTR {
+                    continue
+                } else {
+                    if count == 0 { reachedEOF = true }
+                    break // EOF or no bytes currently available (EAGAIN).
+                }
+            }
+        }
+
+        var text: String { String(decoding: data, as: UTF8.self) }
+    }
+
     func run(_ command: ShellCommand) async -> CommandResult {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
@@ -29,16 +74,17 @@ final class CommandRunner: @unchecked Sendable {
     private func runSync(_ command: ShellCommand) -> CommandResult {
         let startedAt = Date()
         let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-
-        process.executableURL = URL(fileURLWithPath: command.executable)
-        process.arguments = command.arguments
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        process.environment = mergedEnvironmentForGUIApp()
+        let stdoutCapture: OutputCapture
+        let stderrCapture: OutputCapture
 
         do {
+            stdoutCapture = try OutputCapture()
+            stderrCapture = try OutputCapture()
+            process.executableURL = URL(fileURLWithPath: command.executable)
+            process.arguments = command.arguments
+            process.standardOutput = stdoutCapture.pipe
+            process.standardError = stderrCapture.pipe
+            process.environment = mergedEnvironmentForGUIApp()
             try process.run()
         } catch {
             let endedAt = Date()
@@ -53,28 +99,45 @@ final class CommandRunner: @unchecked Sendable {
             )
         }
 
-        let deadline = Date().addingTimeInterval(command.timeout)
+        func waitForOutput() {
+            var descriptors = [
+                pollfd(fd: stdoutCapture.pollDescriptor, events: Int16(POLLIN), revents: 0),
+                pollfd(fd: stderrCapture.pollDescriptor, events: Int16(POLLIN), revents: 0),
+            ]
+            // Wake as soon as either stream has data instead of throttling large
+            // responses to one pipe buffer per sleep interval.
+            _ = poll(&descriptors, nfds_t(descriptors.count), 10)
+        }
+
+        let deadline = ProcessInfo.processInfo.systemUptime + command.timeout
         var didTimeout = false
         while process.isRunning {
-            if Date() >= deadline {
+            stdoutCapture.drain()
+            stderrCapture.drain()
+            if ProcessInfo.processInfo.systemUptime >= deadline {
                 didTimeout = true
                 process.terminate()
-                Thread.sleep(forTimeInterval: 0.05)
-                if process.isRunning {
-                    process.interrupt()
-                }
                 break
             }
-            Thread.sleep(forTimeInterval: 0.02)
+            waitForOutput()
         }
 
-        if process.isRunning {
-            process.waitUntilExit()
+        if didTimeout {
+            let terminationDeadline = ProcessInfo.processInfo.systemUptime + 0.2
+            while process.isRunning && ProcessInfo.processInfo.systemUptime < terminationDeadline {
+                stdoutCapture.drain()
+                stderrCapture.drain()
+                waitForOutput()
+            }
+            if process.isRunning {
+                kill(process.processIdentifier, SIGKILL)
+            }
         }
+        process.waitUntilExit()
+        stdoutCapture.drain()
+        stderrCapture.drain()
 
         let endedAt = Date()
-        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
 
         let errorType: CommandErrorType
         if didTimeout {
@@ -90,8 +153,8 @@ final class CommandRunner: @unchecked Sendable {
             startedAt: startedAt,
             endedAt: endedAt,
             exitStatus: process.terminationStatus,
-            stdout: stdout,
-            stderr: stderr,
+            stdout: stdoutCapture.text,
+            stderr: stderrCapture.text,
             errorType: errorType
         )
     }

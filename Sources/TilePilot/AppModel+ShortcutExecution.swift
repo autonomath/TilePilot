@@ -99,6 +99,14 @@ func runFeatureControl(_ featureID: FeatureControlID, source: FeatureRunSource, 
         refreshMegamap()
         return
     }
+    if featureID == Self.workAreaFillFeatureID {
+        performTilePilotAction(.fillWorkArea)
+        return
+    }
+    if featureID == Self.workAreaToggleFeatureID {
+        toggleAllWorkAreas()
+        return
+    }
     if let entry = resolvedRow?.shortcutEntry {
         runShortcut(entry)
         return
@@ -195,6 +203,7 @@ func assignShortcut(combo: String, to entry: ShortcutEntry) {
                 self.lastErrorMessage = nil
             }
             await self.refreshShortcuts()
+            await self.runBestEffortSkhdRestart(afterConfigChange: true)
         } catch {
             await MainActor.run {
                 self.lastErrorMessage = "Failed to update shortcut: \(error.localizedDescription)"
@@ -271,12 +280,7 @@ func featureDisabledReason(for definition: FeatureDefinition) -> String? {
 }
 
 func normalizedShortcutCombo(_ combo: String) -> String {
-    combo
-        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        .replacingOccurrences(of: "\\s*\\+\\s*", with: " + ", options: .regularExpression)
-        .replacingOccurrences(of: "\\s*-\\s*", with: " - ", options: .regularExpression)
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    ShortcutComboIdentity.normalized(combo)
 }
 
 private func shortcutCommandSegment(from line: String, fallback: String) -> String {

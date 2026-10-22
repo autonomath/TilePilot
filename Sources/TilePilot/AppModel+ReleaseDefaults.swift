@@ -177,6 +177,10 @@ extension AppModel {
 
         appForegroundPolicyByName = state.appForegroundPolicyByName
         persistAppForegroundPolicies()
+        workAreas = state.workAreas
+        persistWorkAreas()
+        workAreaSessionAllowedWindowIDs = []
+        workAreaUnfitWindows = []
         reconcileShortcutsCustomOrderIDsToCurrentItems()
         refreshWindowBadges()
     }

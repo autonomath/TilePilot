@@ -10,31 +10,35 @@ enum MegamapCaptureReason: String, Sendable {
     case manualRefresh
     case beforeTilePilotDesktopSwitch
     case afterTilePilotDesktopSwitch
-    case onMegamapPresent
 }
 
 @MainActor
 extension AppModel {
     func presentMegamap() {
-        if isMegamapVisible {
-            refreshMegamap()
-        } else {
-            openMegamapDashboard()
-        }
+        openMegamapDashboard()
     }
 
     func openMegamapDashboard() {
         acknowledgeInitialStatusIfNeeded()
         NSApp.activate(ignoringOtherApps: true)
+        guard !isMegamapVisible else {
+            NotificationCenter.default.post(name: .tilePilotOpenMegamap, object: nil)
+            return
+        }
         megamapCaptureService.removeAllPersistedCapturesFromDisk()
         megamapScreenRecordingAuthorized = megamapCaptureService.screenRecordingAuthorized()
+        // Open from cached screenshots or synthetic previews immediately.
+        // Refresh owns capture so an old snapshot cannot mislabel a new image.
+        rebuildMegamapSections()
+        NotificationCenter.default.post(name: .tilePilotOpenMegamap, object: nil)
         Task { [weak self] in
             guard let self else { return }
             await self.refreshLiveState()
-            await self.captureCurrentDesktopForMegamapPresentationIfPossible()
-            await MainActor.run {
-                self.megamapScreenRecordingAuthorized = self.megamapCaptureService.screenRecordingAuthorized()
-                self.rebuildMegamapSections()
+            self.megamapScreenRecordingAuthorized = self.megamapCaptureService.screenRecordingAuthorized()
+            self.rebuildMegamapSections()
+            // Replace the unavailable-data window with per-display windows when
+            // data arrives, but do not reopen MegaMap after the user dismissed it.
+            if self.isMegamapVisible {
                 NotificationCenter.default.post(name: .tilePilotOpenMegamap, object: nil)
             }
         }
@@ -174,37 +178,6 @@ extension AppModel {
         }
     }
 
-    private func captureCurrentDesktopForMegamapPresentationIfPossible() async {
-        guard !isRefreshingMegamap else { return }
-        let screenRecordingAuthorized = megamapCaptureService.screenRecordingAuthorized()
-        guard screenRecordingAuthorized else {
-            megamapScreenRecordingAuthorized = false
-            return
-        }
-        megamapScreenRecordingAuthorized = true
-
-        let snapshot = latestLiveStateSnapshot ?? liveStateSnapshot
-        let targetSpaceIndex: Int?
-        if let snapshot {
-            if let activeSpace = activeSpaceIndex(in: snapshot) {
-                targetSpaceIndex = activeSpace
-            } else {
-                targetSpaceIndex = await queryCurrentFocusedSpaceIndex()
-            }
-        } else {
-            targetSpaceIndex = await queryCurrentFocusedSpaceIndex()
-        }
-
-        guard let targetSpaceIndex else { return }
-
-        await captureMegamapDesktopIfNeeded(
-            spaceIndex: targetSpaceIndex,
-            reason: .onMegamapPresent,
-            minimumAgeSeconds: 0.0,
-            requireCacheArmed: false
-        )
-    }
-
     private func refreshSingleMegamapDesktop(spaceIndex: Int) async {
         guard !isRefreshingMegamap else { return }
         isRefreshingMegamap = true
@@ -330,8 +303,15 @@ extension AppModel {
         megamapScreenRecordingAuthorized = megamapCaptureService.screenRecordingAuthorized()
 
         guard megamapScreenRecordingAuthorized else {
-            megamapLastErrorMessage = "Screen Recording is needed for real megamap screenshots. TilePilot is showing synthetic fallback previews for now."
+            await refreshLiveState()
+            rebuildMegamapSections()
+            megamapLastErrorMessage = megamapDisplaySections.isEmpty
+                ? nil
+                : "Screen Recording is needed for real megamap screenshots. TilePilot is showing synthetic fallback previews for now."
             megamapLastActionMessage = nil
+            if isMegamapVisible {
+                NotificationCenter.default.post(name: .tilePilotOpenMegamap, object: nil)
+            }
             return
         }
 

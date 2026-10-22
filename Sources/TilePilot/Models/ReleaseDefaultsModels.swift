@@ -25,6 +25,7 @@ struct ReleaseDefaultsUserState: Codable, Sendable {
     let raiseOnFloatToggleEnabled: Bool
     let appForegroundPolicyByName: [String: AppForegroundPolicy]
     let performanceSettings: PerformanceSettings
+    let workAreas: [WorkAreaConfiguration]
 
     init(
         pinnedFeatureControlIDs: [String],
@@ -45,7 +46,8 @@ struct ReleaseDefaultsUserState: Codable, Sendable {
         desktopScrubInvertDirection: Bool,
         raiseOnFloatToggleEnabled: Bool,
         appForegroundPolicyByName: [String: AppForegroundPolicy],
-        performanceSettings: PerformanceSettings
+        performanceSettings: PerformanceSettings,
+        workAreas: [WorkAreaConfiguration] = []
     ) {
         self.pinnedFeatureControlIDs = pinnedFeatureControlIDs
         self.pinnedDirectionalGroupIDs = pinnedDirectionalGroupIDs
@@ -66,6 +68,7 @@ struct ReleaseDefaultsUserState: Codable, Sendable {
         self.raiseOnFloatToggleEnabled = raiseOnFloatToggleEnabled
         self.appForegroundPolicyByName = appForegroundPolicyByName
         self.performanceSettings = performanceSettings
+        self.workAreas = workAreas
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -88,6 +91,7 @@ struct ReleaseDefaultsUserState: Codable, Sendable {
         case raiseOnFloatToggleEnabled
         case appForegroundPolicyByName
         case performanceSettings
+        case workAreas
     }
 
     init(from decoder: Decoder) throws {
@@ -113,6 +117,7 @@ struct ReleaseDefaultsUserState: Codable, Sendable {
         raiseOnFloatToggleEnabled = try container.decode(Bool.self, forKey: .raiseOnFloatToggleEnabled)
         appForegroundPolicyByName = try container.decode([String: AppForegroundPolicy].self, forKey: .appForegroundPolicyByName)
         performanceSettings = try container.decodeIfPresent(PerformanceSettings.self, forKey: .performanceSettings) ?? .balanced
+        workAreas = try container.decodeIfPresent([WorkAreaConfiguration].self, forKey: .workAreas) ?? []
     }
 }
 

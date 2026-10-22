@@ -26,13 +26,14 @@ Current top-level tab order:
 
 1. `Overview`
 2. `Behaviors`
-3. `Actions & Shortcuts`
-4. `Templates`
-5. `Work Sets`
-6. `Appearance`
-7. `Config Files`
-8. `How It Works`
-9. `System`
+3. `Work Area`
+4. `Actions & Shortcuts`
+5. `Templates`
+6. `Work Sets`
+7. `Appearance`
+8. `Config Files`
+9. `How It Works`
+10. `System`
 
 Main screen roles:
 
@@ -42,6 +43,9 @@ Main screen roles:
 - `Behaviors`
   - file: `Sources/TilePilot/Features/Behaviors/WindowBehaviorDashboardView.swift`
   - purpose: yabai behavior controls, precedence rules, desktop tiling, app defaults, focus/cursor, mouse dragging
+- `Work Area`
+  - file: `Sources/TilePilot/Features/WorkArea/WorkAreaDashboardView.swift`
+  - purpose: per-display placement rectangle, containment, the mirrored menu bar, and exceptions
 - `Actions & Shortcuts`
   - file: `Sources/TilePilot/Features/Shortcuts/ShortcutsDashboardView.swift`
   - purpose: searchable control catalog, shortcut recording/testing/editing, right-click menu pinning, ordering, dynamic actions for Templates and Work Sets
@@ -78,6 +82,9 @@ Supporting modal/window surfaces:
     - `Sources/TilePilot/Features/RecentWindowTiler/RecentWindowTilerPickerView.swift`
   - separate picker `NSPanel` opened by the `Pick Windows to Tile...` action
   - shows current-desktop recent windows, a reorderable list, and a reorderable preview grid
+- Work Area menu bar (System Bar)
+  - files: `Sources/TilePilot/Features/SystemBar/SystemBarController.swift`, `SystemBarView.swift`
+  - non-activating `NSPanel` drawn with AppKit directly above (or inside the top of) a Work Area; looks like the real menu bar, never a TilePilot-styled surface
 
 ## Visual Language
 
@@ -231,6 +238,13 @@ Mini-map details:
   - optional Launch Missing Apps
 - Live Layout previews should help users understand what activation will bring forward or place.
 
+### Work Area
+
+- Four cards, in order: Work Area (display picker, canvas, numeric fields, size and position presets), Menu Bar, Keeping Windows Inside, Exceptions.
+- The canvas is drawn to the display's shape: drag to move, drag edges to resize, drag outside to draw a new area. It shows window outlines only (never titles), the menu bar and Dock strips, and the mirrored menu bar's position.
+- Menu Bar and containment controls stay visible but disabled until the display's Work Area is on.
+- Copy states outcomes: where windows end up and what keeps using the whole display. Teaching material belongs in `How It Works`.
+
 ### Appearance
 
 - Intentionally sparse.
@@ -378,7 +392,7 @@ Visual primitives:
 ## High-Value Validation Scenarios
 
 - Main IA:
-  - tab order must remain `Overview`, `Behaviors`, `Actions & Shortcuts`, `Appearance`, `Config Files`, `System`
+  - tab order must remain `Overview`, `Behaviors`, `Work Area`, `Actions & Shortcuts`, `Templates`, `Work Sets`, `Appearance`, `Config Files`, `How It Works`, `System`
 - Overview:
   - degraded state should surface obvious recovery actions
   - mini-map should preserve real vertical display stacking

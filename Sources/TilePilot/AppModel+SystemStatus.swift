@@ -116,7 +116,8 @@ extension AppModel {
             }
             return keepOnTopInterval > 0 ? min(baseInterval, keepOnTopInterval) : baseInterval
         case .idle:
-            return max(10.0, performanceBackgroundPollingSeconds)
+            // Work Area containment also catches windows moved by keyboard or newly opened.
+            return hasActiveWorkAreaContainment ? 3.0 : max(10.0, performanceBackgroundPollingSeconds)
         }
     }
 

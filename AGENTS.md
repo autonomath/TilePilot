@@ -38,8 +38,10 @@ graphify update .
 
 ## Conventions
 - Keep app/UI/runtime state on `@MainActor`; use async `Task` work for helper and OS calls.
+- The main window is found by its title (`hasOnScreenTilePilotWindow` looks for "TilePilot"). Every tab that shows live window data must keep `.navigationTitle("TilePilot")`, or its live state stops updating.
 - Run yabai/skhd through the managed helper command wrappers with explicit timeouts; report command failures instead of assuming state changed.
 - Treat yabai, WindowServer, and Accessibility as complementary sources. Verify live postconditions for limited/AX-only windows; yabai frame and resize flags can lag or disagree.
+- Mission Control, App Exposé, Show Desktop, and their animations move and scale window-server bounds (`CGWindowListCopyWindowInfo`) while Accessibility frames stay put. Never move or resize a window from window-server bounds alone; containment re-reads the real frame by window ID (`AccessibilityWindowFrames`) first.
 - Keep settings copy short and outcome-based. Say whether windows end tiled or floating; put teaching material in `How It Works`, not settings cards.
 - Preserve existing user behavior by default. Defaults changes require a release-default profile version bump and reset-flow coverage.
 - Present Guided Setup immediately on a genuine first launch; startup readiness grace applies only to existing installations recovering after launch or login.
@@ -53,6 +55,8 @@ graphify update .
 - **Never Auto-Tile:** app-level rule excluding an app from tiled-result bulk actions; it does not block floating Templates.
 - **Template:** normalized floating slot geometry for a display shape, optionally constrained by app allow-lists and z-order.
 - **Work Set:** desktop-scoped exact-window membership and front-to-back order, optionally with a backdrop and Floating, Tile, or Template layout mode. It is not a macOS Space.
+- **Work Area:** per-display rectangle (keyed by display UUID, stored as display fractions) that bounds placement. Tiled windows use runtime per-Space yabai padding (never written to `yabairc`); floating windows are moved back after a drag ends. `AppModel.placementFrame(for:)` is the shared bound for Grid, Templates, and Work Sets.
+- **System Bar:** optional per-Work-Area mirror of the menu bar (`WorkAreaConfiguration.systemBarEnabled`): a non-activating `NSPanel` above (or inside) the area showing the frontmost app's menu titles and the mirrored display's menu bar icons (other displays' icons are opt-in), read through `AccessibilityMirrorReader`. Menus pop locally; third-party icons get a real click at the real icon because many apps ignore `AXPress`, and their panels open where macOS puts them (Phase 2 would mirror them). Icons crop pixels from `MenuBarStripCapture` (ScreenCaptureKit, memory only) when Screen Recording is on, otherwise draw symbols/app icons. `resolvedWorkArea(for:)` returns the window area under the bar.
 - **Limited window:** visible window that cannot be managed reliably through normal yabai state; AX fallback may still support selected operations.
 - **MegaMap:** per-display overview of multiple desktops. Captured screenshots are session-memory-only.
 - **Managed config:** only content between `TILEPILOT MANAGED` / `TILEPILOT YABAI CONFIG` markers belongs to TilePilot.
@@ -67,11 +71,14 @@ graphify update .
 - Preserve unrelated dirty-worktree changes. Do not reset or restore files you did not own.
 
 ## Known issues
-- UNVERIFIED: the current Command Line Tools-only environment compiles XCTest bundles but `swift test`, `swift test list`, and filtered tests execute/list zero tests. Select a full Xcode toolchain, then verify `swift test` and `swift test --filter RecentWindowGridPlannerTests` before claiming tests passed.
+- The selected Command Line Tools compile XCTest bundles but list/execute zero tests. Run XCTest with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test -Xswiftc -swift-version -Xswiftc 5 -Xswiftc -enable-bare-slash-regex` and check the executed count; Xcode's newer compiler turns the Templates drag/drop Sendable warning into an error in Swift 6 mode.
 - UNVERIFIED: no project SwiftFormat/SwiftLint configuration or CI workflow exists. Repo-wide `swift format lint` emits thousands of default-style warnings and is not a usable gate.
-- Release builds currently emit a Swift 6 Sendable-capture warning in the Templates drag/drop provider.
+- Builds currently emit a Swift 6 Sendable-capture warning in the Templates drag/drop provider.
 - Bundled skhd 0.3.9 builds with an existing deprecated FSEvents warning and an unused-function warning.
 - Development notes still mention a user-facing Auto-Tiled picker mode; the current picker exposes Floating Grid and Template only.
+- Native full screen is unsupported with an active Work Area: containment can pull a window out of full screen. The user chose title-bar double-click (zoom, then fit to the Work Area) instead; do not spend effort on full-screen support unless asked.
+- Do not restart yabai while the Mac is locked: it comes back without Accessibility references for existing windows (`has-ax-reference` false, empty role, `can-move` false, stale frames). Work Area containment falls back to Accessibility and window-server frames for such windows, but other features degrade until yabai restarts while unlocked.
+- Menu bar icon (`AXExtrasMenuBar`) frames point at the active display's bar even when the icon is only drawn on another display (most third-party icons live on the main display's bar). Confirm positions by hit test, matching the hit element's `AXIdentifier` or icon container, never just the pid; see `docs/research/SYSTEM_BAR_FEASIBILITY.md`.
 
 ## Maintenance
 When you complete a task and discover this file is wrong or missing something an agent would need, update it. Keep it under 150 lines: prefer correcting existing lines over adding new ones. Do not add one-off fixes, task-specific notes, or anything already obvious from the code.

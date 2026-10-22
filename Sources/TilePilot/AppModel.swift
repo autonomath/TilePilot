@@ -22,6 +22,7 @@ enum TilePilotActionID: String, CaseIterable, Identifiable {
     case focusEast
     case focusNorth
     case focusSouth
+    case fillWorkArea
     case browserReliefPlaceholder
 
     var id: String { rawValue }
@@ -70,6 +71,9 @@ final class AppModel: ObservableObject {
     private static let shortcutsCustomOrderDefaultsKey = "TilePilot.shortcutsCustomOrderIDs"
     static let windowLayoutTemplatesDefaultsKey = "TilePilot.windowLayoutTemplates"
     static let workSetsDefaultsKey = "TilePilot.workSets"
+    static let workAreasDefaultsKey = "TilePilot.workAreas"
+    static let systemBarMatchingIconsDefaultsKey = "TilePilot.systemBarMatchingIcons"
+    static let systemBarOtherDisplayIconsDefaultsKey = "TilePilot.systemBarOtherDisplayIcons"
     static let activeWorkSetIDsByScopeDefaultsKey = "TilePilot.activeWorkSetIDsByScope"
     static let showWindowBadgeOverlayDefaultsKey = "TilePilot.showWindowBadgeOverlay"
     static let showWindowOutlineOverlayDefaultsKey = "TilePilot.showWindowOutlineOverlay"
@@ -139,6 +143,14 @@ final class AppModel: ObservableObject {
 
     private static func loadActiveWorkSetIDsByScope() -> [String: String] {
         UserDefaults.standard.dictionary(forKey: AppModel.activeWorkSetIDsByScopeDefaultsKey) as? [String: String] ?? [:]
+    }
+
+    private static func loadWorkAreas() -> [WorkAreaConfiguration] {
+        guard let data = UserDefaults.standard.data(forKey: AppModel.workAreasDefaultsKey),
+              let workAreas = try? JSONDecoder().decode([WorkAreaConfiguration].self, from: data) else {
+            return []
+        }
+        return workAreas
     }
 
     private static func loadDesktopTilingPreferencesBySpaceIndex() -> [Int: Bool] {
@@ -228,6 +240,12 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var activeWorkSetIDsByScope: [String: String] = AppModel.loadActiveWorkSetIDsByScope()
+    @Published var workAreas: [WorkAreaConfiguration] = AppModel.loadWorkAreas()
+    @Published var workAreaUnfitWindows: [WorkAreaUnfitWindow] = []
+    @Published var workAreaLastFitBatch: WorkAreaFitBatch?
+    @Published var workAreaSessionAllowedWindowIDs: Set<Int> = []
+    @Published var systemBarMatchingIconsEnabled: Bool = (UserDefaults.standard.object(forKey: AppModel.systemBarMatchingIconsDefaultsKey) as? Bool) ?? true
+    @Published var systemBarOtherDisplayIconsEnabled: Bool = UserDefaults.standard.bool(forKey: AppModel.systemBarOtherDisplayIconsDefaultsKey)
     @Published var desktopTilingPreferencesBySpaceIndex: [Int: Bool] = AppModel.loadDesktopTilingPreferencesBySpaceIndex()
     @Published var workSetBackdropPresentations: [WorkSetScopeKey: WorkSetBackdropPresentation] = [:]
     @Published var recentWindowTilerBackdropPresentations: [WorkSetScopeKey: WorkSetBackdropPresentation] = [:]
@@ -447,6 +465,17 @@ final class AppModel: ObservableObject {
     let appUpdateService = AppUpdateService()
     let nativeSpacesScrubSpikeCoordinator = NativeSpacesScrubSpikeCoordinator()
     private let keepOnTopCoordinator = KeepOnTopCoordinator()
+    let workAreaContainmentCoordinator = WorkAreaContainmentCoordinator()
+    let systemBarController = SystemBarController()
+    var systemBarControllerConfigured = false
+    var workAreaAppliedPaddingBySpace: [Int: WorkAreaPadding] = [:]
+    var workAreaPaddingFailureAtBySpace: [Int: Date] = [:]
+    var workAreaPaddingSpaceSignature: String?
+    var workAreaPaddingLastVerifiedAt: Date?
+    var workAreaLastSnapshotSource: StateSourceQuality?
+    var workAreaPaddingApplyInProgress = false
+    var workAreaEditApplyTask: Task<Void, Never>?
+    var workAreaFitBatchExpiryTask: Task<Void, Never>?
     private(set) var overviewDisplayPreviews: [OverviewDisplayPreview] = []
     private(set) var overviewDisplaySections: [OverviewDisplaySection] = []
     private(set) var cachedUnifiedControlRows: [UnifiedControlRow] = []
@@ -477,11 +506,13 @@ final class AppModel: ObservableObject {
     @Published var runtimeDiagnostics = RuntimeDiagnostics()
     private var autoRefreshTask: Task<Void, Never>?
     private var statePollingTask: Task<Void, Never>?
+    var automaticAppUpdateCheckTask: Task<Void, Never>?
     private var managedHelperAutoUpgradeTask: Task<Void, Never>?
     var hasAttemptedAutomaticManagedHelperInstall = false
     var hasAttemptedAutomaticManagedHelperServiceStart = false
     var shortcutRecordMonitor: Any?
     var shortcutGlobalRecordMonitor: Any?
+    var shortcutRecordingSession: ShortcutRecordingSession?
     var hasDismissedAutomaticSetupGuideThisSession = false
     var automaticSetupGuideStartupGraceElapsed = false
     var automaticSetupGuideStartupTask: Task<Void, Never>?
@@ -554,9 +585,7 @@ final class AppModel: ObservableObject {
         Task { [weak self] in
             await self?.ensureReleaseDefaultsInitializedIfNeeded()
         }
-        if shouldRunAutomaticAppUpdateCheck() {
-            checkForAppUpdates(manual: false)
-        }
+        startAutomaticAppUpdateChecksIfNeeded()
         autoRefreshTask = Task { [weak self] in
             guard let self else { return }
             await self.refreshDoctor()
@@ -609,6 +638,7 @@ final class AppModel: ObservableObject {
         autoRefreshTask = nil
         statePollingTask?.cancel()
         statePollingTask = nil
+        stopAutomaticAppUpdateChecks()
         managedHelperAutoUpgradeTask?.cancel()
         managedHelperAutoUpgradeTask = nil
         automaticSetupGuideStartupTask?.cancel()
@@ -617,6 +647,7 @@ final class AppModel: ObservableObject {
         windowBehaviorAutoSaveTask = nil
         stopShortcutRecording()
         nativeSpacesScrubSpikeCoordinator.disableInteractiveScrubMode()
+        systemBarController.stop()
     }
 
     private static func loadPersistedAppUpdateStatus() -> AppUpdateStatus {
@@ -661,6 +692,7 @@ final class AppModel: ObservableObject {
         isRefreshingBootstrap = true
         defer { isRefreshingBootstrap = false }
 
+        await repairManagedHelperPromptLoopIfNeeded()
         var result = await bootstrapService.runBootstrapChecks()
         result = await bootstrapResultAfterAutomaticManagedHelperInstallIfNeeded(result)
         result = await bootstrapResultAfterAutomaticManagedHelperStartIfNeeded(result)
@@ -774,6 +806,7 @@ final class AppModel: ObservableObject {
         rebuildWorkSetRuntimeCaches(using: snapshot, contentSignature: contentSignature)
         seedAllFloatingDesktopTilingPreferencesIfEmpty(using: snapshot)
         await applyPersistedDesktopTilingPreferencesIfNeeded(using: snapshot)
+        await applyWorkAreaRuntimeIfNeeded(using: snapshot)
         if lastLiveStateContentSignature == contentSignature {
             recordRuntimeBurst(.unchangedPoll)
             mutateRuntimeDiagnostics { $0.liveStateUnchangedPollCount += 1 }
@@ -1100,6 +1133,8 @@ final class AppModel: ObservableObject {
             return "window-focus-north"
         case .focusSouth:
             return "window-focus-south"
+        case .fillWorkArea:
+            return "window-fill-work-area"
         case .browserReliefPlaceholder:
             return "browser-relief"
         }
@@ -1331,7 +1366,8 @@ final class AppModel: ObservableObject {
                         focused: $0.focused,
                         windowCount: $0.windowCount,
                         source: .stale,
-                        lastUpdatedAt: previous.lastUpdatedAt
+                        lastUpdatedAt: previous.lastUpdatedAt,
+                        uuid: $0.uuid
                     )
                 },
                 spaces: previous.spaces.map {
@@ -1372,7 +1408,8 @@ final class AppModel: ObservableObject {
                         hasWindowServerMatch: $0.hasWindowServerMatch,
                         windowServerOrderIndex: $0.windowServerOrderIndex,
                         source: .stale,
-                        lastUpdatedAt: previous.lastUpdatedAt
+                        lastUpdatedAt: previous.lastUpdatedAt,
+                        isNativeFullscreen: $0.isNativeFullscreen
                     )
                 },
                 fallbackDisplays: previous.fallbackDisplays.map {
@@ -1629,6 +1666,8 @@ final class AppModel: ObservableObject {
         case .windowBehavior:
             return 3.0
         case .templates, .workSets:
+            return 1.0
+        case .workArea:
             return 1.0
         default:
             return nil

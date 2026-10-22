@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 extension AppModel {
@@ -135,75 +136,65 @@ extension AppModel {
     }
 
     func runBestEffortSkhdRestart(afterConfigChange: Bool) async {
-        let reloadResult = await doctorService.runSupportCommand(
-            skhdCommand(["--reload"], timeout: 2.0)
-        )
-        var result = reloadResult
-        if !reloadResult.isSuccess {
-            result = await doctorService.runSupportCommand(
-                skhdCommand(["--restart-service"], timeout: 2.0)
-            )
-        }
-        await MainActor.run {
-            self.appendCommandLog(from: reloadResult)
-            if !reloadResult.isSuccess {
-                self.appendCommandLog(from: result)
-            }
-
-            if reloadResult.isSuccess {
-                if afterConfigChange {
-                    self.lastActionMessage = "Config saved and skhd reloaded."
-                }
-                self.lastErrorMessage = nil
-            } else if result.isSuccess {
-                if afterConfigChange {
-                    self.lastActionMessage = "Config saved and skhd restart requested."
-                }
-                self.lastErrorMessage = nil
-            } else if afterConfigChange {
-                let stderrReload = reloadResult.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                let stderrRestart = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                let stderr = [stderrReload, stderrRestart].filter { !$0.isEmpty }.joined(separator: " | ")
-                self.lastActionMessage = "Config saved. skhd reload/restart is best effort and may require manual restart."
-                if !stderr.isEmpty {
-                    self.lastErrorMessage = "skhd reload/restart failed: \(trimForUI(stderr))"
-                }
-            }
-        }
+        let failure = await requestRunningSkhdReload()
+        // Doctor refresh clears generic action feedback. Publish the save and
+        // activation result afterwards so a failed reload remains visible.
         await refreshDoctor()
+        if let failure {
+            if afterConfigChange {
+                lastActionMessage = "Config saved. Shortcuts could not be activated."
+            }
+            lastErrorMessage = failure
+        } else {
+            if afterConfigChange {
+                lastActionMessage = "Config saved and shortcut reload requested."
+            }
+            lastErrorMessage = nil
+        }
     }
 
     func runBestEffortSkhdRestartAfterRawFileSave() async {
-        let reloadResult = await doctorService.runSupportCommand(
-            skhdCommand(["--reload"], timeout: 2.0)
+        if let failure = await requestRunningSkhdReload() {
+            filesLastActionMessage = "Saved file. Shortcuts could not be activated."
+            filesLastErrorMessage = failure
+        } else {
+            filesLastActionMessage = "Saved file and shortcut reload requested."
+            filesLastErrorMessage = nil
+        }
+    }
+
+    private func requestRunningSkhdReload() async -> String? {
+        // skhd's own reload relies on a /tmp PID file, which may have been
+        // removed while the service is still running. Locate only this user's
+        // existing daemon and never start a helper as a side effect of saving.
+        let lookup = await doctorService.runSupportCommand(
+            ShellCommand("/usr/bin/pgrep", ["-x", "-u", String(getuid()), "skhd"], timeout: 2.0)
         )
-        var result = reloadResult
-        if !reloadResult.isSuccess {
-            result = await doctorService.runSupportCommand(
-                skhdCommand(["--restart-service"], timeout: 2.0)
-            )
+        appendCommandLog(from: lookup)
+        if lookup.exitStatus == 1, lookup.errorType == .nonZeroExit,
+           lookup.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return SkhdReloadTargetError.notRunning.localizedDescription
         }
-        await MainActor.run {
-            self.appendCommandLog(from: reloadResult)
-            if !reloadResult.isSuccess {
-                self.appendCommandLog(from: result)
-            }
-            if reloadResult.isSuccess {
-                self.filesLastActionMessage = "Saved file and reloaded skhd."
-                self.filesLastErrorMessage = nil
-            } else if result.isSuccess {
-                self.filesLastActionMessage = "Saved file and requested skhd restart."
-                self.filesLastErrorMessage = nil
-            } else {
-                let stderrReload = reloadResult.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                let stderrRestart = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-                let stderr = [stderrReload, stderrRestart].filter { !$0.isEmpty }.joined(separator: " | ")
-                self.filesLastActionMessage = "Saved file. skhd reload/restart is best effort and may require manual restart."
-                if !stderr.isEmpty {
-                    self.filesLastErrorMessage = "skhd reload/restart failed: \(trimForUI(stderr))"
-                }
-            }
+        guard lookup.isSuccess else {
+            return "Could not find the running shortcut service. Open System and recheck skhd."
         }
+        let pid: Int32
+        switch SkhdReloadTarget.resolve(pgrepOutput: lookup.stdout) {
+        case .success(let target): pid = target
+        case .failure(let error): return error.localizedDescription
+        }
+
+        let result = await doctorService.runSupportCommand(
+            ShellCommand("/bin/kill", ["-USR1", String(pid)], timeout: 2.0)
+        )
+        appendCommandLog(from: result)
+        guard result.isSuccess else {
+            let details = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            return details.isEmpty
+                ? "Could not reload shortcuts. Open System and recheck skhd."
+                : "Could not reload shortcuts: \(trimForUI(details))"
+        }
+        return nil
     }
 
     func appendCommandLog(from result: CommandResult) {
@@ -238,6 +229,22 @@ extension AppModel {
     private func runTilePilotAction(_ actionID: TilePilotActionID) async {
         activeActionID = actionID
         defer { activeActionID = nil }
+
+        if actionID == .fillWorkArea {
+            let outcome = await fillFocusedWindowToWorkArea()
+            if outcome.isError {
+                actionsLastErrorMessage = outcome.message
+                actionsLastActionMessage = nil
+                lastErrorMessage = outcome.message
+                lastActionMessage = nil
+            } else {
+                actionsLastActionMessage = outcome.message
+                actionsLastErrorMessage = nil
+                lastActionMessage = outcome.message
+                lastErrorMessage = nil
+            }
+            return
+        }
 
         let beforeSignature = liveStateSignature()
         let commands = TilePilotActionCatalog.commands(for: actionID)

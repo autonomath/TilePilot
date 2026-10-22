@@ -34,6 +34,7 @@ TilePilot is not trying to be a literal i3 clone on macOS. It is a practical tra
 - create reusable floating layout templates for a display and apply them to the current desktop, even when the display shape changed slightly
 - import the current desktop layout into a template and constrain slots to specific apps
 - save desktop-scoped Work Sets so you can bring a known group of windows back to the front
+- draw a Work Area on a TV or very large display so windows stay in a comfortable rectangle, with the app menus and menu bar icons shown right above it
 - manage `yabairc` and `skhdrc` safely without overwriting the rest of your config
 - recover from drifted permissions, helpers, or services through Guided Setup and `System`
 
@@ -57,6 +58,9 @@ If you want to use TilePilot the way it is intended, the path looks like this:
 - `Behaviors`
   - sets the rules behind the workflow
   - desktop tiling, desktop scrub, app rules, focus behavior, cursor behavior, and yabai mouse controls
+- `Work Area`
+  - limits where windows go on a large display, without changing its resolution
+  - draw the area per display, keep floating windows inside, allow exceptions, and show the menu bar at the top of the area
 - `Actions & Shortcuts`
   - the action catalog and shortcut learning surface
   - record shortcuts, edit them, pin frequent ones to the right-click menu, and run the recent-window picker
@@ -83,6 +87,10 @@ If you want to use TilePilot the way it is intended, the path looks like this:
 ### Overview
 
 ![Overview](assets/screenshots/overview.png)
+
+### Work Area
+
+![Work Area](assets/screenshots/work-area.png)
 
 ### Templates
 
@@ -149,6 +157,25 @@ TilePilot also supports mouse-driven desktop scrubbing:
 
 You can enable it and change the trigger keys in `Behaviors`.
 
+## Work Area and the Menu Bar
+
+On a TV or a very wide display, the corners are far away and the menu bar sits at the very top edge. A Work Area is a rectangle you draw on one display in the `Work Area` tab; TilePilot then keeps windows inside it:
+
+- tiled windows stay inside through per-desktop padding
+- floating windows that end up outside move back in after you let go of the mouse
+- double-clicking a title bar makes the window fill the Work Area
+- `Floating Grid`, `Templates`, `Work Sets`, and `Fill Work Area` all use the same rectangle
+- `Apps Allowed Outside`, `Allow Outside`, and `Undo Last Fit` cover windows that should stay where they are
+
+Turn on `Show the menu bar at the top of the Work Area` to get the frontmost app's menus and that display's menu bar icons directly above your windows:
+
+- menus open right under the mirrored bar, and choosing an item uses the real menu, so the app you're working in stays in front
+- clicking or right-clicking an icon clicks the real one, so it behaves exactly as it does at the top of the screen; icon panels such as Wi-Fi or Battery still open at the real menu bar
+- with `Match the real icons` and Screen Recording, icons are copied pixel for pixel in memory; without Screen Recording, TilePilot draws symbols and app icons
+- `Also show icons from other displays` adds icons macOS draws only on another display's menu bar
+
+The Dock, notifications, and the real menu bar keep using the whole display, and the display's resolution never changes.
+
 ## Setup
 
 ### Requirements
@@ -168,8 +195,8 @@ TilePilot ships with bundled `yabai` and `skhd` helpers and installs/manages the
 
 Optional approvals depend on the features you use:
 
-- Accessibility only if macOS prompts for `TilePilot`, `yabai`, or `skhd`, or if a focus/bring-to-front fallback does not work
-- Screen Recording only if you want real `MegaMap` screenshots instead of fallback previews
+- Accessibility only if macOS prompts for `TilePilot`, `yabai`, or `skhd`, if a focus/bring-to-front fallback does not work, or if you use the Work Area menu bar
+- Screen Recording only if you want real `MegaMap` screenshots instead of fallback previews, or menu bar icons that match the real ones
 - Start at Login if you want TilePilot available after sign-in
 
 For the most predictable desktop-navigation behavior on macOS, review these Mission Control settings:
@@ -191,6 +218,7 @@ TilePilot currently focuses on the everyday supported path:
 - recent-window picking with preview, reordering, remembered selection count, and optimized floating-grid placement
 - exact floating layout templates with app-aware slot rules and display auto-fit
 - desktop-scoped Work Sets with optional backdrops, minimized-window restore, missing-app launch, and per-set layout mode
+- per-display Work Areas with window containment, title-bar double-click fill, and an optional menu bar at the top of the area
 - a built-in default template library so new installs can try laptop, wide, ultrawide, superwide, portrait, and dual-display layouts immediately
 - live desktop visibility through `Overview`, overlays, and `MegaMap`
 - Mission Control checklist guidance inside `System`
@@ -201,6 +229,7 @@ Advanced scripting-addition / SIP-dependent desktop-control workflows are intent
 ## Privacy and Safety
 
 - `MegaMap` screenshots stay in memory only for the current app session and are never written to disk.
+- The Work Area menu bar's icon images are captured in memory only and are never written to disk.
 - TilePilot preserves your existing `yabairc` and `skhdrc` content outside the app-managed blocks.
 - TilePilot-managed config uses `TILEPILOT ...` markers so the app only edits what it owns.
 - Each release ships a versioned defaults profile for fresh installs and explicit reset flows.

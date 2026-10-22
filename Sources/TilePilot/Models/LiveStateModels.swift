@@ -18,6 +18,7 @@ struct DisplayState: Identifiable, Codable, Sendable, Equatable {
     let windowCount: Int
     let source: StateSourceQuality
     let lastUpdatedAt: Date
+    var uuid: String? = nil
 }
 
 struct SpaceState: Identifiable, Codable, Sendable, Equatable {
@@ -59,6 +60,7 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
     let windowServerOrderIndex: Int?
     let source: StateSourceQuality
     let lastUpdatedAt: Date
+    let isNativeFullscreen: Bool
 
     var supportsFocusedFloatToggleFallback: Bool {
         (app == "iTerm2" || app == "iTerm") && !isMinimized && !isHidden
@@ -98,6 +100,7 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
         case windowServerOrderIndex
         case source
         case lastUpdatedAt
+        case isNativeFullscreen
     }
 
     init(
@@ -124,7 +127,8 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
         hasWindowServerMatch: Bool = false,
         windowServerOrderIndex: Int? = nil,
         source: StateSourceQuality,
-        lastUpdatedAt: Date
+        lastUpdatedAt: Date,
+        isNativeFullscreen: Bool = false
     ) {
         self.id = id
         self.pid = pid
@@ -150,6 +154,7 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
         self.windowServerOrderIndex = windowServerOrderIndex
         self.source = source
         self.lastUpdatedAt = lastUpdatedAt
+        self.isNativeFullscreen = isNativeFullscreen
     }
 
     init(from decoder: Decoder) throws {
@@ -178,6 +183,7 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
         windowServerOrderIndex = try container.decodeIfPresent(Int.self, forKey: .windowServerOrderIndex)
         source = try container.decode(StateSourceQuality.self, forKey: .source)
         lastUpdatedAt = try container.decode(Date.self, forKey: .lastUpdatedAt)
+        isNativeFullscreen = try container.decodeIfPresent(Bool.self, forKey: .isNativeFullscreen) ?? false
     }
 }
 

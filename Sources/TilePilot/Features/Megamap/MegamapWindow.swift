@@ -21,15 +21,16 @@ private final class MegamapWindow: NSWindow {
 @MainActor
 private final class MegamapDisplayWindowController: NSWindowController, NSWindowDelegate {
     private let model: AppModel
-    private let displayID: Int
+    private let displayID: Int?
 
     private enum PersistedWindowKeys {
-        static func width(for displayID: Int) -> String { "TilePilot.megamapWindow.\(displayID).width" }
-        static func height(for displayID: Int) -> String { "TilePilot.megamapWindow.\(displayID).height" }
-        static func frameAutosaveName(for displayID: Int) -> String { "TilePilotMegamapWindow.\(displayID)" }
+        static func width(for displayID: Int?) -> String { "TilePilot.megamapWindow.\(key(for: displayID)).width" }
+        static func height(for displayID: Int?) -> String { "TilePilot.megamapWindow.\(key(for: displayID)).height" }
+        static func frameAutosaveName(for displayID: Int?) -> String { "TilePilotMegamapWindow.\(key(for: displayID))" }
+        private static func key(for displayID: Int?) -> String { displayID.map(String.init) ?? "fallback" }
     }
 
-    init(model: AppModel, displayID: Int) {
+    init(model: AppModel, displayID: Int?) {
         self.model = model
         self.displayID = displayID
         let hosting = MegamapDisplayWindowController.makeHostingController(model: model, displayID: displayID)
@@ -102,7 +103,7 @@ private final class MegamapDisplayWindowController: NSWindowController, NSWindow
         persistCurrentWindowSize()
     }
 
-    private static func restorePersistedSize(for window: NSWindow, displayID: Int) {
+    private static func restorePersistedSize(for window: NSWindow, displayID: Int?) {
         let defaults = UserDefaults.standard
         let persistedWidth = CGFloat(defaults.double(forKey: PersistedWindowKeys.width(for: displayID)))
         let persistedHeight = CGFloat(defaults.double(forKey: PersistedWindowKeys.height(for: displayID)))
@@ -142,6 +143,7 @@ private final class MegamapDisplayWindowController: NSWindowController, NSWindow
     }
 
     private func bestVisibleFrame() -> NSRect? {
+        guard let displayID else { return NSScreen.main?.visibleFrame }
         let snapshot = model.latestLiveStateSnapshot ?? model.liveStateSnapshot
         if let display = snapshot?.displays.first(where: { $0.id == displayID }) {
             let resolved = model.megamapCaptureService.resolveScreenDescriptors(for: [display])
@@ -182,7 +184,7 @@ private final class MegamapDisplayWindowController: NSWindowController, NSWindow
         return bestScreen?.visibleFrame
     }
 
-    private static func makeHostingController(model: AppModel, displayID: Int) -> NSHostingController<AnyView> {
+    private static func makeHostingController(model: AppModel, displayID: Int?) -> NSHostingController<AnyView> {
         NSHostingController(rootView: AnyView(MegamapRootView(model: model, displayID: displayID)))
     }
 }
@@ -191,6 +193,7 @@ private final class MegamapDisplayWindowController: NSWindowController, NSWindow
 final class MegamapWindowController {
     private let model: AppModel
     private var displayControllers: [Int: MegamapDisplayWindowController] = [:]
+    private var fallbackController: MegamapDisplayWindowController?
 
     init(model: AppModel) {
         self.model = model
@@ -206,9 +209,14 @@ final class MegamapWindowController {
             displayControllers.removeValue(forKey: displayID)
         }
 
-        guard !displaySections.isEmpty else { return }
-
         NSApp.activate(ignoringOtherApps: true)
+        guard !displaySections.isEmpty else {
+            let controller = fallbackController ?? MegamapDisplayWindowController(model: model, displayID: nil)
+            fallbackController = controller
+            controller.show(makeKey: true)
+            return
+        }
+        fallbackController?.hideImmediately()
         let primaryDisplayID = displaySections.first(where: { $0.focused })?.id ?? displaySections.first?.id
 
         for section in displaySections {
@@ -222,12 +230,14 @@ final class MegamapWindowController {
     }
 
     func hideImmediately() {
+        fallbackController?.hideImmediately()
         for controller in displayControllers.values {
             controller.hideImmediately()
         }
     }
 
     func persistCurrentWindowSize() {
+        fallbackController?.persistCurrentWindowSize()
         for controller in displayControllers.values {
             controller.persistCurrentWindowSize()
         }
@@ -243,6 +253,7 @@ final class MegamapViewBridge: ObservableObject {
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var runtimeCommandsEnabled: Bool
     @Published private(set) var runtimeDisabledReason: String?
+    @Published private(set) var emptyState: MegamapEmptyState
 
     let model: AppModel
     private let displayID: Int?
@@ -259,12 +270,13 @@ final class MegamapViewBridge: ObservableObject {
         lastErrorMessage = model.megamapLastErrorMessage
         runtimeCommandsEnabled = model.canRunYabaiRuntimeCommands
         runtimeDisabledReason = model.yabaiRuntimeControlDisabledReason
+        emptyState = MegamapEmptyState(snapshot: model.latestLiveStateSnapshot ?? model.liveStateSnapshot)
 
         model.$megamapDisplaySections
-            .removeDuplicates()
             .sink { [weak self] in
                 guard let self else { return }
                 self.displaySections = Self.filterDisplaySections($0, for: self.displayID)
+                self.emptyState = MegamapEmptyState(snapshot: self.model.latestLiveStateSnapshot ?? self.model.liveStateSnapshot)
             }
             .store(in: &cancellables)
         model.$isRefreshingMegamap
@@ -421,10 +433,10 @@ private struct MegamapDashboardView: View {
 
     private var emptyState: some View {
         VStack(spacing: 14) {
-            Text(bridge.screenRecordingAuthorized ? "No MegaMap capture yet" : "Screen Recording is off")
+            Text(bridge.emptyState.title)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
-            Text(bridge.screenRecordingAuthorized ? "Use Refresh to capture all desktops." : "MegaMap is showing the synthetic fallback until macOS allows screenshots for TilePilot.")
+            Text(bridge.emptyState.message)
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.72))
                 .multilineTextAlignment(.center)
@@ -518,7 +530,7 @@ private struct MegamapDashboardView: View {
 
     private var statusOverlay: some View {
         VStack(spacing: 8) {
-            if !bridge.screenRecordingAuthorized {
+            if !bridge.screenRecordingAuthorized && !bridge.displaySections.isEmpty {
                 MegamapHudNotice(
                     text: "Screen Recording is off. Showing the synthetic preview instead of real screenshots.",
                     foreground: .white,

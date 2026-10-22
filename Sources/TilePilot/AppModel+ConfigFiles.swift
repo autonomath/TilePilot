@@ -118,10 +118,8 @@ extension AppModel {
                 }
 
                 if kind == .skhdrc {
-                    await self.runBestEffortSkhdRestartAfterRawFileSave()
-                }
-                if kind == .skhdrc {
                     await self.refreshShortcuts()
+                    await self.runBestEffortSkhdRestartAfterRawFileSave()
                 } else if kind == .yabairc {
                     await self.refreshWindowBehaviorConfig()
                     await self.refreshDoctor()
@@ -173,8 +171,8 @@ extension AppModel {
                     }
                 }
                 if kind == .skhdrc {
-                    await self.runBestEffortSkhdRestartAfterRawFileSave()
                     await self.refreshShortcuts()
+                    await self.runBestEffortSkhdRestartAfterRawFileSave()
                 } else if kind == .yabairc {
                     await self.refreshWindowBehaviorConfig()
                     await self.refreshDoctor()

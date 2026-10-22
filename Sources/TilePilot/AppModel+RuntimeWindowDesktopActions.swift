@@ -1087,12 +1087,7 @@ extension AppModel {
 
     private func recentWindowTilerDisplayFrame(display: DisplayState?) -> CGRect? {
         guard let display else { return nil }
-        return CGRect(
-            x: display.frameX,
-            y: display.frameY,
-            width: display.frameW,
-            height: display.frameH
-        )
+        return placementFrame(for: display)
     }
 
     private func recentWindowTilerTemplateOptions(display: DisplayState?) -> [RecentWindowTilerTemplateOption] {
@@ -1231,6 +1226,9 @@ extension AppModel {
         isOnTargetDisplay: Bool,
         tilingEnabled: Bool?
     ) -> RecentWindowTilerCandidate? {
+        guard RecentWindowTilerInventoryPolicy.supportsRole(role: window.role, subrole: window.subrole) else {
+            return nil
+        }
         let accessibilityInfo = recentWindowTilerAccessibilityInfo(for: window)
         let canAutoTile = window.isRuntimeManageable
         guard accessibilityInfo?.isSupportedForPicker != false else { return nil }
@@ -1757,11 +1755,12 @@ extension AppModel {
         for assignment in assignments {
             let window = assignment.window
             let normalizedFrame = fittedTemplateRect(for: assignment.slot, template: template, display: display)
+            let placement = placementFrame(for: display)
             let absoluteFrame = CGRect(
-                x: display.frameX + (normalizedFrame.minX * display.frameW),
-                y: display.frameY + (normalizedFrame.minY * display.frameH),
-                width: max(80, normalizedFrame.width * display.frameW),
-                height: max(60, normalizedFrame.height * display.frameH)
+                x: placement.minX + (normalizedFrame.minX * placement.width),
+                y: placement.minY + (normalizedFrame.minY * placement.height),
+                width: max(80, normalizedFrame.width * placement.width),
+                height: max(60, normalizedFrame.height * placement.height)
             ).integral
 
             if window.isRuntimeManageable {
@@ -2965,24 +2964,25 @@ extension AppModel {
     ) -> CGPoint {
         let snapshot = latestLiveStateSnapshot ?? liveStateSnapshot
         let sourceDisplay = snapshot?.displays.first(where: { $0.id == window.display })
+        let bounds = placementFrame(for: targetDisplay)
 
-        let horizontalInset = min(max(targetDisplay.frameW * 0.04, 28), 84)
-        let verticalInset = min(max(targetDisplay.frameH * 0.05, 42), 108)
-        let fallbackX = targetDisplay.frameX + horizontalInset
-        let fallbackY = targetDisplay.frameY + verticalInset
+        let horizontalInset = min(max(bounds.width * 0.04, 28), 84)
+        let verticalInset = min(max(bounds.height * 0.05, 42), 108)
+        let fallbackX = bounds.minX + horizontalInset
+        let fallbackY = bounds.minY + verticalInset
 
         let desiredX: Double
         let desiredY: Double
         if let sourceDisplay {
-            desiredX = targetDisplay.frameX + (window.frameX - sourceDisplay.frameX)
-            desiredY = targetDisplay.frameY + (window.frameY - sourceDisplay.frameY)
+            desiredX = bounds.minX + (window.frameX - sourceDisplay.frameX)
+            desiredY = bounds.minY + (window.frameY - sourceDisplay.frameY)
         } else {
             desiredX = fallbackX
             desiredY = fallbackY
         }
 
-        let maxX = max(fallbackX, targetDisplay.frameX + targetDisplay.frameW - max(window.frameW, 180) - horizontalInset)
-        let maxY = max(fallbackY, targetDisplay.frameY + targetDisplay.frameH - max(window.frameH, 140) - verticalInset)
+        let maxX = max(fallbackX, bounds.maxX - max(window.frameW, 180) - horizontalInset)
+        let maxY = max(fallbackY, bounds.maxY - max(window.frameH, 140) - verticalInset)
 
         return CGPoint(
             x: min(max(desiredX, fallbackX), maxX),
@@ -3399,7 +3399,8 @@ extension AppModel {
     }
 
     private func recentWindowTilerCanUseWindow(_ window: WindowState, in snapshot: LiveStateSnapshot) -> Bool {
-        guard !window.isHidden else {
+        guard !window.isHidden,
+              RecentWindowTilerInventoryPolicy.supportsRole(role: window.role, subrole: window.subrole) else {
             return false
         }
         guard !isBackdropSurfaceWindow(
@@ -3633,11 +3634,12 @@ extension AppModel {
             let window = assignment.window
             let slot = assignment.slot
             let normalizedFrame = fittedTemplateRect(for: slot, template: template, display: display)
+            let placement = placementFrame(for: display)
             let absoluteFrame = CGRect(
-                x: display.frameX + (normalizedFrame.minX * display.frameW),
-                y: display.frameY + (normalizedFrame.minY * display.frameH),
-                width: max(80, normalizedFrame.width * display.frameW),
-                height: max(60, normalizedFrame.height * display.frameH)
+                x: placement.minX + (normalizedFrame.minX * placement.width),
+                y: placement.minY + (normalizedFrame.minY * placement.height),
+                width: max(80, normalizedFrame.width * placement.width),
+                height: max(60, normalizedFrame.height * placement.height)
             ).integral
 
             let resizeResult = await doctorService.runSupportCommand(
@@ -3676,7 +3678,8 @@ extension AppModel {
         display: DisplayState
     ) -> CGRect {
         let sourceAspectRatio = max(template.displayShapeKey.aspectRatio, 0.1)
-        let targetAspectRatio = max(display.frameW, 1) / max(display.frameH, 1)
+        let placement = placementFrame(for: display)
+        let targetAspectRatio = max(placement.width, 1) / max(placement.height, 1)
 
         var scaleX = 1.0
         var scaleY = 1.0
@@ -3887,7 +3890,9 @@ extension AppModel {
 
     private func recentWindowGridAspectRatio(display: DisplayState?) -> Double {
         guard let display, display.frameH > 1 else { return 1.6 }
-        return max(display.frameW / display.frameH, 0.5)
+        let placement = placementFrame(for: display)
+        guard placement.height > 1 else { return 1.6 }
+        return max(placement.width / placement.height, 0.5)
     }
 
     private func recentWindowGridFrame(
@@ -3930,6 +3935,13 @@ extension AppModel {
             let visibleIntersection = displayFrame.intersection(visibleFrame)
             if !visibleIntersection.isNull, !visibleIntersection.isEmpty {
                 usableFrame = visibleIntersection
+            }
+        }
+
+        if let workArea = resolvedWorkArea(for: display) {
+            let constrained = usableFrame.intersection(workArea)
+            if !constrained.isNull, !constrained.isEmpty {
+                usableFrame = constrained
             }
         }
 
@@ -4907,7 +4919,7 @@ extension AppModel {
         let windowsResult = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
         guard windowsResult == .success,
               let windows = windowsRef as? [AXUIElement],
-              let targetWindow = matchingAXWindow(for: window, in: windows) else {
+              let targetWindow = matchingAXWindow(for: window, in: windows, requirePickerMatch: true) else {
             return nil
         }
 
@@ -4931,7 +4943,7 @@ extension AppModel {
         )
     }
 
-    private func setWindowFrameUsingAccessibility(window: WindowState, frame: CGRect) async -> Bool {
+    func setWindowFrameUsingAccessibility(window: WindowState, frame: CGRect) async -> Bool {
         let appPID = pid_t(window.pid)
         let appElement = AXUIElementCreateApplication(appPID)
         var windowsRef: CFTypeRef?
@@ -5019,7 +5031,27 @@ extension AppModel {
             abs(lhs.height - rhs.height) <= tolerance
     }
 
-    private func matchingAXWindow(for window: WindowState, in windows: [AXUIElement]) -> AXUIElement? {
+    private func matchingAXWindow(
+        for window: WindowState,
+        in windows: [AXUIElement],
+        requirePickerMatch: Bool = false
+    ) -> AXUIElement? {
+        if requirePickerMatch {
+            let descriptors = windows.map {
+                RecentWindowTilerInventoryPolicy.AccessibilityWindow(
+                    title: axStringValue($0, kAXTitleAttribute as CFString) ?? "",
+                    frame: axFrameValue($0)
+                )
+            }
+            let frame = CGRect(x: window.frameX, y: window.frameY, width: window.frameW, height: window.frameH)
+            guard let index = RecentWindowTilerInventoryPolicy.matchingAccessibilityWindowIndex(
+                title: window.title,
+                frame: frame,
+                windows: descriptors
+            ) else { return nil }
+            return windows[index]
+        }
+
         let wantedTitle = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !wantedTitle.isEmpty,
            let byTitle = windows.first(where: { axStringValue($0, kAXTitleAttribute as CFString) == wantedTitle }) {

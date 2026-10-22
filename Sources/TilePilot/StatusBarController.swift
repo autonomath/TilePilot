@@ -284,7 +284,21 @@ final class StatusBarController: NSObject {
         presentQuickMenu()
     }
 
+    /// Shows the quick menu under a mirrored TilePilot icon on the System Bar. The bar's panel
+    /// never activates TilePilot, so the frontmost app stays where it is.
+    func presentQuickMenu(in view: NSView, at point: NSPoint) {
+        let menu = buildQuickMenu()
+        menu.popUp(positioning: nil, at: point, in: view)
+    }
+
     private func presentQuickMenu() {
+        let menu = buildQuickMenu()
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    private func buildQuickMenu() -> NSMenu {
         model.rebuildShortcutPresentationCaches()
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -331,11 +345,20 @@ final class StatusBarController: NSObject {
         menu.addItem(outlineItem)
 
         menu.addItem(.separator())
-        menu.addItem(item("Quit", action: #selector(quitApp)))
+        if model.workAreas.isEmpty {
+            menu.addItem(item("Set Up Work Area…", action: #selector(openWorkAreaTab)))
+        } else {
+            let workAreaItem = item("Work Area", action: #selector(toggleWorkArea))
+            workAreaItem.state = model.hasEnabledWorkArea ? .on : .off
+            menu.addItem(workAreaItem)
+        }
+        if model.canUndoLastWorkAreaFit {
+            menu.addItem(item("Undo Last Work Area Fit", action: #selector(undoLastWorkAreaFit)))
+        }
 
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+        menu.addItem(.separator())
+        menu.addItem(item("Quit", action: #selector(quitApp)))
+        return menu
     }
 
     private func item(_ title: String, action: Selector, enabled: Bool = true) -> NSMenuItem {
@@ -647,6 +670,22 @@ final class StatusBarController: NSObject {
         model.toggleWindowOutlineOverlay()
     }
 
+    @objc private func toggleWorkArea() {
+        model.acknowledgeInitialStatusIfNeeded()
+        model.toggleAllWorkAreas()
+    }
+
+    @objc private func undoLastWorkAreaFit() {
+        model.acknowledgeInitialStatusIfNeeded()
+        model.undoLastWorkAreaFit()
+    }
+
+    @objc private func openWorkAreaTab() {
+        model.acknowledgeInitialStatusIfNeeded()
+        model.requestOpenTilePilotTab(.workArea)
+        onOpenTilePilot()
+    }
+
     @objc private func tileFocusedWindow() {
         model.acknowledgeInitialStatusIfNeeded()
         model.tileFocusedWindowNow()
@@ -788,6 +827,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowBadgeOverlayController = WindowBadgeOverlayController(model: model)
         workSetBackdropController = WorkSetBackdropController(model: model)
         recentWindowTilerWindowController = RecentWindowTilerWindowController(model: model)
+        model.systemBarController.quickMenuPresenter = { [weak self] view, point in
+            self?.statusBarController?.presentQuickMenu(in: view, at: point)
+        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(showMegamapWindow),
@@ -874,6 +916,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !featureRaw.isEmpty else { return }
 
             model.acknowledgeInitialStatusIfNeeded()
+            // Opening a window must not wait for helper queries. MegaMap refreshes
+            // its content after presenting and can explain unavailable desktop data.
+            if featureRaw == "app.open-megamap" {
+                model.runFeatureControl(FeatureControlID(rawValue: featureRaw), source: .shortcutsUI)
+                return
+            }
             Task { [weak self] in
                 guard let self else { return }
                 await self.model.refreshLiveState()
@@ -891,6 +939,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case "show-quick-menu":
                 statusBarController?.presentQuickMenuForAutomation()
+            case "system-bar/on", "system-bar/off", "system-bar/toggle":
+                model.setSystemBarEnabledForAllWorkAreas(
+                    actionRaw.hasSuffix("/on") ? true : (actionRaw.hasSuffix("/off") ? false : nil)
+                )
+            case "system-bar/status":
+                guard model.experimentalNativeSpacesScrubSpikeEnabled else { return }
+                model.writeSystemBarDiagnostics()
+            case let raw where raw.hasPrefix("system-bar/click/") || raw.hasPrefix("system-bar/right-click/"):
+                guard model.experimentalNativeSpacesScrubSpikeEnabled,
+                      let index = Int(raw.split(separator: "/").last ?? "") else { return }
+                let result = model.systemBarController.simulateClick(slotIndex: index, rightClick: raw.contains("right-click"))
+                model.lastActionMessage = result
             case "native-spaces-scrub-spike":
                 guard model.experimentalNativeSpacesScrubSpikeEnabled else { return }
                 Task { [weak self] in
@@ -916,6 +976,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .now
         case "behaviors", "window-behavior", "windowbehavior":
             return .windowBehavior
+        case "work-area", "workarea":
+            return .workArea
         case "actions", "shortcuts", "actions-shortcuts":
             return .actions
         case "templates":
@@ -938,6 +1000,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         tilePilotWindowController?.persistCurrentWindowSize()
         megamapWindowController?.persistCurrentWindowSize()
+        model.stop()
         windowBadgeOverlayController = nil
         NotificationCenter.default.removeObserver(self, name: .tilePilotOpenMegamap, object: nil)
         NotificationCenter.default.removeObserver(self, name: .tilePilotHideMegamap, object: nil)

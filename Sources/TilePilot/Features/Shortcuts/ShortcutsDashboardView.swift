@@ -21,6 +21,7 @@ struct ShortcutsDashboardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 shortcutsToolbar
                 searchCard
+                shortcutFeedback
 
                 if !model.shortcutParseIssues.isEmpty {
                     issuesCard
@@ -65,6 +66,21 @@ struct ShortcutsDashboardView: View {
 
     private var filteredSections: [ShortcutsCatalogSection] {
         model.groupedFlatShortcutsSections(query: searchText)
+    }
+
+    @ViewBuilder
+    private var shortcutFeedback: some View {
+        if let error = model.lastErrorMessage {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .textSelection(.enabled)
+        } else if let message = model.lastActionMessage {
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
     }
 
     private var pinnedReorderItems: [PinnedShortcutContextItem] {
@@ -708,8 +724,13 @@ struct ShortcutsDashboardView: View {
 
             HStack(spacing: 4) {
                 Button("Test") {
-                    model.runShortcut(entry)
+                    if let featureID {
+                        model.runFeatureControl(featureID, source: .shortcutsUI)
+                    } else {
+                        model.runShortcut(entry)
+                    }
                 }
+                .disabled(featureRow?.disabledReason != nil)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .font(.system(size: 12, weight: .semibold))
@@ -846,6 +867,7 @@ struct ShortcutsDashboardView: View {
         if model.recordingFeatureID == featureID {
             HStack(spacing: 4) {
                 Text("Type Shortcut")
+                    .help("Press and release a key combination. Escape cancels.")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 10)
@@ -898,6 +920,7 @@ struct ShortcutsDashboardView: View {
         if model.recordingShortcutStableKey == entry.stableKey {
             HStack(spacing: 4) {
                 Text("Type Shortcut")
+                    .help("Press and release a key combination. Escape cancels.")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 10)

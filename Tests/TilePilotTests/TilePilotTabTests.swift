@@ -11,6 +11,7 @@ final class TilePilotTabTests: XCTestCase {
             [
                 .now,
                 .windowBehavior,
+                .workArea,
                 .actions,
                 .templates,
                 .workSets,
@@ -25,6 +26,7 @@ final class TilePilotTabTests: XCTestCase {
             [
                 "Overview",
                 "Behaviors",
+                "Work Area",
                 "Actions & Shortcuts",
                 "Templates",
                 "Work Sets",

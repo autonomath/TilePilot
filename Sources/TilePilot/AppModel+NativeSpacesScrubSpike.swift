@@ -87,6 +87,10 @@ extension AppModel {
     }
 
     func refreshDesktopScrubConfiguration() {
+        nativeSpacesScrubSpikeCoordinator.onStatusChange = { [weak self] message, isError in
+            self?.desktopScrubStatusMessage = message
+            self?.desktopScrubStatusIsError = isError
+        }
         let configured = nativeSpacesScrubSpikeCoordinator.configureInteractiveScrub(
             enabled: desktopScrubEnabled,
             triggerModifiers: desktopScrubTriggerFlags,

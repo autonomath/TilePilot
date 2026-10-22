@@ -148,6 +148,21 @@ extension AppModel {
         return await waitForBootstrapWindowControlServicesToSettle()
     }
 
+    func repairManagedHelperPromptLoopIfNeeded() async {
+        guard helperService.managedLaunchAgentsRequirePromptLoopRepair() else { return }
+
+        let allowServiceStart = HelperStartConsentPolicy.allowsAutomaticStart()
+        if allowServiceStart {
+            hasAttemptedAutomaticManagedHelperServiceStart = true
+        }
+        guard let result = await helperService.repairPromptLoopingLaunchAgentsIfNeeded(
+            allowServiceStart: allowServiceStart
+        ) else {
+            return
+        }
+        applyManagedHelperOperationResult(result)
+    }
+
     func keepExistingHelperInstall() {
         helperMigrationPrompt = nil
         lastErrorMessage = nil

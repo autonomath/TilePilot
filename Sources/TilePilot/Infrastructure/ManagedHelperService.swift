@@ -8,6 +8,11 @@ struct ManagedHelperOperationResult: Sendable {
     let errorMessage: String?
 }
 
+private struct ManagedHelperLaunchAgentActivationResult: Sendable {
+    let commandLogs: [CommandLogEntry]
+    let servicesBootstrapped: Bool
+}
+
 final class ManagedHelperService: @unchecked Sendable {
     static let shared = ManagedHelperService()
 
@@ -129,9 +134,10 @@ final class ManagedHelperService: @unchecked Sendable {
             let launchAgentsInstalled: Bool
             let servicesBootstrapped: Bool
             if shouldStartServices {
-                launchAgentLogs = try await installOrUpdateLaunchAgents()
+                let activation = try await installOrUpdateLaunchAgents()
+                launchAgentLogs = activation.commandLogs
                 launchAgentsInstalled = true
-                servicesBootstrapped = launchAgentLogs.allSatisfy { $0.errorType == .none && ($0.exitStatus ?? 0) == 0 }
+                servicesBootstrapped = activation.servicesBootstrapped
             } else {
                 launchAgentLogs = []
                 launchAgentsInstalled = false
@@ -219,18 +225,18 @@ final class ManagedHelperService: @unchecked Sendable {
     func startManagedServices() async -> ManagedHelperOperationResult {
         do {
             try ensureManagedDirectories()
-            let logs = try await installOrUpdateLaunchAgents()
+            let activation = try await installOrUpdateLaunchAgents()
             let previous = loadInstallState()
             let installState = ManagedHelperInstallState(
                 updatedAt: Date(),
                 helpers: previous?.helpers ?? [],
                 launchAgentsInstalled: true,
-                servicesBootstrapped: logs.allSatisfy { $0.errorType == .none && ($0.exitStatus ?? 0) == 0 }
+                servicesBootstrapped: activation.servicesBootstrapped
             )
             try writeInstallState(installState)
             return ManagedHelperOperationResult(
                 installState: installState,
-                commandLogs: logs,
+                commandLogs: activation.commandLogs,
                 successMessage: installState.servicesBootstrapped ? "Started TilePilot window-control services." : nil,
                 errorMessage: installState.servicesBootstrapped ? nil : "TilePilot could not start yabai/skhd. macOS may require Accessibility approval for the helper named in the system prompt; approve that entry, then try again."
             )
@@ -305,6 +311,68 @@ final class ManagedHelperService: @unchecked Sendable {
         }
 
         return false
+    }
+
+    func managedLaunchAgentsRequirePromptLoopRepair() -> Bool {
+        ManagedHelperKind.allCases.contains { helper in
+            let url = launchAgentURL(for: helper)
+            guard let data = try? Data(contentsOf: url) else { return false }
+            return ManagedHelperLaunchPolicy.requiresPromptLoopRepair(plistData: data)
+        }
+    }
+
+    func repairPromptLoopingLaunchAgentsIfNeeded(allowServiceStart: Bool) async -> ManagedHelperOperationResult? {
+        guard managedLaunchAgentsRequirePromptLoopRepair() else { return nil }
+
+        if allowServiceStart {
+            let result = await startManagedServices()
+            return ManagedHelperOperationResult(
+                installState: result.installState,
+                commandLogs: result.commandLogs,
+                successMessage: result.errorMessage == nil
+                    ? "Updated window-control startup to prevent repeated permission prompts."
+                    : nil,
+                errorMessage: result.errorMessage
+            )
+        }
+
+        var logs: [CommandLogEntry] = []
+        let domain = launchctlDomain()
+        for helper in ManagedHelperKind.allCases {
+            let plistURL = launchAgentURL(for: helper)
+            guard FileManager.default.fileExists(atPath: plistURL.path) else { continue }
+
+            let result = await runner.run(
+                .init("/bin/launchctl", ["bootout", "\(domain)/\(helper.launchAgentLabel)"], timeout: 2.0)
+            )
+            logs.append(makeLog(from: result))
+            try? FileManager.default.removeItem(at: plistURL)
+        }
+
+        let previous = loadInstallState()
+        let installState = ManagedHelperInstallState(
+            updatedAt: Date(),
+            helpers: previous?.helpers ?? [],
+            launchAgentsInstalled: false,
+            servicesBootstrapped: false
+        )
+        do {
+            try ensureManagedDirectories()
+            try writeInstallState(installState)
+            return ManagedHelperOperationResult(
+                installState: installState,
+                commandLogs: logs,
+                successMessage: "Stopped an old helper restart loop. Start Window Control when you are ready.",
+                errorMessage: nil
+            )
+        } catch {
+            return ManagedHelperOperationResult(
+                installState: previous,
+                commandLogs: logs,
+                successMessage: nil,
+                errorMessage: "TilePilot could not remove an old helper restart loop: \(error.localizedDescription)"
+            )
+        }
     }
 
     private func externalHelperURL(for helper: ManagedHelperKind) -> URL? {
@@ -408,28 +476,31 @@ final class ManagedHelperService: @unchecked Sendable {
         try fm.moveItem(at: tempURL, to: destination)
     }
 
-    private func installOrUpdateLaunchAgents() async throws -> [CommandLogEntry] {
+    private func installOrUpdateLaunchAgents() async throws -> ManagedHelperLaunchAgentActivationResult {
         try writeLaunchAgents()
         var logs: [CommandLogEntry] = []
+        var servicesBootstrapped = true
         for helper in ManagedHelperKind.allCases {
             let plistPath = launchAgentURL(for: helper).path
             let domain = launchctlDomain()
-            let commands = [
-                ShellCommand("/bin/launchctl", ["bootout", domain, plistPath], timeout: 2.0),
-                ShellCommand("/bin/launchctl", ["bootstrap", domain, plistPath], timeout: 2.0),
-                ShellCommand("/bin/launchctl", ["kickstart", "-k", "\(domain)/\(helper.launchAgentLabel)"], timeout: 2.0),
-            ]
-            for command in commands {
+            let argumentSets = ManagedHelperLaunchPolicy.activationArguments(
+                domain: domain,
+                label: helper.launchAgentLabel,
+                plistPath: plistPath
+            )
+            for arguments in argumentSets {
+                let command = ShellCommand("/bin/launchctl", arguments, timeout: 2.0)
                 let result = await runner.run(command)
-                if command.arguments.first == "bootout", result.errorType != .none {
-                    // bootout failing on a not-yet-loaded agent is fine
-                    logs.append(makeLog(from: CommandResult(command: result.command, startedAt: result.startedAt, endedAt: result.endedAt, exitStatus: 0, stdout: result.stdout, stderr: "", errorType: .none)))
-                } else {
-                    logs.append(makeLog(from: result))
+                logs.append(makeLog(from: result))
+                if arguments.first == "bootstrap", !result.isSuccess {
+                    servicesBootstrapped = false
                 }
             }
         }
-        return logs
+        return ManagedHelperLaunchAgentActivationResult(
+            commandLogs: logs,
+            servicesBootstrapped: servicesBootstrapped
+        )
     }
 
     private func writeLaunchAgents() throws {
@@ -448,7 +519,7 @@ final class ManagedHelperService: @unchecked Sendable {
         }
     }
 
-    private func launchAgentPlist(for helper: ManagedHelperKind) -> String {
+    func launchAgentPlist(for helper: ManagedHelperKind) -> String {
         let executablePath = managedHelperURL(for: helper).path
         let stdoutPath = managedLogsDirectory().appendingPathComponent("\(helper.rawValue).stdout.log").path
         let stderrPath = managedLogsDirectory().appendingPathComponent("\(helper.rawValue).stderr.log").path
@@ -467,8 +538,6 @@ final class ManagedHelperService: @unchecked Sendable {
                 <string>\(xmlEscaped(executablePath))</string>
             </array>
             <key>RunAtLoad</key>
-            <true/>
-            <key>KeepAlive</key>
             <true/>
             <key>WorkingDirectory</key>
             <string>\(xmlEscaped(workingDirectory))</string>

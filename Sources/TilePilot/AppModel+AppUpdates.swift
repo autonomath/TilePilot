@@ -34,11 +34,18 @@ extension AppModel {
     var appUpdateStatusDetail: String {
         switch appUpdateStatus {
         case .idle:
+            if automaticAppUpdateChecksEnabled {
+                return "TilePilot checks GitHub for a newer stable release every 12 hours while it is running."
+            }
             return "Check GitHub releases to see whether a newer stable TilePilot build is available."
         case .checking:
             return "Checking the latest stable GitHub release for TilePilot."
         case .upToDate(let currentVersion, let checkedAt):
-            return "TilePilot \(currentVersion) is current. Last checked \(relativeUpdateTimeString(from: checkedAt))."
+            let detail = "TilePilot \(currentVersion) is current. Last checked \(relativeUpdateTimeString(from: checkedAt))."
+            if automaticAppUpdateChecksEnabled {
+                return "\(detail) Checks continue every 12 hours while TilePilot is running."
+            }
+            return detail
         case .available(let release):
             if let publishedAt = release.publishedAt {
                 return "\(release.tagName) was published \(relativeUpdateTimeString(from: publishedAt)). Open the GitHub release page to update."
@@ -85,13 +92,49 @@ extension AppModel {
     }
 
     func shouldRunAutomaticAppUpdateCheck(now: Date = Date()) -> Bool {
-        guard automaticAppUpdateChecksEnabled else { return false }
-        guard !isCheckingForAppUpdates else { return false }
-        guard let lastCheck = appUpdateLastSuccessfulCheckAt else { return true }
-        return now.timeIntervalSince(lastCheck) >= 12 * 60 * 60
+        AppUpdateCheckPolicy.shouldRun(
+            enabled: automaticAppUpdateChecksEnabled,
+            isChecking: isCheckingForAppUpdates,
+            lastSuccessfulCheckAt: appUpdateLastSuccessfulCheckAt,
+            now: now
+        )
     }
 
-    private func performAppUpdateCheck(manual: Bool) async {
+    func startAutomaticAppUpdateChecksIfNeeded() {
+        guard automaticAppUpdateChecksEnabled,
+              automaticAppUpdateCheckTask == nil else {
+            return
+        }
+
+        automaticAppUpdateCheckTask = Task { [weak self] in
+            guard let self else { return }
+
+            while !Task.isCancelled {
+                var latestAttemptResult: Bool?
+                if self.shouldRunAutomaticAppUpdateCheck() {
+                    latestAttemptResult = await self.performAppUpdateCheck(manual: false)
+                }
+
+                let delay = AppUpdateCheckPolicy.nextDelay(
+                    lastSuccessfulCheckAt: self.appUpdateLastSuccessfulCheckAt,
+                    latestAttemptResult: latestAttemptResult,
+                    now: Date()
+                )
+                do {
+                    try await Task.sleep(for: .seconds(delay))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    func stopAutomaticAppUpdateChecks() {
+        automaticAppUpdateCheckTask?.cancel()
+        automaticAppUpdateCheckTask = nil
+    }
+
+    private func performAppUpdateCheck(manual: Bool) async -> Bool {
         isCheckingForAppUpdates = true
         defer { isCheckingForAppUpdates = false }
 
@@ -111,7 +154,7 @@ extension AppModel {
                     lastErrorMessage = "Update check failed: this build does not report a usable app version."
                     lastActionMessage = nil
                 }
-                return
+                return false
             }
 
             guard let latestRelease,
@@ -122,7 +165,7 @@ extension AppModel {
                 if manual {
                     lastErrorMessage = nil
                 }
-                return
+                return true
             }
 
             persistKnownAppUpdate(latestRelease)
@@ -130,6 +173,7 @@ extension AppModel {
             if manual {
                 lastErrorMessage = nil
             }
+            return true
         } catch {
             let message = userFacingAppUpdateErrorMessage(error)
             if case .available = priorStatus {
@@ -143,6 +187,7 @@ extension AppModel {
                 lastErrorMessage = "Update check failed: \(message)"
                 lastActionMessage = nil
             }
+            return false
         }
     }
 

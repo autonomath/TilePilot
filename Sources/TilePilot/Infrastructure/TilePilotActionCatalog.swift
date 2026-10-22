@@ -93,6 +93,16 @@ enum TilePilotActionCatalog {
                 requiresLiveState: true,
                 disableInDegradedMode: false
             )
+        case .fillWorkArea:
+            return .init(
+                title: "Fill Work Area",
+                subtitle: "Resize the focused floating window to fill the Work Area on its display",
+                category: "Window",
+                buttonLabel: "Fill",
+                requiredCapabilities: ["yabai-binary", "yabai-daemon", "yabai-query"],
+                requiresLiveState: true,
+                disableInDegradedMode: false
+            )
         case .browserReliefPlaceholder:
             return .init(
                 title: "Browser Relief",
@@ -127,6 +137,9 @@ enum TilePilotActionCatalog {
             return [yabaiCommand(["-m", "window", "--focus", "north"], timeout: 1.5)]
         case .focusSouth:
             return [yabaiCommand(["-m", "window", "--focus", "south"], timeout: 1.5)]
+        case .fillWorkArea:
+            // Runs in AppModel because it needs live geometry and verification.
+            return []
         case .browserReliefPlaceholder:
             return []
         }

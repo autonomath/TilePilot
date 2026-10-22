@@ -269,6 +269,34 @@ extension AppModel {
                 isExperimental: false
             ),
             FeatureDefinition(
+                id: Self.workAreaFillFeatureID,
+                group: .windowPlacement,
+                title: "Fill Work Area",
+                description: "Resizes the focused floating window to fill the Work Area on its display.",
+                backend: .tilePilotAction,
+                capabilityGate: .yabaiRuntime,
+                defaultCombo: nil,
+                commandMatchers: [tilePilotFeatureURL(Self.workAreaFillFeatureID)],
+                matchAllCommandMatchers: false,
+                preferredCommand: tilePilotFeatureCommand(Self.workAreaFillFeatureID),
+                actionID: .fillWorkArea,
+                isExperimental: false
+            ),
+            FeatureDefinition(
+                id: Self.workAreaToggleFeatureID,
+                group: .displays,
+                title: "Turn Work Area On or Off",
+                description: "Turns every saved Work Area off, or back on when they are all off.",
+                backend: .tilePilotAction,
+                capabilityGate: .none,
+                defaultCombo: nil,
+                commandMatchers: [tilePilotFeatureURL(Self.workAreaToggleFeatureID)],
+                matchAllCommandMatchers: false,
+                preferredCommand: tilePilotFeatureCommand(Self.workAreaToggleFeatureID),
+                actionID: nil,
+                isExperimental: false
+            ),
+            FeatureDefinition(
                 id: "app.run-guided-setup",
                 group: .apps,
                 title: "Run Guided Setup",

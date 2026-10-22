@@ -21,5 +21,20 @@ final class ReleaseDefaultsTests: XCTestCase {
             ReleaseDefaultsService().currentProfile().configState.managedSkhdSectionBody
         )
     }
+
+    func testReleaseDefaultsResetClearsWorkAreas() {
+        XCTAssertEqual(ReleaseDefaultsService().currentProfile().userState.workAreas, [])
+    }
+
+    func testUserStateFromBeforeWorkAreasStillDecodes() throws {
+        let profile = ReleaseDefaultsService().currentProfile()
+        let encoded = try JSONEncoder().encode(profile.userState)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "workAreas")
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(ReleaseDefaultsUserState.self, from: legacy)
+        XCTAssertEqual(decoded.workAreas, [])
+        XCTAssertEqual(decoded.pinnedFeatureControlIDs, profile.userState.pinnedFeatureControlIDs)
+    }
 }
 #endif

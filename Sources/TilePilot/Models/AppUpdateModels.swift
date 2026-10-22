@@ -1,5 +1,36 @@
 import Foundation
 
+enum AppUpdateCheckPolicy {
+    static let successfulCheckInterval: TimeInterval = 12 * 60 * 60
+    static let failedCheckRetryInterval: TimeInterval = 30 * 60
+
+    static func shouldRun(
+        enabled: Bool,
+        isChecking: Bool,
+        lastSuccessfulCheckAt: Date?,
+        now: Date
+    ) -> Bool {
+        guard enabled, !isChecking else { return false }
+        guard let lastSuccessfulCheckAt else { return true }
+        return now.timeIntervalSince(lastSuccessfulCheckAt) >= successfulCheckInterval
+    }
+
+    static func nextDelay(
+        lastSuccessfulCheckAt: Date?,
+        latestAttemptResult: Bool?,
+        now: Date
+    ) -> TimeInterval {
+        if latestAttemptResult == false {
+            return failedCheckRetryInterval
+        }
+        guard let lastSuccessfulCheckAt else {
+            return latestAttemptResult == nil ? failedCheckRetryInterval : 1
+        }
+        let remaining = successfulCheckInterval - now.timeIntervalSince(lastSuccessfulCheckAt)
+        return min(successfulCheckInterval, max(1, remaining))
+    }
+}
+
 struct AppVersion: Comparable, Hashable, Sendable {
     let normalized: String
     private let components: [Int]
@@ -38,6 +69,19 @@ struct AppVersion: Comparable, Hashable, Sendable {
             }
         }
         return false
+    }
+
+    /// Missing trailing components count as zero, matching `<`: 0.2.12 equals 0.2.12.0.
+    static func == (lhs: AppVersion, rhs: AppVersion) -> Bool {
+        !(lhs < rhs) && !(rhs < lhs)
+    }
+
+    func hash(into hasher: inout Hasher) {
+        var significant = components
+        while significant.count > 1, significant.last == 0 {
+            significant.removeLast()
+        }
+        hasher.combine(significant)
     }
 }
 

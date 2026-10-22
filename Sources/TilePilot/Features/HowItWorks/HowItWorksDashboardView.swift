@@ -7,6 +7,7 @@ struct HowItWorksDashboardView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     introCard
                     windowBehaviorSection
+                    workAreaSection
                     shortcutsSection
                     recentWindowPickerSection
                     workSetsSection
@@ -54,6 +55,52 @@ struct HowItWorksDashboardView: View {
                 summary: "Hold the trigger keys, move the mouse left or right, then let go and macOS settles on that desktop."
             ) {
                 DesktopScrubExplainerDiagram()
+            }
+        }
+    }
+
+    private var workAreaSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Work Area")
+            conceptCard(
+                title: "What It Changes",
+                summary: "A Work Area is a smaller rectangle on one display. TilePilot places windows inside it so a very large screen feels closer to a normal one, without changing the display resolution."
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Tiled windows stay inside it through desktop padding", systemImage: "rectangle.split.3x1")
+                    Label("Floating windows that end up outside move back in after you let go of the mouse", systemImage: "arrow.down.right.and.arrow.up.left")
+                    Label("Double-click a title bar: the window grows to the screen, then shrinks to fill the Work Area", systemImage: "macwindow")
+                    Label("Floating Grid, Templates, Work Sets, and Fill Work Area all use the same rectangle", systemImage: "rectangle.3.offgrid")
+                    Label("Screen Edge Padding still applies inside the area", systemImage: "square.dashed")
+                    Label("Turn on the menu bar to get the app menus and this display's menu bar icons at the top of the area; clicks go to the real ones", systemImage: "menubar.rectangle")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+            conceptCard(
+                title: "What Stays on the Whole Display",
+                summary: "macOS still owns the edges of the real screen, so some things ignore the Work Area."
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("The real menu bar, Dock, notifications, and desktop icons (the mirrored menu bar is a copy)", systemImage: "menubar.rectangle")
+                    Label("The pointer, so you can still reach system controls and other displays", systemImage: "cursorarrow")
+                    Label("Screen sharing and screenshots of the whole display", systemImage: "rectangle.on.rectangle")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+            conceptCard(
+                title: "When a Window Can't Fit",
+                summary: "Some windows have a minimum size or refuse to move. TilePilot tries twice, then lists the window in the Work Area tab and waits 30 seconds before trying again."
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Allow Outside lets one window stay anywhere until TilePilot restarts", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label("Apps Allowed Outside keeps every window from an app free", systemImage: "app.badge.checkmark")
+                    Label("Undo Last Fit puts the windows TilePilot just moved back where they were", systemImage: "arrow.uturn.backward")
+                    Label("Dialogs, sheets, and tool palettes are never moved", systemImage: "macwindow.on.rectangle")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             }
         }
     }

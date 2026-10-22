@@ -1,9 +1,13 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import OSLog
 
 @MainActor
 final class NativeSpacesScrubSpikeCoordinator {
+    var onStatusChange: ((String?, Bool) -> Void)?
+    private let scrubLogger = Logger(subsystem: "com.klode.tilepilot", category: "DesktopScrub")
+    private var interactiveMouseEventCount = 0
     private enum SessionEndReason: String {
         case completed
         case cancelled
@@ -28,7 +32,7 @@ final class NativeSpacesScrubSpikeCoordinator {
     private var interactiveHorizontalScale: Double = 1.0 / 1600.0
     private var scrubTriggerModifiers: NSEvent.ModifierFlags = DesktopScrubModifier.flags(for: DesktopScrubModifier.defaultSelection)
     private var scrubTriggerCharacter: DesktopScrubCharacterKey = .none
-    private var isTriggerCharacterHeld = false
+    private var scrubKeyCapture = DesktopScrubKeyCapture()
     private var scrubSensitivity = 1.0
     private var scrubInvertDirection = true
     private let scrubPerEventDeltaClamp = 0.18
@@ -56,9 +60,10 @@ final class NativeSpacesScrubSpikeCoordinator {
         sensitivity: Double,
         invertDirection: Bool
     ) -> Bool {
+        endInteractiveScrub(commit: false)
         scrubTriggerModifiers = triggerModifiers.intersection([.shift, .control, .option, .command])
         scrubTriggerCharacter = triggerCharacter
-        isTriggerCharacterHeld = false
+        scrubKeyCapture.cancelTrigger()
         scrubSensitivity = min(max(sensitivity, 0.4), 5.0)
         scrubInvertDirection = invertDirection
 
@@ -208,6 +213,9 @@ final class NativeSpacesScrubSpikeCoordinator {
     @discardableResult
     private func installInteractiveMonitors() -> Bool {
         removeInteractiveMonitors()
+        // Consuming a global chord requires existing Accessibility trust. This
+        // check must never prompt when restoring the user's enabled setting.
+        guard AXIsProcessTrusted() else { return false }
         let mask =
             (1 << CGEventType.flagsChanged.rawValue) |
             (1 << CGEventType.keyDown.rawValue) |
@@ -220,16 +228,24 @@ final class NativeSpacesScrubSpikeCoordinator {
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(event) }
             let coordinator = Unmanaged<NativeSpacesScrubSpikeCoordinator>.fromOpaque(userInfo).takeUnretainedValue()
-            MainActor.assumeIsolated {
-                coordinator.handleInteractiveCGEvent(type: type, event: event)
+            let consumed = MainActor.assumeIsolated {
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    coordinator.endInteractiveScrub(commit: false)
+                    coordinator.scrubKeyCapture.reset()
+                    if let tap = coordinator.interactiveEventTap {
+                        CGEvent.tapEnable(tap: tap, enable: true)
+                    }
+                    return false
+                }
+                return coordinator.handleInteractiveCGEvent(type: type, event: event)
             }
-            return Unmanaged.passUnretained(event)
+            return consumed ? nil : Unmanaged.passUnretained(event)
         }
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,
+            options: .defaultTap,
             eventsOfInterest: CGEventMask(mask),
             callback: callback,
             userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
@@ -249,6 +265,7 @@ final class NativeSpacesScrubSpikeCoordinator {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.endInteractiveScrub(commit: false)
+                self?.scrubKeyCapture.cancelTrigger()
             }
         }
         interactiveNotificationObservers = [resignObserver]
@@ -256,12 +273,16 @@ final class NativeSpacesScrubSpikeCoordinator {
     }
 
     private func removeInteractiveMonitors() {
+        if let tap = interactiveEventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
         if let source = interactiveEventTapRunLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
         interactiveEventTapRunLoopSource = nil
         interactiveEventTap = nil
-        isTriggerCharacterHeld = false
+        scrubKeyCapture.reset()
         for observer in interactiveNotificationObservers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -269,8 +290,8 @@ final class NativeSpacesScrubSpikeCoordinator {
         invalidateDockSwipeRepeatTimers()
     }
 
-    private func handleInteractiveCGEvent(type: CGEventType, event: CGEvent) {
-        guard isInteractiveScrubArmed else { return }
+    private func handleInteractiveCGEvent(type: CGEventType, event: CGEvent) -> Bool {
+        guard isInteractiveScrubArmed else { return false }
 
         switch type {
         case .flagsChanged:
@@ -281,34 +302,35 @@ final class NativeSpacesScrubSpikeCoordinator {
                 endInteractiveScrub(commit: true)
             }
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-            guard isInteractiveScrubbing else { return }
+            guard isInteractiveScrubbing else { return false }
+            interactiveMouseEventCount += 1
             let deltaX = CGFloat(event.getIntegerValueField(.mouseEventDeltaX))
-            guard abs(deltaX) > scrubActivationThreshold else { return }
+            guard abs(deltaX) > scrubActivationThreshold else { return false }
             handleInteractiveMouseDelta(deltaX)
         case .keyDown:
-            if event.getIntegerValueField(.keyboardEventKeycode) == 53 {
-                guard isInteractiveScrubbing else { return }
+            let flags = NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue))
+            let decision = scrubKeyCapture.keyDown(
+                event.getIntegerValueField(.keyboardEventKeycode),
+                configuredTrigger: scrubTriggerCharacter.keyCode,
+                modifiersMatch: flags.intersection([.shift, .control, .option, .command]) == scrubTriggerModifiers,
+                isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0,
+                isScrubbing: isInteractiveScrubbing
+            )
+            if decision == .cancel {
                 endInteractiveScrub(commit: false)
-                return
+            } else if decision == .begin {
+                beginInteractiveScrub()
             }
-
-            if scrubTriggerCharacter != .none, eventMatchesTriggerCharacter(event) {
-                isTriggerCharacterHeld = true
-                let triggerActive = scrubTriggerIsActive(NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue)))
-                if triggerActive, !isInteractiveScrubbing {
-                    beginInteractiveScrub()
-                }
-                return
-            }
+            return decision.consumesEvent
 
         case .keyUp:
-            guard scrubTriggerCharacter != .none, eventMatchesTriggerCharacter(event) else { return }
-            isTriggerCharacterHeld = false
-            guard isInteractiveScrubbing else { return }
-            endInteractiveScrub(commit: true)
+            let decision = scrubKeyCapture.keyUp(event.getIntegerValueField(.keyboardEventKeycode))
+            if decision == .commit { endInteractiveScrub(commit: true) }
+            return decision.consumesEvent
         default:
             break
         }
+        return false
     }
 
     private func scrubTriggerIsActive(_ flags: NSEvent.ModifierFlags) -> Bool {
@@ -317,18 +339,15 @@ final class NativeSpacesScrubSpikeCoordinator {
         if scrubTriggerCharacter == .none {
             return true
         }
-        return isTriggerCharacterHeld
-    }
-
-    private func eventMatchesTriggerCharacter(_ event: CGEvent) -> Bool {
-        guard scrubTriggerCharacter != .none else { return false }
-        let eventKey = DesktopScrubCharacterKey.from(keyCode: event.getIntegerValueField(.keyboardEventKeycode))
-        return eventKey == scrubTriggerCharacter
+        return scrubKeyCapture.isTriggerHeld
     }
 
     private func beginInteractiveScrub() {
         guard !isInteractiveScrubbing else { return }
         isInteractiveScrubbing = true
+        interactiveMouseEventCount = 0
+        onStatusChange?(nil, false)
+        scrubLogger.notice("Desktop Scrub gesture started")
         startedDockSwipeGesture = false
         accumulatedHorizontalDelta = 0
         lastDockSwipeDelta = 0
@@ -347,16 +366,23 @@ final class NativeSpacesScrubSpikeCoordinator {
         guard abs(appliedDelta) > .ulpOfOne else { return }
 
         if !startedDockSwipeGesture {
-            _ = postDockSwipeEvent(delta: appliedDelta, type: 1, phase: 1, invertedFromDevice: false)
-            startedDockSwipeGesture = true
+            startedDockSwipeGesture = postDockSwipeEvent(delta: appliedDelta, type: 1, phase: 1, invertedFromDevice: false)
+            if !startedDockSwipeGesture { endInteractiveScrub(commit: false) }
         } else {
-            _ = postDockSwipeEvent(delta: appliedDelta, type: 1, phase: 2, invertedFromDevice: false)
+            if !postDockSwipeEvent(delta: appliedDelta, type: 1, phase: 2, invertedFromDevice: false) {
+                endInteractiveScrub(commit: false)
+            }
         }
 
     }
 
     private func endInteractiveScrub(commit: Bool) {
         guard isInteractiveScrubbing else { return }
+        let mouseEvents = interactiveMouseEventCount
+        let travel = Double(accumulatedHorizontalDelta)
+        let offset = dockSwipeOriginOffset
+        let gesturePosted = startedDockSwipeGesture
+        scrubLogger.notice("Desktop Scrub gesture ended: mouseEvents=\(mouseEvents), travel=\(travel), offset=\(offset), gesturePosted=\(gesturePosted), commit=\(commit)")
 
         if isInteractiveScrubbing && startedDockSwipeGesture {
             let shouldCommit = commit && abs(dockSwipeOriginOffset) >= scrubCommitThreshold
@@ -653,6 +679,9 @@ final class NativeSpacesScrubSpikeCoordinator {
         invertedFromDevice: Bool
     ) {
         invalidateDockSwipeRepeatTimers()
+        // Ending the interactive session resets its progress immediately. Keep
+        // the release position for delayed end events so they cannot snap back.
+        let finalOriginOffset = dockSwipeOriginOffset
         dockSwipeRepeatEndTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -660,7 +689,8 @@ final class NativeSpacesScrubSpikeCoordinator {
                     phase: phase,
                     exitSpeed: exitSpeed,
                     type: type,
-                    invertedFromDevice: invertedFromDevice
+                    invertedFromDevice: invertedFromDevice,
+                    originOffset: finalOriginOffset
                 )
             }
         }
@@ -671,7 +701,8 @@ final class NativeSpacesScrubSpikeCoordinator {
                     phase: phase,
                     exitSpeed: exitSpeed,
                     type: type,
-                    invertedFromDevice: invertedFromDevice
+                    invertedFromDevice: invertedFromDevice,
+                    originOffset: finalOriginOffset
                 )
             }
         }
@@ -688,50 +719,26 @@ final class NativeSpacesScrubSpikeCoordinator {
         phase: Int64,
         exitSpeed: Double?,
         type: Double = 1,
-        invertedFromDevice: Bool = false
+        invertedFromDevice: Bool = false,
+        originOffset: Double? = nil
     ) -> Bool {
-        guard let e29 = CGEvent(source: nil), let e30 = CGEvent(source: nil) else { return false }
-
-        let subtype: Int64 = 23 // kIOHIDEventTypeDockSwipe
-        let eventTypeGesture = 29.0
-        let eventTypeMagnify = 30.0
-        let magic41 = 33231.0
-        let weirdTypeOrSum = 1.401298464324817e-45 // horizontal
-
-        e29.setDoubleValueField(eventField(55), value: eventTypeGesture)
-        e29.setDoubleValueField(eventField(41), value: magic41)
-
-        e30.setDoubleValueField(eventField(55), value: eventTypeMagnify)
-        e30.setDoubleValueField(eventField(41), value: magic41)
-        e30.setDoubleValueField(eventField(110), value: Double(subtype))
-        e30.setDoubleValueField(eventField(132), value: Double(phase))
-        e30.setDoubleValueField(eventField(134), value: Double(phase))
-        e30.setDoubleValueField(eventField(124), value: dockSwipeOriginOffset)
-
-        var originFloat = Float32(dockSwipeOriginOffset)
-        let encodedOrigin = withUnsafeBytes(of: &originFloat) { bytes -> UInt32 in
-            bytes.load(as: UInt32.self)
+        guard let events = DockSwipeEventBuilder.makeEvents(
+            originOffset: originOffset ?? dockSwipeOriginOffset,
+            phase: phase,
+            exitSpeed: exitSpeed,
+            type: type,
+            invertedFromDevice: invertedFromDevice
+        ) else {
+            let message = DockSwipeEventBuilder.unavailableReason
+                ?? "macOS could not create the Desktop Scrub gesture."
+            onStatusChange?(message, true)
+            scrubLogger.error("Desktop Scrub event construction failed: \(message, privacy: .public)")
+            return false
         }
-        e30.setIntegerValueField(eventField(135), value: Int64(encodedOrigin))
-
-        e30.setDoubleValueField(eventField(119), value: weirdTypeOrSum)
-        e30.setDoubleValueField(eventField(139), value: weirdTypeOrSum)
-        e30.setDoubleValueField(eventField(123), value: type)
-        e30.setDoubleValueField(eventField(165), value: type)
-        e30.setIntegerValueField(eventField(136), value: invertedFromDevice ? 1 : 0)
-
-        if let exitSpeed {
-            e30.setDoubleValueField(eventField(129), value: exitSpeed)
-            e30.setDoubleValueField(eventField(130), value: exitSpeed)
+        for event in events {
+            event.post(tap: .cgSessionEventTap)
         }
-
-        e30.post(tap: .cgSessionEventTap)
-        e29.post(tap: .cgSessionEventTap)
         return true
-    }
-
-    private func eventField(_ rawValue: Int) -> CGEventField {
-        CGEventField(rawValue: UInt32(rawValue))!
     }
 
     private func parseSpaceIndex(from raw: String) -> Int? {

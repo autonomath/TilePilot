@@ -105,6 +105,7 @@ final class ReleaseDefaultsService: @unchecked Sendable {
             "TilePilot.appForegroundPolicyByName",
             "TilePilot.desktopTilingPreferencesBySpaceIndex",
             "TilePilot.performanceHideMinimizedHelperWindowsInMaps",
+            "TilePilot.workAreas",
         ]
         return keys.contains { defaults.object(forKey: $0) != nil }
     }

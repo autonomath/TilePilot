@@ -7,6 +7,7 @@ enum TilePilotTab: Hashable {
     case workSets
     case appearance
     case windowBehavior
+    case workArea
     case actions
     case shortcuts
     case howItWorks
@@ -21,6 +22,7 @@ enum TilePilotTab: Hashable {
     static let visibleTabs: [TilePilotTab] = [
         .now,
         .windowBehavior,
+        .workArea,
         .actions,
         .templates,
         .workSets,
@@ -42,6 +44,8 @@ enum TilePilotTab: Hashable {
             return "Work Sets"
         case .windowBehavior:
             return "Behaviors"
+        case .workArea:
+            return "Work Area"
         case .actions, .shortcuts:
             return "Actions & Shortcuts"
         case .howItWorks:
@@ -65,6 +69,8 @@ enum TilePilotTab: Hashable {
             return "square.stack.3d.up"
         case .windowBehavior:
             return "hand.raised.square"
+        case .workArea:
+            return "rectangle.inset.filled"
         case .actions, .shortcuts:
             return "square.grid.2x2"
         case .howItWorks:
@@ -195,6 +201,8 @@ struct TilePilotRootView: View {
             NowDashboardView()
         case .windowBehavior:
             WindowBehaviorDashboardView()
+        case .workArea:
+            WorkAreaDashboardView()
         case .actions, .shortcuts:
             UnifiedControlsDashboardView()
         case .templates:

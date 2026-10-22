@@ -592,6 +592,8 @@ extension AppModel {
                 }
             }
         }
+        // The global padding commands above reset every desktop, including Work Area desktops.
+        invalidateWorkAreaPaddingCache()
 
         let ruleCommands = yabaiRulesConfigService.runtimeRuleCommands(previous: previous, current: current)
         var ruleApplyFailed = false
@@ -645,6 +647,7 @@ extension AppModel {
         await refreshLiveState()
         await refreshDoctor()
         await refreshWindowBehaviorConfig()
+        await reapplyWorkAreaPaddingIfMissing()
     }
 
     private func floatOpenWindowsForApps(_ appNames: Set<String>) async {

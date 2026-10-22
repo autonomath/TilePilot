@@ -21,6 +21,7 @@ final class YabaiStateService: @unchecked Sendable {
     private var cachedScreenDescriptorsUpdatedAt: Date?
     private let fallbackRefreshInterval: TimeInterval = 12
     private let screenDescriptorRefreshInterval: TimeInterval = 15
+    private let queryTimeout: TimeInterval = 1.5
 
     private struct ScreenDescriptor: Sendable {
         let displayID: CGDirectDisplayID
@@ -36,9 +37,9 @@ final class YabaiStateService: @unchecked Sendable {
     }
 
     func pollLiveState() async -> LiveStatePollResult {
-        async let displaysTask = runner.run(yabaiCommand(["-m", "query", "--displays"], timeout: 1.5))
-        async let spacesTask = runner.run(yabaiCommand(["-m", "query", "--spaces"], timeout: 1.5))
-        async let windowsTask = runner.run(yabaiCommand(["-m", "query", "--windows"], timeout: 1.5))
+        async let displaysTask = runner.run(yabaiCommand(["-m", "query", "--displays"], timeout: queryTimeout))
+        async let spacesTask = runner.run(yabaiCommand(["-m", "query", "--spaces"], timeout: queryTimeout))
+        async let windowsTask = runner.run(yabaiCommand(["-m", "query", "--windows"], timeout: queryTimeout))
 
         let timestamp = Date()
         let displaysResult = await displaysTask
@@ -50,15 +51,12 @@ final class YabaiStateService: @unchecked Sendable {
         let fallbackTotal = fallbackDisplays.reduce(0) { $0 + $1.windowCount }
 
         guard queriesSucceeded else {
-            let rawMessage = firstNonEmpty([
-                windowsResult.stderr,
-                spacesResult.stderr,
-                displaysResult.stderr,
-                windowsResult.stdout,
-                spacesResult.stdout,
-                displaysResult.stdout,
-            ]) ?? "yabai query failed"
-            let message = userFacingLiveStateError(from: rawMessage)
+            let message = YabaiQueryFailure.summary(
+                windows: windowsResult,
+                spaces: spacesResult,
+                displays: displaysResult,
+                timeout: queryTimeout
+            )
 
             return LiveStatePollResult(
                 timestamp: timestamp,
@@ -68,7 +66,7 @@ final class YabaiStateService: @unchecked Sendable {
                 fallbackDisplays: fallbackDisplays,
                 yabaiWindowTotal: nil,
                 fallbackWindowTotal: fallbackDisplays.isEmpty ? nil : fallbackTotal,
-                errorMessage: trimForUI(message)
+                errorMessage: message
             )
         }
 
@@ -218,7 +216,8 @@ final class YabaiStateService: @unchecked Sendable {
                 hasWindowServerMatch: onScreenDescriptor != nil,
                 windowServerOrderIndex: onScreenDescriptor?.orderIndex,
                 source: .yabai,
-                lastUpdatedAt: timestamp
+                lastUpdatedAt: timestamp,
+                isNativeFullscreen: bool(from: row["is-native-fullscreen"]) ?? false
             )
         }
         .sorted { lhs, rhs in
@@ -268,7 +267,8 @@ final class YabaiStateService: @unchecked Sendable {
                 focused: bool(from: row["has-focus"]) ?? false,
                 windowCount: windowCountByDisplay[id] ?? 0,
                 source: .yabai,
-                lastUpdatedAt: timestamp
+                lastUpdatedAt: timestamp,
+                uuid: resolvedDisplayUUID(from: row, screenDescriptors: screenDescriptors)
             )
         }
         .sorted { $0.id < $1.id }
@@ -311,6 +311,18 @@ final class YabaiStateService: @unchecked Sendable {
         }
 
         return "Display \(fallbackID)"
+    }
+
+    private func resolvedDisplayUUID(from row: [String: Any], screenDescriptors: [ScreenDescriptor]) -> String? {
+        if let yabaiUUID = string(from: row["uuid"])?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+           !yabaiUUID.isEmpty {
+            return yabaiUUID
+        }
+        if let frame = yabaiFrame(from: row["frame"]),
+           let match = bestScreenDescriptor(for: frame, descriptors: screenDescriptors) {
+            return match.uuid?.uppercased()
+        }
+        return nil
     }
 
     private func yabaiFrame(from value: Any?) -> CGRect? {
@@ -420,29 +432,6 @@ final class YabaiStateService: @unchecked Sendable {
         default:
             return nil
         }
-    }
-
-    private func firstNonEmpty(_ values: [String]) -> String? {
-        values
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first { !$0.isEmpty }
-    }
-
-    private func userFacingLiveStateError(from raw: String) -> String {
-        let normalized = raw.lowercased()
-        if normalized.contains("env: yabai: no such file or directory") || normalized.contains("not found") {
-            return "TilePilot has not finished preparing its local yabai/skhd components yet. Run Guided Setup, then return to Overview."
-        }
-        if normalized.contains("could not connect")
-            || normalized.contains("message socket")
-            || normalized.contains("failed to connect to socket")
-            || normalized.contains("socket unavailable") {
-            return "TilePilot cannot talk to yabai yet. Run Guided Setup, start window control, and approve any yabai/skhd Accessibility prompt macOS shows."
-        }
-        if normalized.contains("permission") && normalized.contains("denied") {
-            return "yabai was blocked by macOS permissions. Open Guided Setup, approve the exact yabai/skhd Accessibility entry macOS names, then retry."
-        }
-        return raw
     }
 
     private func currentScreenDescriptors() async -> [ScreenDescriptor] {

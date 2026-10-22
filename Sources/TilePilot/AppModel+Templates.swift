@@ -217,13 +217,22 @@ extension AppModel {
             return nil
         }
 
+        let liveDisplay = (latestLiveStateSnapshot ?? liveStateSnapshot)?.displays.first(where: { $0.id == source.display.id })
         let importedSlots = normalizedTemplateSlotZOrder(
             source.desktop.windows.map { window in
-                WindowLayoutSlot(
-                    normalizedX: window.normalizedX,
-                    normalizedY: window.normalizedY,
-                    normalizedWidth: window.normalizedW,
-                    normalizedHeight: window.normalizedH,
+                let displayNormalized = CGRect(
+                    x: window.normalizedX,
+                    y: window.normalizedY,
+                    width: window.normalizedW,
+                    height: window.normalizedH
+                )
+                // Slots are stored relative to the Work Area so the layout reapplies inside it.
+                let rect = liveDisplay.map { workAreaRelativeNormalizedRect(displayNormalized, display: $0) } ?? displayNormalized
+                return WindowLayoutSlot(
+                    normalizedX: rect.minX,
+                    normalizedY: rect.minY,
+                    normalizedWidth: rect.width,
+                    normalizedHeight: rect.height,
                     allowedApps: [window.app]
                 )
             }

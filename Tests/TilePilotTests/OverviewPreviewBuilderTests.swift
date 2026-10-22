@@ -145,7 +145,7 @@ final class OverviewPreviewBuilderTests: XCTestCase {
         XCTAssertEqual(previews.first?.desktops.first?.windows.first?.desktopIndex, 1)
     }
 
-    func testNormalizedPreviewClampsWindowsToDisplayBounds() {
+    func testNormalizedPreviewClampsWindowsToDisplayBounds() throws {
         let display = DisplayState(
             id: 1,
             name: "Built-in",
@@ -181,14 +181,13 @@ final class OverviewPreviewBuilderTests: XCTestCase {
             lastUpdatedAt: .distantPast
         )
 
-        let preview = OverviewPreviewBuilder.normalizedPreview(for: window, in: display, desktopIndex: 1)
+        let preview = try XCTUnwrap(OverviewPreviewBuilder.normalizedPreview(for: window, in: display, desktopIndex: 1))
 
-        XCTAssertNotNil(preview)
-        XCTAssertEqual(preview?.desktopIndex, 1)
-        XCTAssertEqual(preview?.normalizedX, 0, accuracy: 0.0001)
-        XCTAssertEqual(preview?.normalizedY, 0, accuracy: 0.0001)
-        XCTAssertEqual(preview?.normalizedW, 1, accuracy: 0.0001)
-        XCTAssertEqual(preview?.normalizedH, 1, accuracy: 0.0001)
+        XCTAssertEqual(preview.desktopIndex, 1)
+        XCTAssertEqual(preview.normalizedX, 0, accuracy: 0.0001)
+        XCTAssertEqual(preview.normalizedY, 0, accuracy: 0.0001)
+        XCTAssertEqual(preview.normalizedW, 1, accuracy: 0.0001)
+        XCTAssertEqual(preview.normalizedH, 1, accuracy: 0.0001)
     }
 
     func testMiniMapGeometryAppliesMinimumTileSizeInsideCanvas() {
@@ -199,6 +198,8 @@ final class OverviewPreviewBuilderTests: XCTestCase {
             desktopIndex: 1,
             floating: false,
             runtimeManageable: true,
+            usesLimitedVisualStyle: false,
+            warmPaletteIndex: nil,
             focused: false,
             visible: true,
             normalizedX: 0.95,
