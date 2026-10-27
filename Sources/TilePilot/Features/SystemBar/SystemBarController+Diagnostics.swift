@@ -59,6 +59,8 @@ extension SystemBarController {
         let searched = scan.searchedKeys.map { itemsByKey[$0]?.shortName ?? $0 }
         lines.append("last scan: \(String(format: "%.2f", scan.seconds)) s, \(scan.hitTests) hit tests, searched \(searched)")
         lines.append(iconScanSummary)
+        let learned = Dictionary(grouping: brightness.factors.values, by: { String(format: "%.2f", $0) }).mapValues(\.count)
+        lines.append("dimming: learned \(learned.sorted { $0.key < $1.key }); brightened now \(brightenedIconNames)")
         for bar in bars.values.sorted(by: { $0.key < $1.key }) {
             let shown = bar.view.content.icons.map { item -> String in
                 guard let source = item.pixelSource else { return "\(item.shortName)@-" }

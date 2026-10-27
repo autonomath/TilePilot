@@ -572,5 +572,59 @@ final class SystemBarModelsTests: XCTestCase {
         XCTAssertTrue(signature([60...80, 100...123, 130...153, 160...190]).differs(from: base), "a new icon")
         XCTAssertTrue(signature([100...123, 160...190]).differs(from: base), "an icon left")
     }
+
+    // MARK: - Icon brightness
+
+    /// A 24×22 icon: `ink` gray in the given columns over a `background` gray, as macOS would
+    /// draw it at `fraction` of full brightness.
+    private func iconImage(ink: CGFloat, background: CGFloat = 2, fraction: CGFloat = 1, columns: ClosedRange<Int> = 6...17) -> CGImage {
+        let context = CGContext(
+            data: nil, width: 24, height: 22, bitsPerComponent: 8, bytesPerRow: 24 * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        )!
+        let backgroundGray = background / 255
+        context.setFillColor(CGColor(srgbRed: backgroundGray, green: backgroundGray, blue: backgroundGray, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 24, height: 22))
+        let value = (background + fraction * (ink - background)) / 255
+        context.setFillColor(CGColor(srgbRed: value, green: value, blue: value, alpha: 1))
+        context.fill(CGRect(x: columns.lowerBound, y: 5, width: columns.count, height: 12))
+        return context.makeImage()!
+    }
+
+    private func maxGray(_ image: CGImage) -> Int {
+        let context = CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        )!
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let bytes = context.data!.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
+        return (0..<(image.width * image.height)).map { Int(bytes[$0 * 4 + 1]) }.max() ?? 0
+    }
+
+    func testIconBrightnessLearnsTheDimmingOfTemplateAndColorIcons() {
+        XCTAssertEqual(SystemBarIconBrightness.learnFactor(bright: iconImage(ink: 230), dim: iconImage(ink: 230, fraction: 0.28)), 0.28)
+        XCTAssertEqual(SystemBarIconBrightness.learnFactor(bright: iconImage(ink: 255), dim: iconImage(ink: 255, fraction: 0.6)), 0.6)
+        XCTAssertEqual(SystemBarIconBrightness.learnFactor(bright: iconImage(ink: 230), dim: iconImage(ink: 230, fraction: 0.35)), 0.35, "the system's own icons")
+        XCTAssertNil(SystemBarIconBrightness.learnFactor(bright: iconImage(ink: 230), dim: iconImage(ink: 230, fraction: 0.45)), "not a fraction macOS uses")
+        XCTAssertNil(
+            SystemBarIconBrightness.learnFactor(bright: iconImage(ink: 230, columns: 2...9), dim: iconImage(ink: 230, fraction: 0.28, columns: 14...21)),
+            "the icon changed in between"
+        )
+    }
+
+    func testIconBrightnessRestoresADimmedIconOnceItHasSeenItBright() {
+        var brightness = SystemBarIconBrightness()
+        let dim = iconImage(ink: 230, fraction: 0.28)
+        XCTAssertNil(brightness.brightened(dim, key: "drive"), "unknown until seen bright")
+        brightness.noteBright(iconImage(ink: 230), key: "drive")
+        let restored = brightness.brightened(dim, key: "drive")
+        XCTAssertEqual(maxGray(restored!), 230, accuracy: 3)
+        XCTAssertEqual(brightness.factors["drive"], 0.28)
+        // The fraction stays known for later copies, after a restart too.
+        var restarted = SystemBarIconBrightness(factors: brightness.factors)
+        XCTAssertEqual(maxGray(restarted.brightened(iconImage(ink: 230, fraction: 0.28, columns: 3...10), key: "drive")!), 230, accuracy: 3)
+    }
 }
 #endif

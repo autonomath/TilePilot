@@ -56,6 +56,13 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     private var savedIconRow: SystemBarIconRowState.Snapshot?
     private static let iconRowDefaultsKey = "TilePilot.systemBarIconRow"
     private(set) var backgroundLook = SystemBarBackgroundLook()
+    /// Brings icons copied from an inactive display's bar back to full brightness; the learned
+    /// fractions are saved between launches.
+    private(set) var brightness = SystemBarIconBrightness()
+    private var savedDimmingFactors: [String: CGFloat] = [:]
+    private static let dimmingDefaultsKey = "TilePilot.systemBarIconDimming"
+    /// Icons shown brightened in the last redraw, for the status route.
+    private(set) var brightenedIconNames: [String] = []
     private var activeBackgroundRect: (menuBar: CGRect, rect: CGRect)?
     private var activationScanTask: Task<Void, Never>?
     /// The last copied pixels of each icon, shown while a focus change moves the icon's copy
@@ -129,6 +136,10 @@ final class SystemBarController: NSObject, NSMenuDelegate {
            let snapshot = try? JSONDecoder().decode(SystemBarIconRowState.Snapshot.self, from: data) {
             iconRow = SystemBarIconRowState(snapshot: snapshot)
             savedIconRow = snapshot
+        }
+        if let saved = UserDefaults.standard.dictionary(forKey: Self.dimmingDefaultsKey) as? [String: Double] {
+            savedDimmingFactors = saved.mapValues { CGFloat($0) }
+            brightness = SystemBarIconBrightness(factors: savedDimmingFactors)
         }
         captureSet.onFrame = { [weak self] in
             self?.scheduleRedraw()
@@ -502,6 +513,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         let presentKeys = Set(statusItems.map(\.stableKey))
         var sticky = (stickyIcons[key] ?? [:]).filter { presentKeys.contains($0.key) }
         lastIconImages = lastIconImages.filter { presentKeys.contains($0.key) }
+        brightness.keepOnly(Set(SystemBarIconRowState.keyed(statusItems).map(\.key)))
         if let ownBar = bar.menuBarFrame {
             var drawn: [String: (rightOffset: CGFloat, width: CGFloat)] = [:]
             for item in statusItems {
@@ -630,6 +642,10 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             guard canMatch, let id = display(menuBar) else { return nil }
             return captureSet.capture(for: id)
         }
+        // Copies from the active bar are bright; copies from another bar were dimmed by macOS.
+        let activeBar = activeMenuBar.map(Self.barKey)
+        let rowKeys = Dictionary(SystemBarIconRowState.keyed(content.icons).map { ($0.item.stableKey, $0.key) }, uniquingKeysWith: { first, _ in first })
+        var brightened: [String] = []
         var renderings: [Int: SystemBarIconRendering] = [:]
         for slot in content.plan.slots {
             guard case let .icon(index) = slot.kind, content.icons.indices.contains(index) else { continue }
@@ -641,6 +657,14 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 image = capture(for: source.menuBar)?.image(for: Self.regionKey(for: source))
                 size = source.frame.size
                 top = source.frame.minY - source.menuBar.minY
+                if let copied = image, let rowKey = rowKeys[item.stableKey] {
+                    if activeBar == nil || Self.barKey(source.menuBar) == activeBar {
+                        brightness.noteBright(copied, key: rowKey)
+                    } else if let restored = brightness.brightened(copied, key: rowKey) {
+                        image = restored
+                        brightened.append(item.shortName)
+                    }
+                }
             }
             if let image {
                 lastIconImages[item.stableKey] = (image, size, top)
@@ -652,6 +676,11 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             renderings[index] = rendering(for: item, barHeight: bar.layout.bar.height, matchingImage: image, size: size, top: top)
         }
         content.iconRenderings = renderings
+        brightenedIconNames = brightened
+        if brightness.factors != savedDimmingFactors {
+            savedDimmingFactors = brightness.factors
+            UserDefaults.standard.set(savedDimmingFactors.mapValues { Double($0) }, forKey: Self.dimmingDefaultsKey)
+        }
         if !canMatch {
             lastIconImages.removeAll()
         }
