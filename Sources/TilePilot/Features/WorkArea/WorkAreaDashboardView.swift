@@ -320,7 +320,7 @@ struct WorkAreaDashboardView: View {
                 .toggleStyle(.switch)
                 .disabled(!workAreaOn || !barOn)
 
-                Text("Shows every menu bar icon once, in a row that stays put when focus moves between displays. Icons copied from an inactive display look dimmed, as macOS draws them there; panels open where macOS draws the icon.")
+                Text("Shows every menu bar icon once, in a row that stays put when focus moves between displays. Icons macOS dims on the other display are shown at full brightness; panels open where macOS draws the icon.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

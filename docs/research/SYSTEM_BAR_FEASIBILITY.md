@@ -101,19 +101,36 @@ What the mirror does with this (default):
   (the laptop on this Mac, whichever display is active); an icon that bar stops drawing keeps its
   slot from the previous row, right after the icon it followed. The row also remembers icons that
   vanish while their app keeps running (macOS removes the system icons while the screen is locked),
-  so they come back in place. A fresh launch starts with no memory, so an icon seen only off the
-  copied bar starts at an end of the row until that bar draws it once. Gaps are measured only between
+  so they come back in place. The row is keyed by bundle ID and Accessibility identifier and saved
+  in `TilePilot.systemBarIconRow`, so restarts and app relaunches keep every slot; icons not seen for
+  30 days are forgotten. Gaps are measured only between
   icons drawn next to each other; otherwise the last gap stays. An icon not yet seen drawn anywhere
   waits instead of showing an app-icon stand-in. Pixels and clicks still go to wherever macOS draws
-  each icon, so icons copied from an inactive bar are dimmed. That dimming is not one factor:
-  template icons drop to about 28% brightness, others to about 60% (measured 2026-10-27).
+  each icon.
+- macOS dims every icon on an inactive bar by a fixed fraction over the background: dim =
+  background + f × (bright − background), within 2 of 255 (measured 2026-10-27, macOS 27, dark
+  bar). f is 0.28 for third-party template icons, 0.35 for the system's icons (clock, Wi-Fi,
+  battery), and 0.60 for full-color images. `SystemBarIconBrightness` learns each icon's f from a
+  copy taken while its bar was active and one taken while it was not, keeps it only when it snaps to
+  one of those values and fits at least 70% of the icon, saves it in `TilePilot.systemBarIconDimming`,
+  and divides the dimming back out. On real captures restored icons matched the bright originals with
+  a median difference of 0 and at most 5 of 255. Icons whose content changed between the two copies
+  (TraceBar's graph) learn nothing until a matching pair comes along.
 - On macOS 27 a hit test on an icon drawn on an inactive bar answers with the app's own `AXMenuBar`;
   empty stretches answer with the menu bar of the app that bar shows. `hitTest` counts an
   `AXMenuBar` hit as the icon's container unless its pid owns that bar, sampled with five hit tests
   the first time a scan needs it. A scan of 33 icons takes 0.13–0.22 s and 38–69 hit tests
-  (`system-bar/status` reports `last scan`); TilePilot used 1.7–2.0% of one core with the row on.
-  An earlier version that searched every wide gap for icons drawn twice kept the scan thread busy
-  nonstop.
+  (`system-bar/status` reports `last scan`). An earlier version that searched every wide gap for
+  icons drawn twice kept the scan thread busy nonstop.
+- Icons are scanned on events and when the captured bar's layout changes, instead of every 3 s.
+  Menu bar icons are not windows on macOS 27 (`CGWindowListCopyWindowInfo` lists none), so the
+  signal comes from the pixels already captured: the capture measures which columns of the icon
+  stretch differ from the background, joins gaps up to 4 pt, and counts a change when a span
+  appears, disappears, or moves more than 2 pt (`SystemBarLayoutSignature`). Measuring on the
+  main thread from a converted image cost about 1% of a core; measuring the raw buffer on the
+  capture queue, only when that stretch's pixels changed, costs nothing visible. With 34 icons,
+  scans fell from one every 3 s to one every 10–20 s, and TilePilot from about 2% to 1.2% of a core.
+  Width changes inside a fixed-size icon (TraceBar's ping text) still trigger an occasional scan.
 - An app that had icons last scan is never put on the 30-second "no icons" skip list; an icon missing
   from one scan stays for 10 s. Without this, all system icons vanished after a display switch.
 

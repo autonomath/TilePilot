@@ -172,7 +172,7 @@ Turn on `Show the menu bar at the top of the Work Area` to get the frontmost app
 - menus open right under the mirrored bar, and choosing an item uses the real menu, so the app you're working in stays in front
 - clicking or right-clicking an icon clicks the real one, so it behaves exactly as it does at the top of the screen; icon panels such as Wi-Fi or Battery still open at the real menu bar
 - with `Match the real icons` and Screen Recording, icons are copied pixel for pixel in memory; without Screen Recording, TilePilot draws symbols and app icons
-- `Also show icons from other displays` adds icons macOS draws only on another display's menu bar
+- `Also show icons from other displays` shows every display's icons once, in one row that stays put when you switch displays; icons macOS dims on the other display are shown at full brightness
 
 The Dock, notifications, and the real menu bar keep using the whole display, and the display's resolution never changes.
 
