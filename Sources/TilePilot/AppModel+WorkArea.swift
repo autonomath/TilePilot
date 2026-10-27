@@ -90,8 +90,8 @@ extension AppModel {
     }
 
     private func workAreaScreenUUID(_ screen: NSScreen) -> String? {
-        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
-              let uuid = CGDisplayCreateUUIDFromDisplayID(CGDirectDisplayID(number.uint32Value))?.takeRetainedValue() else {
+        guard let displayID = screen.displayID,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else {
             return nil
         }
         return (CFUUIDCreateString(nil, uuid) as String).uppercased()

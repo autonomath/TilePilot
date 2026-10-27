@@ -221,6 +221,196 @@ final class SystemBarModelsTests: XCTestCase {
 
     // MARK: - Configuration
 
+    // MARK: - Islands
+
+    func testMenusAndIconsBecomeTwoIslandsThatReachTheBarEdges() {
+        let slots = [
+            SystemBarSlot(kind: .menu(index: 0), x: 10, width: 34),
+            SystemBarSlot(kind: .menu(index: 1), x: 44, width: 79),
+            SystemBarSlot(kind: .icon(index: 0), x: 3600, width: 24),
+            SystemBarSlot(kind: .icon(index: 1), x: 3630, width: 190),
+        ]
+        let islands = SystemBarLayoutPlanner.islands(for: slots, barWidth: 3840)
+        XCTAssertEqual(islands, [0...129, 3594...3840])
+    }
+
+    func testIconGroupsCloseTogetherShareAnIslandAndDistantOnesDoNot() {
+        let slots = [
+            SystemBarSlot(kind: .icon(index: 0), x: 1000, width: 24),
+            SystemBarSlot(kind: .icon(index: 1), x: 1040, width: 24),
+            SystemBarSlot(kind: .icon(index: 2), x: 1500, width: 24),
+        ]
+        let islands = SystemBarLayoutPlanner.islands(for: slots, barWidth: 3840)
+        XCTAssertEqual(islands, [994...1070, 1494...1530])
+    }
+
+    func testEmptyBarHasNoIslands() {
+        XCTAssertTrue(SystemBarLayoutPlanner.islands(for: [], barWidth: 3840).isEmpty)
+    }
+
+    // MARK: - Icon row (every display's icons)
+
+    private func sightings(_ pairs: (String, CGFloat)...) -> [SystemBarIconRow.Sighting] {
+        pairs.map { SystemBarIconRow.Sighting(bar: $0.0, minX: $0.1) }
+    }
+
+    func testIconRowCopiesTheBarThatDrawsTheMostIcons() {
+        // The laptop draws a, camera, b, c, d; the Samsung draws only d and b in its own order,
+        // plus its own system icons.
+        let row = SystemBarIconRow.order(
+            icons: [
+                ("a", sightings(("L", 100)), false),
+                ("camera", sightings(("S", 2800), ("L", 120)), true),
+                ("b", sightings(("L", 140), ("S", 3000)), false),
+                ("c", sightings(("L", 180)), false),
+                ("d", sightings(("L", 220), ("S", 2950)), false),
+                ("clock", sightings(("S", 3100)), true),
+                ("wifi", sightings(("S", 3050)), true),
+            ],
+            previousReference: nil
+        )
+        XCTAssertEqual(row.reference, "L")
+        XCTAssertEqual(row.order, ["a", "camera", "b", "c", "d", "wifi", "clock"], "each icon once, where the copied bar draws it")
+    }
+
+    func testIconRowKeepsItsBarUnlessAnotherClearlyDrawsMore() {
+        let icons: [(key: String, sightings: [SystemBarIconRow.Sighting], isSystem: Bool)] = [
+            ("a", sightings(("L", 100), ("S", 900)), false),
+            ("b", sightings(("L", 140), ("S", 800)), false),
+            ("c", sightings(("S", 700)), false),
+        ]
+        let kept = SystemBarIconRow.order(icons: icons, previousReference: "L")
+        XCTAssertEqual(kept.reference, "L")
+        XCTAssertEqual(kept.order, ["c", "a", "b"], "an icon the copied bar does not draw goes at the left")
+        let fresh = SystemBarIconRow.order(icons: icons, previousReference: nil)
+        XCTAssertEqual(fresh.reference, "S")
+    }
+
+    func testIconRowKeepsTheSlotOfIconsThatMoveToAnotherDisplay() {
+        // The laptop drew everything; focus moved to the Samsung and macOS now draws "t" and the
+        // camera only there, and the laptop's clock is no longer found.
+        let row = SystemBarIconRow.order(
+            icons: [
+                ("a", sightings(("L", 100)), false),
+                ("camera", sightings(("S", 2800)), true),
+                ("t", sightings(("S", 2870)), false),
+                ("b", sightings(("L", 160)), false),
+                ("c", sightings(("L", 200)), false),
+                ("clock", sightings(("S", 3100)), true),
+                ("new", sightings(("S", 2900)), false),
+            ],
+            previousReference: "L",
+            previousOrder: ["a", "camera", "t", "b", "c", "clock"]
+        )
+        XCTAssertEqual(row.reference, "L")
+        XCTAssertEqual(row.order, ["new", "a", "camera", "t", "b", "c", "clock"], "known icons stay put; a new one starts at the left")
+    }
+
+    func testIconRowGivesAnIconThatVanishedForAWhileItsSlotBack() {
+        // The system icons disappear while the screen is locked; "quit" belongs to an app that quit.
+        let memory = SystemBarIconRow.remembered(
+            order: ["a", "t", "b"],
+            previous: ["a", "camera", "t", "b", "quit", "clock"],
+            keep: { $0 != "quit" }
+        )
+        XCTAssertEqual(memory, ["a", "camera", "t", "b", "clock"])
+        // After the unlock the camera is drawn only on the Samsung, which is not the copied bar.
+        let row = SystemBarIconRow.order(
+            icons: [
+                ("a", sightings(("L", 100)), false),
+                ("camera", sightings(("S", 2800)), true),
+                ("t", sightings(("L", 130)), false),
+                ("b", sightings(("L", 160)), false),
+                ("clock", sightings(("S", 3100)), true),
+            ],
+            previousReference: "L",
+            previousOrder: memory
+        )
+        XCTAssertEqual(row.order, ["a", "camera", "t", "b", "clock"])
+    }
+
+    func testIconRowGapsKeepTheirLastMeasurementWhenNeighboursAreApart() {
+        let gaps = SystemBarIconRow.learnedGaps(
+            order: ["a", "t", "b", "c"],
+            frames: [
+                "a": ["L": CGRect(x: 100, y: 0, width: 24, height: 24)],
+                "t": ["S": CGRect(x: 2870, y: 0, width: 36, height: 24)],
+                "b": ["L": CGRect(x: 160, y: 0, width: 24, height: 24)],
+                "c": ["L": CGRect(x: 190, y: 0, width: 24, height: 24)],
+            ],
+            previous: ["a": 9, "t": 7, "b": 3, "gone": 5]
+        )
+        XCTAssertEqual(gaps["a"], 9, "a and t are not drawn on one bar now")
+        XCTAssertEqual(gaps["t"], 7)
+        XCTAssertEqual(gaps["b"], 6, "measured: b and c sit next to each other on the laptop")
+        XCTAssertNil(gaps["gone"])
+    }
+
+    func testIconRowPacksFromTheRightWithRealGaps() {
+        let offsets = SystemBarIconRow.packedRightOffsets(
+            order: ["a", "b", "clock"],
+            widths: ["a": 24, "b": 36, "clock": 130],
+            trailingGaps: ["a": 6, "b": 16],
+            trailingInset: 20
+        )
+        XCTAssertEqual(offsets["clock"], 20)
+        XCTAssertEqual(offsets["b"], 20 + 130 + 16)
+        XCTAssertEqual(offsets["a"], 20 + 130 + 16 + 36 + 6)
+    }
+
+    func testCaptureRetriesQuicklyAfterAReconnectThenBacksOff() {
+        XCTAssertEqual(SystemBarCapturePolicy.retryDelay(afterFailures: 1), 2)
+        XCTAssertEqual(SystemBarCapturePolicy.retryDelay(afterFailures: 2), 10)
+        XCTAssertEqual(SystemBarCapturePolicy.retryDelay(afterFailures: 7), 30)
+    }
+
+    // MARK: - Remembered icons
+
+    private let t0 = Date(timeIntervalSinceReferenceDate: 1_000_000)
+
+    private func sticky(_ offset: CGFloat, _ width: CGFloat = 24, missing: Date? = nil) -> SystemBarStickyIcon {
+        SystemBarStickyIcon(rightOffset: offset, width: width, missingSince: missing)
+    }
+
+    func testActiveBarDropsIconsItStoppedDrawingAfterTheGrace() {
+        // TraceBar was remembered at offset 300; the active bar now draws Raycast there instead.
+        let remembered = ["trace": sticky(300, 86), "wifi": sticky(100)]
+        let drawn: [String: (rightOffset: CGFloat, width: CGFloat)] = ["wifi": (100, 24), "raycast": (310, 24)]
+
+        let first = SystemBarStickyIconPolicy.update(remembered, drawn: drawn, ownBarIsActive: true, now: t0)
+        XCTAssertNotNil(first["trace"], "kept during the grace in case the bar is still redrawing")
+        XCTAssertNil(SystemBarStickyIconPolicy.shown(first)["trace"], "never drawn on top of an icon the bar shows now")
+
+        let later = SystemBarStickyIconPolicy.update(first, drawn: drawn, ownBarIsActive: true, now: t0.addingTimeInterval(7))
+        XCTAssertEqual(Set(later.keys), ["wifi", "raycast"])
+    }
+
+    func testInactiveBarKeepsTheLastActiveSetAndPlaces() {
+        let remembered = ["a": sticky(100), "b": sticky(140), "c": sticky(180)]
+        // While another display is active, macOS draws only one icon here, shifted.
+        let drawn: [String: (rightOffset: CGFloat, width: CGFloat)] = ["c": (120, 24)]
+        let next = SystemBarStickyIconPolicy.update(remembered, drawn: drawn, ownBarIsActive: false, now: t0)
+        XCTAssertEqual(next, remembered)
+    }
+
+    func testInactiveBarAddsANewIconOnlyWhereItFits() {
+        let remembered = ["a": sticky(100), "b": sticky(140)]
+        let drawn: [String: (rightOffset: CGFloat, width: CGFloat)] = ["new": (110, 24), "far": (400, 24)]
+        let next = SystemBarStickyIconPolicy.update(remembered, drawn: drawn, ownBarIsActive: false, now: t0)
+        XCTAssertNil(next["new"])
+        XCTAssertEqual(next["far"], sticky(400))
+    }
+
+    func testIconsNotYetRedrawnAfterFocusReturnsStayVisible() {
+        let remembered = ["a": sticky(100), "b": sticky(140)]
+        let drawn: [String: (rightOffset: CGFloat, width: CGFloat)] = ["a": (100, 24)]
+        let next = SystemBarStickyIconPolicy.update(remembered, drawn: drawn, ownBarIsActive: true, now: t0)
+        XCTAssertEqual(next["b"]?.missingSince, t0)
+        XCTAssertNotNil(SystemBarStickyIconPolicy.shown(next)["b"])
+        let redrawn = SystemBarStickyIconPolicy.update(next, drawn: ["a": (100, 24), "b": (140, 24)], ownBarIsActive: true, now: t0.addingTimeInterval(1))
+        XCTAssertNil(redrawn["b"]?.missingSince)
+    }
+
     func testWorkAreaConfigurationDecodesMissingSystemBarFieldsWithDefaults() throws {
         let json = """
         {"displayName":"SAMSUNG","displayWidth":3840,"displayHeight":2160,"normalizedX":0.1,"normalizedY":0.2,"normalizedWidth":0.6,"normalizedHeight":0.6}

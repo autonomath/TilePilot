@@ -10,6 +10,8 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
         let pid: pid_t
         let bundleIdentifier: String
         let name: String
+        /// Apps that started moments ago may not have added their icon yet.
+        var launchedAt: Date? = nil
     }
 
     enum PressOutcome: Sendable, Equatable {
@@ -46,7 +48,28 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
     /// Each app's AXExtrasMenuBar, so hit tests can tell an icon container from a menu bar.
     private var statusContainerByPID: [pid_t: AXUIElement] = [:]
     private var pidsWithIcons = Set<pid_t>()
+    /// The real bars of the current scan and, once a hit test needed it, which app's menu bar
+    /// answers for each bar's empty stretches (see barOwnerPID).
+    private var scanMenuBars: [CGRect] = []
+    private var barOwners: [String: pid_t] = [:]
+    private var scanHitTests = 0
+    private var scanSearches: [String] = []
+    private var scanStats = ScanStats(seconds: 0, hitTests: 0, searchedKeys: [])
     private var clickNote = ""
+
+    /// What the last icon scan cost, for the status route.
+    struct ScanStats: Sendable {
+        let seconds: TimeInterval
+        let hitTests: Int
+        /// Icons whose drawn place had to be searched for instead of confirmed in one hit test.
+        let searchedKeys: [String]
+    }
+
+    var lastScanStats: ScanStats {
+        lock.lock()
+        defer { lock.unlock() }
+        return scanStats
+    }
     /// What the last icon click did, for the status route.
     var lastClickNote: String {
         lock.lock()
@@ -177,6 +200,12 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
 
     private func readStatusItemsSync(apps: [RunningApp], menuBars: [CGRect], ownBars: [CGRect]) -> [SystemBarStatusItem] {
         let now = Date()
+        lock.lock()
+        scanMenuBars = menuBars
+        barOwners = [:]
+        scanHitTests = 0
+        scanSearches = []
+        lock.unlock()
         let generation = beginGeneration(.statusItem)
         var result: [SystemBarStatusItem] = []
         var seenKeys = Set<String>()
@@ -191,16 +220,19 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
         // An app that had icons last time may answer empty for a moment (macOS rebuilds the
         // menu bars when focus moves to another display); only apps that keep having none are
         // skipped for a while.
-        func noteNoIcons(_ pid: pid_t) {
-            guard !hadIcons.contains(pid) else { return }
-            setNoExtrasUntil(pid, now.addingTimeInterval(Self.noExtrasRescanSeconds))
+        func noteNoIcons(_ app: RunningApp) {
+            guard !hadIcons.contains(app.pid) else { return }
+            if let launchedAt = app.launchedAt, now.timeIntervalSince(launchedAt) < Self.noExtrasRescanSeconds {
+                return
+            }
+            setNoExtrasUntil(app.pid, now.addingTimeInterval(Self.noExtrasRescanSeconds))
         }
 
         for app in apps {
             if let until = cachedNoExtrasUntil(app.pid), until > now { continue }
             let appElement = applicationElement(pid: app.pid)
             guard let extras = elementAttribute(appElement, "AXExtrasMenuBar") else {
-                noteNoIcons(app.pid)
+                noteNoIcons(app)
                 continue
             }
             lock.lock()
@@ -208,7 +240,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
             lock.unlock()
             let leaves = children(of: extras).flatMap { leafMenuBarItems(under: $0, depth: 0) }
             if leaves.isEmpty {
-                noteNoIcons(app.pid)
+                noteNoIcons(app)
                 continue
             }
             withIcons.insert(app.pid)
@@ -245,6 +277,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
                         isPositionConfirmed: placement != nil,
                         stableKey: key,
                         reportedMenuBarFrame: menuBar,
+                        reportedFrame: frame,
                         ownBarPlacements: ownPlacements
                     )
                 )
@@ -254,6 +287,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
         relocationByKey = relocationByKey.filter { seenKeys.contains($0.key) }
         pidsWithIcons = withIcons
         ownProbeByKey = ownProbeByKey.filter { seenKeys.contains(String($0.key.split(separator: "@").first ?? "")) }
+        scanStats = ScanStats(seconds: Date().timeIntervalSince(now), hitTests: scanHitTests, searchedKeys: scanSearches)
         lock.unlock()
         return result
     }
@@ -264,8 +298,6 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
         let barIndex: Int
         /// Shift from the predicted center to the measured center, in points.
         let centerShift: CGFloat
-        /// The reported frame this was measured for; a different report is measured again.
-        let claimedFrame: CGRect
     }
 
     /// What a hit test found at a point on a menu bar.
@@ -304,7 +336,8 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
     /// Where an icon is really drawn. Confirms the reported frame with one hit test; when that
     /// misses, looks on the other menu bars at the same distance from the right edge (icons keep
     /// roughly that distance on every display), then measures the icon's hit area there to center
-    /// it exactly. Measurements are cached per icon and re-checked with one hit test. Some apps
+    /// it exactly. Measurements are cached per icon and re-checked with one hit test, also after
+    /// the reported frame shifts (a neighbour changed width; the drawn icon shifts with it). Some apps
     /// answer hit tests with an error; such an area counts as the icon when the reported spot
     /// clearly belonged to another app. Nil when nothing matched.
     private func confirmedPlacement(identity: IconIdentity, key: String, frame: CGRect, claimedBar: CGRect, menuBars: [CGRect]) -> (frame: CGRect, menuBar: CGRect)? {
@@ -325,7 +358,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
         lock.lock()
         let remembered = relocationByKey[key]
         lock.unlock()
-        if let remembered, remembered.claimedFrame == frame, menuBars.indices.contains(remembered.barIndex) {
+        if let remembered, menuBars.indices.contains(remembered.barIndex) {
             let bar = menuBars[remembered.barIndex]
             let placed = predicted(on: bar).offsetBy(dx: remembered.centerShift, dy: 0)
             if matches(hitTest(at: CGPoint(x: placed.midX, y: placed.midY))) {
@@ -333,6 +366,9 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
             }
         }
 
+        lock.lock()
+        scanSearches.append(key)
+        lock.unlock()
         for (barIndex, bar) in menuBars.enumerated() where bar != claimedBar {
             let guess = predicted(on: bar)
             for nudge in Self.searchNudges {
@@ -356,7 +392,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
                 }
                 if measured {
                     lock.lock()
-                    relocationByKey[key] = Relocation(barIndex: barIndex, centerShift: shift, claimedFrame: frame)
+                    relocationByKey[key] = Relocation(barIndex: barIndex, centerShift: shift)
                     lock.unlock()
                 }
                 return (guess.offsetBy(dx: shift, dy: 0), bar)
@@ -428,7 +464,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
         return nil
     }
 
-    /// The horizontal extent around \`point\` that returns the same hit result, found by binary
+    /// The horizontal extent around `point` that returns the same hit result, found by binary
     /// search to one point. Nil when the area runs past the search limit on either side.
     private func hitArea(around point: CGPoint, matching hit: HitResult, iconWidth: CGFloat, within bar: CGRect) -> CGRect? {
         let reach = iconWidth / 2 + Self.hitPaddingAllowance + 8
@@ -453,6 +489,9 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
     }
 
     private func hitTest(at point: CGPoint) -> HitResult {
+        lock.lock()
+        scanHitTests += 1
+        lock.unlock()
         var found: AXUIElement?
         guard AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &found) == .success,
               let element = found else { return .noElement }
@@ -464,10 +503,47 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
             guard string(element, kAXSubroleAttribute) == "AXMenuExtra" else { return .other(pid) }
             return .statusItem(pid, string(element, "AXIdentifier"))
         }
-        if role == kAXMenuBarRole as String, let container = statusContainer(pid: pid), CFEqual(element, container) {
-            return .statusContainer(pid)
+        if role == kAXMenuBarRole as String, let container = statusContainer(pid: pid) {
+            // On a bar that is not active, an icon answers with its app's icon container or, on
+            // recent macOS, with the app's own menu bar. Each bar's empty stretches answer with the
+            // menu bar of the app whose menus that bar shows, so for that app only the container
+            // counts.
+            if CFEqual(element, container) || pid != barOwnerPID(at: point) {
+                return .statusContainer(pid)
+            }
         }
         return .other(pid)
+    }
+
+    /// Which app's menu bar fills the empty stretches of the real bar under `point` (the app whose
+    /// menus that bar shows). Measured with a few hit tests the first time a scan needs it; 0 when
+    /// no sample answered with a menu bar.
+    private func barOwnerPID(at point: CGPoint) -> pid_t? {
+        lock.lock()
+        let bar = scanMenuBars.first { $0.contains(point) }
+        let key = bar.map { "\(Int($0.minX)),\(Int($0.minY))" }
+        let known = key.flatMap { barOwners[$0] }
+        lock.unlock()
+        guard let bar, let key else { return nil }
+        if let known { return known }
+        var votes: [pid_t: Int] = [:]
+        for fraction in [0.2, 0.3, 0.4, 0.5, 0.6] as [CGFloat] {
+            var found: AXUIElement?
+            let sample = CGPoint(x: bar.minX + bar.width * fraction, y: bar.midY)
+            lock.lock()
+            scanHitTests += 1
+            lock.unlock()
+            guard AXUIElementCopyElementAtPosition(systemWide, Float(sample.x), Float(sample.y), &found) == .success,
+                  let element = found, string(element, kAXRoleAttribute) == kAXMenuBarRole as String else { continue }
+            var pid: pid_t = 0
+            AXUIElementGetPid(element, &pid)
+            votes[pid, default: 0] += 1
+        }
+        let owner = votes.max(by: { $0.value < $1.value })?.key ?? 0
+        lock.lock()
+        barOwners[key] = owner
+        lock.unlock()
+        return owner
     }
 
     private func statusContainer(pid: pid_t) -> AXUIElement? {
@@ -505,15 +581,7 @@ final class AccessibilityMirrorReader: @unchecked Sendable {
 
     /// Presses a menu bar icon that has no static menu and reports what happened: a menu that
     /// appeared is read and closed again so TilePilot can show it locally; otherwise the press
-    /// stands on its own (a panel or a direct action).
-    func pressStatusItemAndClassify(_ id: MirrorElementID, preferShowMenu: Bool) async -> PressOutcome {
-        await withCheckedContinuation { continuation in
-            menuQueue.async {
-                continuation.resume(returning: self.pressStatusItemAndClassifySync(id, preferShowMenu: preferShowMenu))
-            }
-        }
-    }
-
+    /// stands on its own (a panel or a direct action). Runs on the menu queue.
     private func pressStatusItemAndClassifySync(_ id: MirrorElementID, preferShowMenu: Bool) -> PressOutcome {
         guard let element = element(for: id) else { return .failed }
         let actions = actionNames(of: element)

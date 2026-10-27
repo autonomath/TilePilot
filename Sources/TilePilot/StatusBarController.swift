@@ -946,6 +946,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "system-bar/status":
                 guard model.experimentalNativeSpacesScrubSpikeEnabled else { return }
                 model.writeSystemBarDiagnostics()
+            case "system-bar/drop-capture":
+                guard model.experimentalNativeSpacesScrubSpikeEnabled else { return }
+                model.lastActionMessage = model.systemBarController.simulateCaptureStopForDiagnostics()
             case let raw where raw.hasPrefix("system-bar/click/") || raw.hasPrefix("system-bar/right-click/"):
                 guard model.experimentalNativeSpacesScrubSpikeEnabled,
                       let index = Int(raw.split(separator: "/").last ?? "") else { return }

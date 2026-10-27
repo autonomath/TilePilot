@@ -77,15 +77,22 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     private var menuBarFrames: [CGRect] = []
     private var menuBarFramesReadAt: Date?
     private var captures: [CGDirectDisplayID: MenuBarStripCapture] = [:]
-    private var captureFailures: [CGDirectDisplayID: (at: Date, reason: String)] = [:]
-    private static let captureRetrySeconds: TimeInterval = 30
-    private struct StickyIcon {
-        let rightOffset: CGFloat
-        let width: CGFloat
-    }
-
+    /// Why each display's capture last stopped, and how many tries in a row have failed. A
+    /// successful start clears the entry.
+    private var captureFailures: [CGDirectDisplayID: (at: Date, reason: String, attempts: Int)] = [:]
     /// Per bar: icons seen on that display's real bar, with their place there.
-    private var stickyIcons: [String: [String: StickyIcon]] = [:]
+    private var stickyIcons: [String: [String: SystemBarStickyIcon]] = [:]
+    // The row shown with every display's icons (see `learnIconRow`).
+    /// Left-to-right order of the icons present now.
+    private var iconRowOrder: [String] = []
+    /// The same order plus icons missing right now whose app still runs, in their last places.
+    private var iconRowMemory: [String] = []
+    /// Each icon's gap to its right-hand neighbour.
+    private var iconRowGaps: [String: CGFloat] = [:]
+    /// Space between the last icon and the bar's right edge.
+    private var iconRowTrailingInset: CGFloat = SystemBarLayoutPlanner.defaultTrailingInset
+    /// The real bar whose row the mirror copies; kept until another bar clearly draws more.
+    private var iconRowReference: String?
     private var activeBackgroundRect: (menuBar: CGRect, rect: CGRect)?
     private var lastBackgroundImage: CGImage?
     /// The newest sampled look and when it was first seen; it replaces `barLook` only after
@@ -100,7 +107,8 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     private var recentStatusItems: [String: (item: SystemBarStatusItem, seenAt: Date)] = [:]
     private static let missingIconGraceSeconds: TimeInterval = 10
 
-    /// Also show icons that macOS draws only on other displays' bars (off by default).
+    /// Show every display's icons once, in one row that stays put as focus moves (off by default:
+    /// only the mirrored display's own icons).
     var includeOtherDisplayIcons = false {
         didSet {
             guard includeOtherDisplayIcons != oldValue else { return }
@@ -114,6 +122,10 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     private var appIconCache: [pid_t: NSImage] = [:]
     private var refreshTask: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
+    /// Watches the running-app list itself. macOS posts no launch or quit notification for
+    /// menu-bar-only apps (LSUIElement), which own most menu bar icons.
+    private var runningAppsObservation: NSKeyValueObservation?
+    private var launchScanTask: Task<Void, Never>?
     private var redrawScheduled = false
     private var menuInProgress = false
     /// The last icon click and its outcome, for the status route.
@@ -167,12 +179,10 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 self?.scheduleTitleRefresh()
             }
         })
-        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
-            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.cachedRunningApps = nil
-                }
-            })
+        runningAppsObservation = NSWorkspace.shared.observe(\.runningApplications, options: []) { [weak self] _, _ in
+            Task { @MainActor in
+                self?.runningAppsChanged()
+            }
         }
         observers.append(center.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -182,6 +192,8 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.menuBarFramesReadAt = nil
+                // A reconnected or rearranged display stops its capture; start over right away.
+                self?.captureFailures.removeAll()
                 self?.requestRelayout?()
             }
         })
@@ -306,15 +318,14 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         panel.depthLimit = .twentyfourBitRGB
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
 
-        let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: frame.size))
-        effect.material = .titlebar
-        effect.blendingMode = .behindWindow
-        effect.state = .active
-        effect.autoresizingMask = [.width, .height]
-        let view = SystemBarView(frame: effect.bounds)
+        // A plain container: the bar view puts frosted backdrops behind its menus and icons only.
+        // A full-width material would catch clicks even where it is masked out.
+        let container = NSView(frame: NSRect(origin: .zero, size: frame.size))
+        container.autoresizingMask = [.width, .height]
+        let view = SystemBarView(frame: container.bounds)
         view.autoresizingMask = [.width, .height]
-        effect.addSubview(view)
-        panel.contentView = effect
+        container.addSubview(view)
+        panel.contentView = container
         return (panel, view)
     }
 
@@ -350,8 +361,8 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             try? await Task.sleep(for: .milliseconds(120))
             await self?.refreshTitles()
         }
-        // Accessibility moves every icon to the newly active display's bar; rescan soon so the
-        // icons are copied from the bright bar instead of the one macOS is dimming.
+        // Accessibility now reports every icon on the newly active display's bar; rescan soon so
+        // confirmed positions, and the bars icons are copied from, follow the switch.
         activationScanTask?.cancel()
         activationScanTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
@@ -380,8 +391,26 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// An app launched or quit: rebuild the app list and look again once it has had a moment to
+    /// add its icon, then once more as the other icons settle into their new places.
+    private func runningAppsChanged() {
+        cachedRunningApps = nil
+        guard !bars.isEmpty else { return }
+        launchScanTask?.cancel()
+        launchScanTask = Task { [weak self] in
+            for delay in [800, 1500] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard !Task.isCancelled else { return }
+                await self?.refreshIcons()
+            }
+        }
+    }
+
     private func refreshIcons() async {
         guard !bars.isEmpty else { return }
+        // While the screen is locked macOS hides the icons and capture stops; keep the last state
+        // so the bar comes back unchanged after the unlock.
+        guard !Self.screenIsLocked() else { return }
         let apps: [AccessibilityMirrorReader.RunningApp]
         if let cachedRunningApps {
             apps = cachedRunningApps
@@ -390,7 +419,8 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 AccessibilityMirrorReader.RunningApp(
                     pid: $0.processIdentifier,
                     bundleIdentifier: $0.bundleIdentifier ?? "",
-                    name: $0.localizedName ?? ""
+                    name: $0.localizedName ?? "",
+                    launchedAt: $0.launchDate
                 )
             }
             cachedRunningApps = apps
@@ -412,8 +442,48 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             recentStatusItems[item.stableKey] = (item, now)
         }
         statusItems = merged
+        learnIconRow(livePIDs: Set(apps.map(\.pid)))
         updateCaptures()
         relayoutAllBars()
+    }
+
+    private static func screenIsLocked() -> Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return session["CGSSessionScreenIsLocked"] as? Bool ?? false
+    }
+
+    /// Chooses the mirror's icon row and each icon's spacing from what the real bars draw (see
+    /// SystemBarIconRow.order). Only confirmed positions count; what cannot be measured right now
+    /// keeps its previous place and spacing.
+    private func learnIconRow(livePIDs: Set<pid_t>) {
+        let barKey = Self.barKey
+        var icons: [(key: String, sightings: [SystemBarIconRow.Sighting], isSystem: Bool)] = []
+        var frames: [String: [String: CGRect]] = [:]
+        var trailingInsets: [String: [String: CGFloat]] = [:]
+        for item in statusItems {
+            let placements = item.allPlacements.filter { $0.frame.width > 0 }
+            for placement in placements {
+                frames[item.stableKey, default: [:]][barKey(placement.menuBar)] = placement.frame
+                trailingInsets[item.stableKey, default: [:]][barKey(placement.menuBar)] = placement.menuBar.maxX - placement.frame.maxX
+            }
+            var sightings = placements.map { SystemBarIconRow.Sighting(bar: barKey($0.menuBar), minX: $0.frame.minX) }
+            if sightings.isEmpty {
+                sightings = [SystemBarIconRow.Sighting(bar: barKey(item.reportedMenuBarFrame), minX: item.reportedFrame.minX)]
+            }
+            icons.append((item.stableKey, sightings, item.isSystemExtra))
+        }
+        let result = SystemBarIconRow.order(icons: icons, previousReference: iconRowReference, previousOrder: iconRowMemory)
+        iconRowOrder = result.order
+        iconRowReference = result.reference
+        iconRowMemory = SystemBarIconRow.remembered(order: result.order, previous: iconRowMemory) { key in
+            key.split(separator: ":").first.flatMap { pid_t($0) }.map(livePIDs.contains) ?? false
+        }
+        iconRowGaps = SystemBarIconRow.learnedGaps(order: iconRowOrder, frames: frames, previous: iconRowGaps)
+        // The last icon's distance from the right edge, as the copied bar draws it.
+        if let lastKey = iconRowOrder.last, let reference = iconRowReference,
+           let inset = trailingInsets[lastKey]?[reference] {
+            iconRowTrailingInset = min(max(inset, 4), 40)
+        }
     }
 
     /// TilePilot's own menu bar comes straight from AppKit; Accessibility cannot serve a process
@@ -451,33 +521,58 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             SystemBarView.measuredTitleWidth(title, isApplicationMenu: index == 1)
         }
 
-        // Remember every icon seen on this display's real bar, with its place there. macOS
-        // draws fewer icons on a display's bar while another display is active; the mirror
-        // keeps showing the full set in a stable order.
-        var sticky = stickyIcons[key] ?? [:]
+        // Remember the icons this display's real bar draws, with their place there (see
+        // SystemBarStickyIconPolicy): the active bar is the authority; while another display is
+        // active the mirror keeps the last consistent set.
         let presentKeys = Set(statusItems.map(\.stableKey))
-        sticky = sticky.filter { presentKeys.contains($0.key) }
+        var sticky = (stickyIcons[key] ?? [:]).filter { presentKeys.contains($0.key) }
         lastIconImages = lastIconImages.filter { presentKeys.contains($0.key) }
         if let ownBar = bar.menuBarFrame {
+            var drawn: [String: (rightOffset: CGFloat, width: CGFloat)] = [:]
             for item in statusItems {
                 guard let placement = item.ownBarPlacements.first(where: { $0.menuBar.intersects(ownBar) }) else { continue }
-                sticky[item.stableKey] = StickyIcon(rightOffset: ownBar.maxX - placement.frame.maxX, width: placement.frame.width)
+                drawn[item.stableKey] = (ownBar.maxX - placement.frame.maxX, placement.frame.width)
             }
+            let ownBarIsActive = activeMenuBar.map { $0.intersects(ownBar) } ?? false
+            sticky = SystemBarStickyIconPolicy.update(sticky, drawn: drawn, ownBarIsActive: ownBarIsActive, now: Date())
         }
         stickyIcons[key] = sticky
+        let shownSticky = SystemBarStickyIconPolicy.shown(sticky)
 
-        let orderedBars = menuBarFrames
         var shown: [SystemBarStatusItem] = []
         var metrics: [SystemBarIconMetric] = []
-        for item in statusItems {
-            if let own = sticky[item.stableKey] {
+        if includeOtherDisplayIcons {
+            // Every icon once, in the order macOS keeps across displays, packed from the right
+            // with real spacing. The row does not change when focus moves; pixels and clicks still
+            // go to wherever macOS draws each icon. An icon not yet seen drawn anywhere has no
+            // pixels to copy, so it waits instead of showing a stand-in that does not match.
+            let canMatch = canMatchIcons
+            let byKey = Dictionary(statusItems.map { ($0.stableKey, $0) }, uniquingKeysWith: { first, _ in first })
+            let order = iconRowOrder.filter { key in
+                guard let item = byKey[key] else { return false }
+                return !canMatch || item.pixelSource != nil || lastIconImages[key] != nil
+            }
+            var widths: [String: CGFloat] = [:]
+            for key in order {
+                guard let item = byKey[key] else { continue }
+                widths[key] = item.frame.width > 0 ? item.frame.width : item.reportedFrame.width
+            }
+            let offsets = SystemBarIconRow.packedRightOffsets(
+                order: order,
+                widths: widths,
+                trailingGaps: iconRowGaps,
+                trailingInset: iconRowTrailingInset
+            )
+            for key in order {
+                guard let item = byKey[key], let offset = offsets[key], let width = widths[key] else { continue }
+                shown.append(item)
+                metrics.append(SystemBarIconMetric(width: width, rightOffset: offset, group: 1_000))
+            }
+        } else {
+            for item in statusItems {
+                guard let own = shownSticky[item.stableKey] else { continue }
                 shown.append(item)
                 metrics.append(SystemBarIconMetric(width: own.width, rightOffset: own.rightOffset, group: 1_000))
-            } else if includeOtherDisplayIcons, let source = item.pixelSource {
-                // Icons from other displays keep their spacing there and sit to the left.
-                let group = orderedBars.firstIndex(where: { $0.intersects(source.menuBar) }) ?? 0
-                shown.append(item)
-                metrics.append(SystemBarIconMetric(width: source.frame.width, rightOffset: source.menuBar.maxX - source.frame.maxX, group: group))
             }
         }
         let plan = SystemBarLayoutPlanner.plan(barWidth: bar.layout.bar.width, menuWidths: menuWidths, icons: metrics)
@@ -507,7 +602,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     private var activeMenuBar: CGRect? {
         var counts: [String: (bar: CGRect, count: Int)] = [:]
         for item in statusItems where item.reportedMenuBarFrame.width > 0 {
-            let key = "\(Int(item.reportedMenuBarFrame.minX)),\(Int(item.reportedMenuBarFrame.minY))"
+            let key = Self.barKey(item.reportedMenuBarFrame)
             counts[key] = (item.reportedMenuBarFrame, (counts[key]?.count ?? 0) + 1)
         }
         return counts.values.max { $0.count < $1.count }?.bar
@@ -517,21 +612,14 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     /// a background sample on the active bar.
     private func syncCaptureRegions() {
         guard !captures.isEmpty else { return }
-        var displayIDs: [String: CGDirectDisplayID] = [:]
-        func display(for menuBar: CGRect) -> CGDirectDisplayID? {
-            let key = "\(Int(menuBar.minX)),\(Int(menuBar.minY))"
-            if let cached = displayIDs[key] { return cached }
-            let id = displayID(forMenuBar: menuBar)
-            displayIDs[key] = id
-            return id
-        }
+        let display = displayLookup()
         var regionsByDisplay: [CGDirectDisplayID: [String: CGRect]] = [:]
         for bar in bars.values {
             let content = bar.view.content
             for slot in content.plan.slots {
                 guard case let .icon(index) = slot.kind, content.icons.indices.contains(index),
                       let source = content.icons[index].pixelSource,
-                      let id = display(for: source.menuBar) else { continue }
+                      let id = display(source.menuBar) else { continue }
                 regionsByDisplay[id, default: [:]][Self.regionKey(for: source)] = CGRect(
                     x: source.frame.minX - source.menuBar.minX,
                     y: source.frame.minY - source.menuBar.minY,
@@ -540,7 +628,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 )
             }
         }
-        if let active = activeBackgroundRect, let id = display(for: active.menuBar) {
+        if let active = activeBackgroundRect, let id = display(active.menuBar) {
             regionsByDisplay[id, default: [:]][Self.backgroundRegionKey] = active.rect
         }
         for (id, capture) in captures {
@@ -549,14 +637,10 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     }
 
     private func fillImages(of content: inout SystemBarContent, bar: DisplayBar) {
-        let canMatch = matchingIconsEnabled && !captures.isEmpty && screenRecordingAuthorized()
-        var displayIDs: [String: CGDirectDisplayID] = [:]
+        let canMatch = canMatchIcons
+        let display = displayLookup()
         func capture(for menuBar: CGRect) -> MenuBarStripCapture? {
-            guard canMatch else { return nil }
-            let key = "\(Int(menuBar.minX)),\(Int(menuBar.minY))"
-            if let id = displayIDs[key] { return captures[id] }
-            guard let id = displayID(forMenuBar: menuBar) else { return nil }
-            displayIDs[key] = id
+            guard canMatch, let id = display(menuBar) else { return nil }
             return captures[id]
         }
         var renderings: [Int: SystemBarIconRendering] = [:]
@@ -701,19 +785,34 @@ final class SystemBarController: NSObject, NSMenuDelegate {
 
     // MARK: - Captures
 
+    /// The display a real menu bar (top-left coordinates) belongs to.
     private func displayID(forMenuBar menuBar: CGRect) -> CGDirectDisplayID? {
-        let screens = NSScreen.screens
-        guard let primaryMaxY = screens.first(where: { abs($0.frame.minX) < 0.5 && abs($0.frame.minY) < 0.5 })?.frame.maxY
-            ?? screens.first?.frame.maxY else { return nil }
+        let primaryMaxY = AppModel.primaryScreenMaxY()
         let midpoint = CGPoint(x: menuBar.midX, y: menuBar.midY)
-        for screen in screens {
-            let topLeft = WorkAreaGeometry.topLeftRect(fromAppKit: screen.frame, primaryScreenMaxY: primaryMaxY)
-            guard topLeft.contains(midpoint) else { continue }
-            if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
-                return CGDirectDisplayID(number.uint32Value)
-            }
+        return NSScreen.screens.first {
+            WorkAreaGeometry.topLeftRect(fromAppKit: $0.frame, primaryScreenMaxY: primaryMaxY).contains(midpoint)
+        }?.displayID
+    }
+
+    /// `displayID(forMenuBar:)` with answers kept for the caller's pass over many icons.
+    private func displayLookup() -> (CGRect) -> CGDirectDisplayID? {
+        var cache: [String: CGDirectDisplayID?] = [:]
+        return { [unowned self] menuBar in
+            let key = Self.barKey(menuBar)
+            if let known = cache[key] { return known }
+            let id = self.displayID(forMenuBar: menuBar)
+            cache[key] = id
+            return id
         }
-        return nil
+    }
+
+    /// Identifies a real menu bar by its top-left corner.
+    private static func barKey(_ bar: CGRect) -> String {
+        "\(Int(bar.minX)),\(Int(bar.minY))"
+    }
+
+    private var canMatchIcons: Bool {
+        matchingIconsEnabled && !captures.isEmpty && screenRecordingAuthorized()
     }
 
     private func updateCaptures() {
@@ -722,14 +821,11 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             return
         }
         let screens = NSScreen.screens
-        let primaryMaxY = screens.first(where: { abs($0.frame.minX) < 0.5 && abs($0.frame.minY) < 0.5 })?.frame.maxY
-            ?? screens.first?.frame.maxY ?? 0
+        let primaryMaxY = AppModel.primaryScreenMaxY()
         var wanted: [CGDirectDisplayID: (strip: CGRect, scale: CGFloat)] = [:]
         for item in statusItems {
             guard let displayID = displayID(forMenuBar: item.menuBarFrame), wanted[displayID] == nil else { continue }
-            guard let screen = screens.first(where: {
-                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
-            }) else { continue }
+            guard let screen = screens.first(where: { $0.displayID == displayID }) else { continue }
             let screenTopLeft = WorkAreaGeometry.topLeftRect(fromAppKit: screen.frame, primaryScreenMaxY: primaryMaxY)
             let strip = CGRect(
                 x: item.menuBarFrame.minX - screenTopLeft.minX,
@@ -745,7 +841,8 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             Task { await capture.stop() }
         }
         for (displayID, spec) in wanted where captures[displayID] == nil {
-            if let failure = captureFailures[displayID], Date().timeIntervalSince(failure.at) < Self.captureRetrySeconds {
+            if let failure = captureFailures[displayID],
+               Date().timeIntervalSince(failure.at) < SystemBarCapturePolicy.retryDelay(afterFailures: failure.attempts) {
                 continue
             }
             let barColorSpace = bars.values.first?.panel.screen?.colorSpace?.cgColorSpace
@@ -764,24 +861,29 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             Task { [weak self] in
                 do {
                     try await capture.start()
+                    guard let self, self.captures[displayID] === capture else { return }
+                    self.captureFailures[displayID] = nil
                 } catch {
                     guard let self else { return }
-                    self.captures.removeValue(forKey: displayID)
-                    let isFirstFailure = self.captureFailures[displayID] == nil
-                    self.captureFailures[displayID] = (Date(), error.localizedDescription)
-                    if isFirstFailure {
+                    if self.captures[displayID] === capture {
+                        self.captures.removeValue(forKey: displayID)
+                    }
+                    let attempts = (self.captureFailures[displayID]?.attempts ?? 0) + 1
+                    self.captureFailures[displayID] = (Date(), error.localizedDescription, attempts)
+                    if attempts == SystemBarCapturePolicy.attemptsBeforeMessage {
                         self.onMessage?("Menu bar icons use the simplified look until the real menu bar can be captured (\(error.localizedDescription)).", false)
                     }
                     self.relayoutAllBars()
                 }
             }
         }
-        for (displayID, capture) in captures where !capture.isStartingOrRunning && captureFailures[displayID] == nil {
-            // The stream stopped on its own (display change, lock screen); try again later.
+        for (displayID, capture) in captures where !capture.isStartingOrRunning {
+            // The stream stopped on its own (display change, lock screen). Drop it so its last
+            // pixels are never shown as if live, and start a new one soon.
             let reason: String
             if case let .stopped(why) = capture.state { reason = why } else { reason = "not running" }
             captures.removeValue(forKey: displayID)
-            captureFailures[displayID] = (Date(), reason)
+            captureFailures[displayID] = (Date(), reason, (captureFailures[displayID]?.attempts ?? 0) + 1)
             Task { await capture.stop() }
         }
         syncCaptureRegions()
@@ -799,6 +901,15 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     func resetCaptureFailures() {
         captureFailures.removeAll()
         updateCaptures()
+    }
+
+    /// Development route: stops every running capture as a display change would.
+    func simulateCaptureStopForDiagnostics() -> String {
+        let running = captures.values.filter(\.isRunning)
+        for capture in running {
+            Task { await capture.simulateUnexpectedStop() }
+        }
+        return "stopped \(running.count) capture(s)"
     }
 
     // MARK: - Diagnostics
@@ -827,23 +938,36 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         }
         if lines.isEmpty { lines.append("no bars") }
         lines.append("last click: \(lastClickTrace); reader: \(reader.lastClickNote)")
+        let display = displayLookup()
+        // Bars are named by display number in the lines below, for example D2:2870.
+        func barName(_ bar: CGRect) -> String {
+            display(bar).map { "D\($0)" } ?? Self.barKey(bar)
+        }
         var mapping: [String: String] = [:]
         for item in statusItems {
-            let key = "\(Int(item.menuBarFrame.minX)),\(Int(item.menuBarFrame.minY))"
-            mapping[key] = displayID(forMenuBar: item.menuBarFrame).map { "display \($0)" } ?? "no display"
+            mapping[Self.barKey(item.menuBarFrame)] = display(item.menuBarFrame).map { "display \($0)" } ?? "no display"
         }
         lines.append("icon bars -> displays: \(mapping.sorted { $0.key < $1.key }); unconfirmed icons: \(statusItems.filter { !$0.isPositionConfirmed }.map(\.appName))")
-        let active = activeMenuBar.map { "\(Int($0.minX)),\(Int($0.minY))" } ?? "unknown"
+        let active = activeMenuBar.map(Self.barKey) ?? "unknown"
         let look = barLook.map { "\($0.color.components?.prefix(3).map { String(format: "%.2f", $0) } ?? []) dark \($0.isDark)" } ?? "none"
         lines.append("active bar \(active); bar look \(look); include other displays \(includeOtherDisplayIcons)")
+        let itemsByKey = Dictionary(statusItems.map { ($0.stableKey, $0) }, uniquingKeysWith: { first, _ in first })
+        let rowText = iconRowOrder.compactMap { key -> String? in
+            guard let item = itemsByKey[key] else { return nil }
+            let bars = item.allPlacements.map { "\(barName($0.menuBar)):\(Int($0.frame.minX))" }
+            return "\(item.shortName)[\(bars.joined(separator: "/"))]"
+        }
+        lines.append("icon row: \(rowText.joined(separator: " "))")
+        let scan = reader.lastScanStats
+        let searched = scan.searchedKeys.map { itemsByKey[$0]?.shortName ?? $0 }
+        lines.append("last scan: \(String(format: "%.2f", scan.seconds)) s, \(scan.hitTests) hit tests, searched \(searched)")
         for bar in bars.values.sorted(by: { $0.key < $1.key }) {
-            let names = bar.view.content.icons.map { $0.isSystemExtra ? String($0.identifier.dropFirst(SystemBarStatusItem.systemExtraPrefix.count)) : $0.appName }
-            let sources = bar.view.content.icons.map { item -> String in
-                guard let source = item.pixelSource else { return "-" }
-                let bar = source.menuBar.minY < -1 ? "S" : "L"
-                return "\(bar)[\(Int(source.frame.minX))..\(Int(source.frame.maxX))]\(item.isPositionConfirmed ? "" : "~")"
+            let shown = bar.view.content.icons.map { item -> String in
+                guard let source = item.pixelSource else { return "\(item.shortName)@-" }
+                let confirmed = item.isPositionConfirmed ? "" : "~"
+                return "\(item.shortName)@\(barName(source.menuBar))[\(Int(source.frame.minX))..\(Int(source.frame.maxX))]\(confirmed)"
             }
-            lines.append("shown on \(bar.key.prefix(8)): \(zip(names, sources).map { "\($0)@\($1)" }.joined(separator: ", "))")
+            lines.append("shown on \(bar.key.prefix(8)): \(shown.joined(separator: ", "))")
         }
         for (id, capture) in captures.sorted(by: { $0.key < $1.key }) {
             lines.append("capture \(id): state \(capture.state) strip \(capture.stripRect) scale \(capture.scale) \(capture.regionSummary)")

@@ -5,6 +5,230 @@ import Foundation
 /// reader ever touches the element; everything else passes the handle around.
 typealias MirrorElementID = String
 
+/// The one icon row the mirror shows when it includes every display's icons: each icon exactly
+/// once, packed from the right edge with real spacing, in the same place whichever display is
+/// active. Pixels and clicks still go to wherever macOS draws each icon.
+enum SystemBarIconRow {
+    /// One icon on a real bar, for choosing the mirror's row.
+    struct Sighting: Equatable, Sendable {
+        let bar: String
+        let minX: CGFloat
+    }
+
+    /// Bars must draw this many more third-party icons than the current reference to replace it,
+    /// so the row does not flip back and forth while macOS moves icons around.
+    static let referenceSwitchMargin = 3
+
+    /// The row to show, left to right. macOS keeps no single order across displays (each bar
+    /// orders the icons it draws its own way), so the mirror copies one bar: the one that draws
+    /// the most third-party icons. An icon that bar does not draw keeps its place from
+    /// `previousOrder` (right after the icon it followed there), so icons macOS moves to another
+    /// display as focus changes stay put. Icons never placed before go at the left (third-party)
+    /// or the right (system), in their own bar's order.
+    static func order(
+        icons: [(key: String, sightings: [Sighting], isSystem: Bool)],
+        previousReference: String?,
+        previousOrder: [String] = []
+    ) -> (order: [String], reference: String?) {
+        var counts: [String: Int] = [:]
+        for icon in icons where !icon.isSystem {
+            for bar in Set(icon.sightings.map(\.bar)) {
+                counts[bar, default: 0] += 1
+            }
+        }
+        let best = counts.max { lhs, rhs in lhs.value == rhs.value ? lhs.key > rhs.key : lhs.value < rhs.value }
+        var reference = best?.key
+        if let previousReference, let previousCount = counts[previousReference], let best,
+           best.value - previousCount < referenceSwitchMargin {
+            reference = previousReference
+        }
+        var onReference: [(String, CGFloat)] = []
+        var offReference: [String: (minX: CGFloat, isSystem: Bool)] = [:]
+        for icon in icons {
+            if let sighting = icon.sightings.first(where: { $0.bar == reference }) {
+                onReference.append((icon.key, sighting.minX))
+            } else {
+                offReference[icon.key] = (icon.sightings.first?.minX ?? 0, icon.isSystem)
+            }
+        }
+        let byPosition: ((String, CGFloat), (String, CGFloat)) -> Bool = { $0.1 == $1.1 ? $0.0 < $1.0 : $0.1 < $1.1 }
+        var row = onReference.sorted(by: byPosition).map(\.0)
+        var placed = Set(row)
+        for (index, key) in previousOrder.enumerated() where offReference[key] != nil && !placed.contains(key) {
+            if insert(key, at: index, of: previousOrder, into: &row, placed: placed) {
+                placed.insert(key)
+            }
+        }
+        let unplaced = offReference.filter { !placed.contains($0.key) }
+        let leftOver = unplaced.filter { !$0.value.isSystem }.map { ($0.key, $0.value.minX) }.sorted(by: byPosition).map(\.0)
+        let rightOver = unplaced.filter { $0.value.isSystem }.map { ($0.key, $0.value.minX) }.sorted(by: byPosition).map(\.0)
+        return (leftOver + row + rightOver, reference)
+    }
+
+    /// `order` plus the icons of `previous` missing from it right now that `keep` accepts, each
+    /// right after the icon it followed, so an icon that vanishes for a while (macOS removes the
+    /// system icons while the screen is locked) gets its slot back. Pass the result as the next
+    /// `previousOrder`.
+    static func remembered(order: [String], previous: [String], keep: (String) -> Bool) -> [String] {
+        var row = order
+        var placed = Set(row)
+        for (index, key) in previous.enumerated() where !placed.contains(key) && keep(key) {
+            if insert(key, at: index, of: previous, into: &row, placed: placed) {
+                placed.insert(key)
+            }
+        }
+        return row
+    }
+
+    /// Puts `key` (at `index` in `previous`) into `row` right after the nearest earlier icon of
+    /// `previous` already in the row, or before the nearest later one. False when neither exists.
+    private static func insert(_ key: String, at index: Int, of previous: [String], into row: inout [String], placed: Set<String>) -> Bool {
+        if let before = previous[..<index].last(where: placed.contains), let at = row.firstIndex(of: before) {
+            row.insert(key, at: at + 1)
+            return true
+        }
+        if let after = previous[(index + 1)...].first(where: placed.contains), let at = row.firstIndex(of: after) {
+            row.insert(key, at: at)
+            return true
+        }
+        return false
+    }
+
+    /// Natural gaps between neighbouring icons stay under this; a wider stretch means another icon
+    /// sits between them on that bar.
+    static let maximumNaturalGap: CGFloat = 24
+
+    /// The gap after each icon in `order` to its right-hand neighbour, measured where macOS draws
+    /// both on the same bar right next to each other. Pairs that cannot be measured now (one of
+    /// them moved to another display) keep their `previous` gap, so the row does not shift.
+    static func learnedGaps(
+        order: [String],
+        frames: [String: [String: CGRect]],
+        previous: [String: CGFloat]
+    ) -> [String: CGFloat] {
+        let present = Set(order)
+        var gaps = previous.filter { present.contains($0.key) }
+        for (left, right) in zip(order, order.dropFirst()) {
+            guard let leftFrames = frames[left], let rightFrames = frames[right] else { continue }
+            for (bar, leftFrame) in leftFrames.sorted(by: { $0.key < $1.key }) {
+                guard let rightFrame = rightFrames[bar] else { continue }
+                let gap = rightFrame.minX - leftFrame.maxX
+                if gap >= -4, gap <= maximumNaturalGap {
+                    gaps[left] = gap
+                    break
+                }
+            }
+        }
+        return gaps
+    }
+
+    /// Distance from the bar's right edge for each icon in `order` (left to right), packed with
+    /// each icon's remembered gap to its right-hand neighbour.
+    static func packedRightOffsets(
+        order: [String],
+        widths: [String: CGFloat],
+        trailingGaps: [String: CGFloat],
+        trailingInset: CGFloat,
+        defaultGap: CGFloat = 6
+    ) -> [String: CGFloat] {
+        var result: [String: CGFloat] = [:]
+        var cursor = trailingInset
+        for index in order.indices.reversed() {
+            let key = order[index]
+            guard let width = widths[key], width > 0 else { continue }
+            result[key] = cursor
+            cursor += width
+            if index > 0 {
+                cursor += trailingGaps[order[index - 1]] ?? defaultGap
+            }
+        }
+        return result
+    }
+}
+
+
+/// An icon remembered on a display's own real menu bar: its distance from the bar's right edge,
+/// its width, and since when the bar has been active without drawing it.
+struct SystemBarStickyIcon: Equatable, Sendable {
+    var rightOffset: CGFloat
+    var width: CGFloat
+    var missingSince: Date?
+
+    func overlaps(_ other: SystemBarStickyIcon) -> Bool {
+        rightOffset < other.rightOffset + other.width - 1 && other.rightOffset < rightOffset + width - 1
+    }
+}
+
+/// Which icons the mirror shows for a display, and where. While that display's bar is the active
+/// one it draws the display's whole set, so it is the authority: icons it stops drawing leave
+/// after a short grace. While another display is active, macOS draws fewer icons there and shifts
+/// the rest, so the set and places from the last active moment are kept. Positions always come from
+/// one moment, so remembered icons never land on top of each other.
+enum SystemBarStickyIconPolicy {
+    static let missingGraceSeconds: TimeInterval = 6
+
+    static func update(
+        _ remembered: [String: SystemBarStickyIcon],
+        drawn: [String: (rightOffset: CGFloat, width: CGFloat)],
+        ownBarIsActive: Bool,
+        now: Date
+    ) -> [String: SystemBarStickyIcon] {
+        if ownBarIsActive || remembered.isEmpty {
+            var next = drawn.mapValues { SystemBarStickyIcon(rightOffset: $0.rightOffset, width: $0.width, missingSince: nil) }
+            guard ownBarIsActive else { return next }
+            for (key, icon) in remembered where next[key] == nil {
+                let missingSince = icon.missingSince ?? now
+                if now.timeIntervalSince(missingSince) < missingGraceSeconds {
+                    next[key] = SystemBarStickyIcon(rightOffset: icon.rightOffset, width: icon.width, missingSince: missingSince)
+                }
+            }
+            return next
+        }
+        var next = remembered
+        for (key, place) in drawn.sorted(by: { $0.key < $1.key }) {
+            if next[key] != nil {
+                next[key]?.missingSince = nil
+                continue
+            }
+            let icon = SystemBarStickyIcon(rightOffset: place.rightOffset, width: place.width, missingSince: nil)
+            if !shown(next).values.contains(where: { $0.overlaps(icon) }) {
+                next[key] = icon
+            }
+        }
+        return next
+    }
+
+    /// The remembered icons to draw: all present ones, plus missing ones that do not overlap them.
+    static func shown(_ remembered: [String: SystemBarStickyIcon]) -> [String: SystemBarStickyIcon] {
+        let present = remembered.filter { $0.value.missingSince == nil }
+        var result = present
+        for (key, icon) in remembered.sorted(by: { $0.key < $1.key }) where icon.missingSince != nil {
+            if !result.values.contains(where: { $0.overlaps(icon) }) {
+                result[key] = icon
+            }
+        }
+        return result
+    }
+}
+
+
+/// When to try capturing a display's real menu bar again after its stream stopped or failed to
+/// start. Display reconnects are the usual cause and recover within seconds, so the first retry
+/// is quick; repeated failures back off.
+enum SystemBarCapturePolicy {
+    /// Failures in a row before TilePilot mentions the simplified look; a single display
+    /// reconnect stays quiet.
+    static let attemptsBeforeMessage = 3
+
+    static func retryDelay(afterFailures attempts: Int) -> TimeInterval {
+        switch attempts {
+        case ...1: return 2
+        case 2: return 10
+        default: return 30
+        }
+    }
+}
+
 /// Modifier keys of a menu item shortcut, decoded from `AXMenuItemCmdModifiers`. Command is
 /// implied unless bit 3 is set; bit 0 is Shift, bit 1 is Option, bit 2 is Control, bit 4 is Fn.
 struct MirroredMenuModifiers: Equatable, Hashable, Sendable {
@@ -128,6 +352,17 @@ struct SystemBarStatusItem: Identifiable, Equatable, Sendable {
     /// The bar Accessibility reported the icon on. macOS reports every icon on the active
     /// display's bar, even icons it only draws elsewhere.
     var reportedMenuBarFrame: CGRect = .zero
+    /// Where Accessibility reported the icon on that bar.
+    var reportedFrame: CGRect = .zero
+
+    /// Every bar the icon is known to be drawn on, one placement per bar.
+    var allPlacements: [SystemBarPlacement] {
+        var result: [SystemBarPlacement] = isPositionConfirmed ? [SystemBarPlacement(menuBar: menuBarFrame, frame: frame)] : []
+        for placement in ownBarPlacements where !result.contains(where: { $0.menuBar == placement.menuBar }) {
+            result.append(placement)
+        }
+        return result
+    }
     /// Where the icon is drawn on the mirrored displays' own bars, when it is.
     var ownBarPlacements: [SystemBarPlacement] = []
 
@@ -144,6 +379,11 @@ struct SystemBarStatusItem: Identifiable, Equatable, Sendable {
 
     var isSystemExtra: Bool {
         identifier.hasPrefix(Self.systemExtraPrefix)
+    }
+
+    /// A short label for diagnostics: the system icon's name (clock, wifi) or the app's name.
+    var shortName: String {
+        isSystemExtra ? String(identifier.dropFirst(Self.systemExtraPrefix.count)) : appName
     }
 
     /// Distance from the right edge of its menu bar; stable while the bar re-flows.
@@ -347,6 +587,34 @@ enum SystemBarLayoutPlanner {
                 return icons[lhs].rightOffset > icons[rhs].rightOffset
             }
             return lhs < rhs
+        }
+    }
+
+    /// The stretches of the bar that hold menus or icons, as x ranges. The rest of the bar stays
+    /// transparent. Slots closer than `mergeGap` share a stretch; each stretch gets `padding` on
+    /// both sides and runs to the bar's edge when it starts or ends within `edgeSnap` of it.
+    static func islands(
+        for slots: [SystemBarSlot],
+        barWidth: CGFloat,
+        mergeGap: CGFloat = 28,
+        padding: CGFloat = 6,
+        edgeSnap: CGFloat = 32
+    ) -> [ClosedRange<CGFloat>] {
+        guard barWidth > 0 else { return [] }
+        var spans: [(lower: CGFloat, upper: CGFloat)] = []
+        for slot in slots.filter({ $0.width > 0 }).sorted(by: { $0.x < $1.x }) {
+            if let last = spans.last, slot.x - last.upper <= mergeGap {
+                spans[spans.count - 1].upper = max(last.upper, slot.maxX)
+            } else {
+                spans.append((slot.x, slot.maxX))
+            }
+        }
+        return spans.map { span in
+            var lower = max(0, span.lower - padding)
+            var upper = min(barWidth, span.upper + padding)
+            if lower <= edgeSnap { lower = 0 }
+            if upper >= barWidth - edgeSnap { upper = barWidth }
+            return lower...max(lower, upper)
         }
     }
 

@@ -47,6 +47,7 @@ final class SystemBarView: NSView {
         didSet {
             if content.plan != oldValue.plan {
                 rebuildToolTips()
+                updateIslands()
             }
             let titlesChanged = content.titles.map { "\($0.title)|\($0.isEnabled)" } != oldValue.titles.map { "\($0.title)|\($0.isEnabled)" }
             let backgroundChanged = content.backgroundColor != oldValue.backgroundColor || content.backgroundIsDark != oldValue.backgroundIsDark
@@ -75,6 +76,12 @@ final class SystemBarView: NSView {
     }
     private var trackingArea: NSTrackingArea?
     private var pendingControlClick = false
+    /// The parts of the bar that hold menus or icons. Only these are drawn; the rest of the bar
+    /// is fully transparent, so clicks there reach whatever is underneath.
+    private var islandRects: [NSRect] = []
+    /// Frosted backdrops behind the islands, siblings below this view. Sized to the islands
+    /// because a window-wide material catches clicks even where it is masked out.
+    private var backdropViews: [NSVisualEffectView] = []
 
     override var isFlipped: Bool { true }
 
@@ -100,6 +107,67 @@ final class SystemBarView: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override var mouseDownCanMoveWindow: Bool { false }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateIslands()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        updateIslands()
+    }
+
+    // MARK: - Islands
+
+    private func updateIslands() {
+        let rects = SystemBarLayoutPlanner.islands(for: content.plan.slots, barWidth: bounds.width).map {
+            NSRect(x: $0.lowerBound, y: 0, width: $0.upperBound - $0.lowerBound, height: bounds.height)
+        }
+        guard rects != islandRects || backdropViews.count != rects.count || backdropViews.first?.superview !== superview else { return }
+        islandRects = rects
+        needsDisplay = true
+        backdropViews.forEach { $0.removeFromSuperview() }
+        guard let container = superview else {
+            backdropViews = []
+            return
+        }
+        let barWidth = bounds.width
+        backdropViews = rects.map { rect in
+            let effect = NSVisualEffectView(frame: convert(rect, to: container))
+            effect.material = .titlebar
+            effect.blendingMode = .behindWindow
+            effect.state = .active
+            let local = NSRect(origin: .zero, size: rect.size)
+            let roundsLeft = rect.minX > 0.5
+            let roundsRight = rect.maxX < barWidth - 0.5
+            effect.maskImage = NSImage(size: rect.size, flipped: false) { _ in
+                NSColor.black.setFill()
+                Self.islandPath(local, roundsLeft: roundsLeft, roundsRight: roundsRight).fill()
+                return true
+            }
+            container.addSubview(effect, positioned: .below, relativeTo: self)
+            return effect
+        }
+    }
+
+    /// Rounded where the island ends inside the bar, square where it meets the bar's edge.
+    private static func islandPath(_ rect: NSRect, barWidth: CGFloat) -> NSBezierPath {
+        islandPath(rect, roundsLeft: rect.minX > 0.5, roundsRight: rect.maxX < barWidth - 0.5)
+    }
+
+    private static func islandPath(_ rect: NSRect, roundsLeft: Bool, roundsRight: Bool) -> NSBezierPath {
+        guard roundsLeft || roundsRight else { return NSBezierPath(rect: rect) }
+        let radius = min(7, rect.height / 2, rect.width / 2)
+        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        if !roundsLeft {
+            path.append(NSBezierPath(rect: NSRect(x: rect.minX, y: rect.minY, width: rect.width / 2, height: rect.height)))
+        } else if !roundsRight {
+            path.append(NSBezierPath(rect: NSRect(x: rect.midX, y: rect.minY, width: rect.width / 2, height: rect.height)))
+        }
+        path.windingRule = .nonZero
+        return path
+    }
 
     /// Width a title needs on the bar when the app's real menu bar is hidden.
     static func measuredTitleWidth(_ title: SystemBarMenuTitle, isApplicationMenu: Bool) -> CGFloat {
@@ -202,10 +270,9 @@ final class SystemBarView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         if let backgroundColor = content.backgroundColor, let color = NSColor(cgColor: backgroundColor) {
             color.setFill()
-            dirtyRect.fill()
-        } else {
-            NSColor.separatorColor.withAlphaComponent(0.5).setFill()
-            NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+            for rect in islandRects where rect.intersects(dirtyRect) {
+                Self.islandPath(rect, barWidth: bounds.width).fill()
+            }
         }
 
         for (index, slot) in content.plan.slots.enumerated() {

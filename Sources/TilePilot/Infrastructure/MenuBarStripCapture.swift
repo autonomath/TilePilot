@@ -99,11 +99,17 @@ final class MenuBarStripCapture: NSObject, @unchecked Sendable, SCStreamOutput, 
             images[key] = nil
         }
         regions = newRegions
-        let buffer = lastPixelBuffer
+        let hasFrame = lastPixelBuffer != nil
         lock.unlock()
-        guard let buffer else { return }
+        guard hasFrame else { return }
         outputQueue.async { [weak self] in
-            self?.process(buffer)
+            guard let self else { return }
+            self.lock.lock()
+            let buffer = self.lastPixelBuffer
+            self.lock.unlock()
+            if let buffer {
+                self.process(buffer)
+            }
         }
     }
 
@@ -139,6 +145,19 @@ final class MenuBarStripCapture: NSObject, @unchecked Sendable, SCStreamOutput, 
     func stop() async {
         guard let current = takeStream() else { return }
         try? await current.stopCapture()
+    }
+
+    /// Development only: ends the stream the way macOS does when its display goes away, keeping
+    /// the last images like `stream(_:didStopWithError:)`.
+    func simulateUnexpectedStop() async {
+        let current = lock.withLock { stream }
+        try? await current?.stopCapture()
+        lock.withLock {
+            currentState = .stopped(reason: "simulated display change")
+            stream = nil
+            lastPixelBuffer = nil
+        }
+        onChange()
     }
 
     private func storeStream(_ stream: SCStream) {

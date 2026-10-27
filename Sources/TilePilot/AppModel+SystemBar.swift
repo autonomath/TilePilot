@@ -193,8 +193,8 @@ extension AppModel {
             let frame = WorkAreaGeometry.topLeftRect(fromAppKit: screen.frame, primaryScreenMaxY: primaryMaxY)
             guard frame.width > 1, frame.height > 1 else { return nil }
             var uuid: String?
-            if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
-               let cfUUID = CGDisplayCreateUUIDFromDisplayID(CGDirectDisplayID(number.uint32Value))?.takeRetainedValue() {
+            if let displayID = screen.displayID,
+               let cfUUID = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() {
                 uuid = (CFUUIDCreateString(nil, cfUUID) as String).uppercased()
             }
             return DisplayState(
