@@ -87,14 +87,33 @@ bar), something else, or no element.
 What the mirror does with this (default):
 
 - Shows the mirrored display's own icon set. Icons are remembered with their place on that bar
-  (`stickyIcons`), so the set and order stay the same when macOS draws fewer icons there while
-  another display is active. If TilePilot starts while the other display is active, the set grows
-  once, the first time the mirrored display becomes active.
+  (`SystemBarStickyIconPolicy`). While that display's bar is active it is the authority: an icon it
+  stops drawing leaves the mirror after 6 s and is never drawn over an icon the bar shows now. While
+  another display is active, the set and places from the last active moment stay, so the mirror does
+  not shrink on focus changes. Which icons macOS puts on each bar drifts over days (3, then 33, then
+  22 of the third-party icons on the Samsung), so places are never mixed from different moments.
 - Copies each icon from the bar where it is drawn bright (the active bar when it is drawn there).
   A scan runs 250 ms after every app activation; until it lands, the previous copy stays.
 - Paints one solid background color, sampled from the active bar's empty stretch, adopted only after
   it holds for 1.5 s.
-- "Also show icons from other displays" (off) adds the icons macOS draws only on other bars.
+- "Also show icons from other displays" (off) shows every icon once, in one row that stays put when
+  focus moves (`SystemBarIconRow`). The row copies the bar that draws the most third-party icons
+  (the laptop on this Mac, whichever display is active); an icon that bar stops drawing keeps its
+  slot from the previous row, right after the icon it followed. The row also remembers icons that
+  vanish while their app keeps running (macOS removes the system icons while the screen is locked),
+  so they come back in place. A fresh launch starts with no memory, so an icon seen only off the
+  copied bar starts at an end of the row until that bar draws it once. Gaps are measured only between
+  icons drawn next to each other; otherwise the last gap stays. An icon not yet seen drawn anywhere
+  waits instead of showing an app-icon stand-in. Pixels and clicks still go to wherever macOS draws
+  each icon, so icons copied from an inactive bar are dimmed. That dimming is not one factor:
+  template icons drop to about 28% brightness, others to about 60% (measured 2026-10-27).
+- On macOS 27 a hit test on an icon drawn on an inactive bar answers with the app's own `AXMenuBar`;
+  empty stretches answer with the menu bar of the app that bar shows. `hitTest` counts an
+  `AXMenuBar` hit as the icon's container unless its pid owns that bar, sampled with five hit tests
+  the first time a scan needs it. A scan of 33 icons takes 0.13–0.22 s and 38–69 hit tests
+  (`system-bar/status` reports `last scan`); TilePilot used 1.7–2.0% of one core with the row on.
+  An earlier version that searched every wide gap for icons drawn twice kept the scan thread busy
+  nonstop.
 - An app that had icons last scan is never put on the 30-second "no icons" skip list; an icon missing
   from one scan stays for 10 s. Without this, all system icons vanished after a display switch.
 
