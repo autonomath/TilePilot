@@ -30,7 +30,14 @@ final class SystemBarController: NSObject, NSMenuDelegate {
 
     private static let refreshTickSeconds: UInt64 = 1
     private static let titleRefreshTicks = 2
-    private static let iconRefreshTicks = 3
+    /// Icons are scanned on app activation, launch and quit, display and Space changes, unlock,
+    /// and when a captured bar shows icons moving (SystemBarLayoutSignature). The poll is only a
+    /// fallback: every 3 s without a captured bar to watch, every 20 s with one.
+    private static let iconPollSeconds: TimeInterval = 3
+    private static let watchedIconPollSeconds: TimeInterval = 20
+    private static let layoutScanDelayMilliseconds = 300
+    /// How far left of the leftmost icon the watch looks for new icons, in points.
+    private static let layoutWatchLeadingPoints: CGFloat = 120
     private static let redrawThrottleMilliseconds = 250
 
     let reader = AccessibilityMirrorReader()
@@ -72,6 +79,13 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     private var appIconCache: [pid_t: NSImage] = [:]
     private var refreshTask: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
+    private var lastIconScanAt = Date.distantPast
+    private var requestedScanTask: Task<Void, Never>?
+    /// Per captured display: the stretch of its real bar that holds the icons (points relative to
+    /// the bar), and how many of its layout changes have been answered with a scan.
+    private var layoutWatch: [CGDirectDisplayID: (region: CGRect, seenChanges: Int)] = [:]
+    /// Scans the layout watch asked for, for the status route.
+    private var layoutTriggeredScans = 0
     /// Watches the running-app list itself. macOS posts no launch or quit notification for
     /// menu-bar-only apps (LSUIElement), which own most menu bar icons.
     private var runningAppsObservation: NSKeyValueObservation?
@@ -140,6 +154,12 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         observers.append(center.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.orderBarsFront()
+                self?.requestIconScan(afterMilliseconds: 300)
+            }
+        })
+        observers.append(DistributedNotificationCenter.default().addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.requestIconScan(afterMilliseconds: 500)
             }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
@@ -148,6 +168,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 // A reconnected or rearranged display stops its capture; start over right away.
                 self?.captureSet.clearFailures()
                 self?.requestRelayout?()
+                self?.requestIconScan(afterMilliseconds: 500)
             }
         })
     }
@@ -293,12 +314,38 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 if tick % Self.titleRefreshTicks == 0 {
                     await self.refreshTitles()
                 }
-                if tick % Self.iconRefreshTicks == 0 {
+                let pollSeconds = self.isWatchingIconLayout ? Self.watchedIconPollSeconds : Self.iconPollSeconds
+                if Date().timeIntervalSince(self.lastIconScanAt) >= pollSeconds - 0.5 {
                     await self.refreshIcons()
                 }
                 tick += 1
                 try? await Task.sleep(for: .seconds(Self.refreshTickSeconds))
             }
+        }
+    }
+
+    private var isWatchingIconLayout: Bool {
+        layoutWatch.keys.contains { captureSet.capture(for: $0)?.layoutWatch.spans != nil }
+    }
+
+    /// When icons were last scanned and what the layout watch sees, for the status route.
+    var iconScanSummary: String {
+        let watched = layoutWatch.sorted { $0.key < $1.key }.map { id, watch in
+            let spans = captureSet.capture(for: id)?.layoutWatch.spans
+            return "display \(id) \(Int(watch.region.minX))..\(Int(watch.region.maxX)): \(spans.map { "\($0) spans" } ?? "not measured")"
+        }
+        let poll = isWatchingIconLayout ? Self.watchedIconPollSeconds : Self.iconPollSeconds
+        return "icon scans: last \(String(format: "%.1f", Date().timeIntervalSince(lastIconScanAt))) s ago, poll every \(Int(poll)) s; layout watch \(watched); \(layoutTriggeredScans) scans after layout changes"
+    }
+
+    /// Scans the icons soon; requests that arrive meanwhile join the same scan.
+    private func requestIconScan(afterMilliseconds delay: Int) {
+        guard !bars.isEmpty, requestedScanTask == nil else { return }
+        requestedScanTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(delay))
+            guard let self, !Task.isCancelled else { return }
+            self.requestedScanTask = nil
+            await self.refreshIcons()
         }
     }
 
@@ -364,6 +411,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         // While the screen is locked macOS hides the icons and capture stops; keep the last state
         // so the bar comes back unchanged after the unlock.
         guard !Self.screenIsLocked() else { return }
+        lastIconScanAt = Date()
         let apps: [AccessibilityMirrorReader.RunningApp]
         if let cachedRunningApps {
             apps = cachedRunningApps
@@ -500,6 +548,17 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             fillImages(of: &content, bar: bar)
             bars[key]?.view.content = content
         }
+        checkIconLayout()
+    }
+
+    /// Asks for a scan when a watched bar's icons moved, appeared, or disappeared.
+    private func checkIconLayout() {
+        for (displayID, watch) in layoutWatch {
+            guard let changes = captureSet.capture(for: displayID)?.layoutWatch.changes, changes != watch.seenChanges else { continue }
+            layoutWatch[displayID]?.seenChanges = changes
+            layoutTriggeredScans += 1
+            requestIconScan(afterMilliseconds: Self.layoutScanDelayMilliseconds)
+        }
     }
 
     private static func regionKey(for source: SystemBarPlacement) -> String {
@@ -522,15 +581,20 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     /// Tells each capture which rectangles to watch: the shown icons drawn on its display, and
     /// a background sample on the active bar.
     private func syncCaptureRegions() {
-        guard !captureSet.isEmpty else { return }
+        guard !captureSet.isEmpty else {
+            layoutWatch.removeAll()
+            return
+        }
         let display = displayLookup()
         var regionsByDisplay: [CGDirectDisplayID: [String: CGRect]] = [:]
+        var barSizes: [CGDirectDisplayID: CGSize] = [:]
         for bar in bars.values {
             let content = bar.view.content
             for slot in content.plan.slots {
                 guard case let .icon(index) = slot.kind, content.icons.indices.contains(index),
                       let source = content.icons[index].pixelSource,
                       let id = display(source.menuBar) else { continue }
+                barSizes[id] = source.menuBar.size
                 regionsByDisplay[id, default: [:]][Self.regionKey(for: source)] = CGRect(
                     x: source.frame.minX - source.menuBar.minX,
                     y: source.frame.minY - source.menuBar.minY,
@@ -542,7 +606,21 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         if let active = activeBackgroundRect, let id = display(active.menuBar) {
             regionsByDisplay[id, default: [:]][Self.backgroundRegionKey] = active.rect
         }
+        // On each captured bar, the stretch that holds the icons, watched for icons moving.
+        var watched: [CGDirectDisplayID: CGRect] = [:]
+        for (id, size) in barSizes {
+            guard let leftmost = regionsByDisplay[id]?.filter({ $0.key.hasPrefix("icon|") }).values.map(\.minX).min() else { continue }
+            let minX = max(0, leftmost - Self.layoutWatchLeadingPoints)
+            let region = CGRect(x: minX, y: 0, width: size.width - minX, height: size.height)
+            watched[id] = region
+        }
+        let previousWatch = layoutWatch
+        layoutWatch = watched.reduce(into: [:]) { result, entry in
+            let changes = previousWatch[entry.key]?.seenChanges ?? captureSet.capture(for: entry.key)?.layoutWatch.changes ?? 0
+            result[entry.key] = (entry.value, changes)
+        }
         captureSet.setRegions(regionsByDisplay)
+        captureSet.setLayoutRegions(watched)
     }
 
     private func fillImages(of content: inout SystemBarContent, bar: DisplayBar) {

@@ -103,6 +103,13 @@ final class SystemBarCaptureSet {
         }
     }
 
+    /// The stretch of each display's bar to watch for icons moving (see MenuBarStripCapture).
+    func setLayoutRegions(_ regionsByDisplay: [CGDirectDisplayID: CGRect]) {
+        for (displayID, capture) in captures {
+            capture.setLayoutRegion(regionsByDisplay[displayID])
+        }
+    }
+
     /// Development route: stops every running stream as a display change would.
     func simulateUnexpectedStop() -> Int {
         let running = captures.values.filter(\.isRunning)

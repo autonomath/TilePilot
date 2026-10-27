@@ -530,5 +530,47 @@ final class SystemBarModelsTests: XCTestCase {
         XCTAssertFalse(SystemBarBackgroundLook.sameLook(look.current?.color, black))
         XCTAssertEqual(look.current?.isDark, false)
     }
+
+    // MARK: - Layout signature
+
+    /// A bar stretch with white blocks (icons) on a dark background, at `scale` pixels per point.
+    private func barImage(pointsWide: Int, scale: Int = 1, blocks: [ClosedRange<Int>], gray: [ClosedRange<Int>] = []) -> CGImage {
+        let context = CGContext(
+            data: nil, width: pointsWide * scale, height: 30 * scale, bitsPerComponent: 8, bytesPerRow: pointsWide * scale * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
+        context.setFillColor(CGColor(srgbRed: 0.05, green: 0.05, blue: 0.05, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: pointsWide, height: 30))
+        context.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+        for block in blocks {
+            context.fill(CGRect(x: block.lowerBound, y: 8, width: block.count, height: 14))
+        }
+        context.setFillColor(CGColor(srgbRed: 0.6, green: 0.6, blue: 0.6, alpha: 1))
+        for block in gray {
+            context.fill(CGRect(x: block.lowerBound, y: 12, width: block.count, height: 6))
+        }
+        return context.makeImage()!
+    }
+
+    private func signature(_ blocks: [ClosedRange<Int>], gray: [ClosedRange<Int>] = [], scale: Int = 2) -> SystemBarLayoutSignature {
+        SystemBarLayoutSignature.measure(barImage(pointsWide: 300, scale: scale, blocks: blocks, gray: gray), originX: 1000, pointsWide: 300)!
+    }
+
+    func testLayoutSignatureFindsIconsAndJoinsTheLettersOfATitle() {
+        // The last two blocks are letters of one title, 2 pt apart.
+        let found = signature([100...123, 130...153, 160...175, 178...190])
+        XCTAssertEqual(found.spans, [1100...1124, 1130...1154, 1160...1191])
+        XCTAssertEqual(signature([100...123, 130...153, 160...175, 178...190], scale: 1), found)
+    }
+
+    func testLayoutSignatureChangesOnlyWhenIconsMoveAppearOrDisappear() {
+        let base = signature([100...123, 130...153, 160...190])
+        XCTAssertFalse(signature([100...123, 130...153, 160...190], gray: [135...140]).differs(from: base), "a graph or digits changed inside an icon")
+        XCTAssertFalse(signature([101...123, 130...153, 160...190]).differs(from: base), "a 1 pt wobble")
+        XCTAssertTrue(signature([100...123, 130...160, 167...197]).differs(from: base), "an icon grew and pushed its neighbour")
+        XCTAssertTrue(signature([60...80, 100...123, 130...153, 160...190]).differs(from: base), "a new icon")
+        XCTAssertTrue(signature([100...123, 160...190]).differs(from: base), "an icon left")
+    }
 }
 #endif

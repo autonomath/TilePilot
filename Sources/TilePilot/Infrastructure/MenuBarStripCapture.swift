@@ -30,6 +30,13 @@ final class MenuBarStripCapture: NSObject, @unchecked Sendable, SCStreamOutput, 
     private var regions: [String: CGRect] = [:]
     private var fingerprints: [String: UInt64] = [:]
     private var images: [String: CGImage] = [:]
+    /// The stretch of the bar that holds the icons (points relative to the strip), watched for
+    /// icons moving (see SystemBarLayoutSignature): its last fingerprint and signature, and how
+    /// many layout changes were seen.
+    private var layoutRegion: CGRect?
+    private var layoutFingerprint: UInt64?
+    private var layoutSignature: SystemBarLayoutSignature?
+    private var layoutChangeCount = 0
     /// The newest frame, kept so regions registered later can be filled without waiting for the
     /// display to change. Only one buffer is held.
     private var lastPixelBuffer: CVPixelBuffer?
@@ -111,6 +118,40 @@ final class MenuBarStripCapture: NSObject, @unchecked Sendable, SCStreamOutput, 
                 self.process(buffer)
             }
         }
+    }
+
+    /// Watches `rect` (points relative to the strip) for icons moving, appearing, or
+    /// disappearing; nil stops watching. A new stretch is measured from the newest frame without
+    /// counting as a change.
+    func setLayoutRegion(_ rect: CGRect?) {
+        lock.lock()
+        guard rect != layoutRegion else {
+            lock.unlock()
+            return
+        }
+        layoutRegion = rect
+        layoutFingerprint = nil
+        layoutSignature = nil
+        let hasFrame = lastPixelBuffer != nil
+        lock.unlock()
+        guard hasFrame, rect != nil else { return }
+        outputQueue.async { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let buffer = self.lastPixelBuffer
+            self.lock.unlock()
+            if let buffer {
+                self.process(buffer)
+            }
+        }
+    }
+
+    /// How many layout changes the watched stretch has shown, and how many icon spans it held when
+    /// last measured (nil before the first measurement).
+    var layoutWatch: (changes: Int, spans: Int?) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (layoutChangeCount, layoutSignature?.spans.count)
     }
 
     func start() async throws {
@@ -207,10 +248,13 @@ final class MenuBarStripCapture: NSObject, @unchecked Sendable, SCStreamOutput, 
         lock.lock()
         let currentRegions = regions
         let knownFingerprints = fingerprints
+        let layout = layoutRegion
+        let knownLayoutFingerprint = layoutFingerprint
         lock.unlock()
-        guard !currentRegions.isEmpty else { return }
+        guard !currentRegions.isEmpty || layout != nil else { return }
 
         var changed: [String: (rect: CGRect, fingerprint: UInt64)] = [:]
+        var measuredLayout: (fingerprint: UInt64, signature: SystemBarLayoutSignature)?
         guard CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly) == kCVReturnSuccess else { return }
         if let base = CVPixelBufferGetBaseAddress(pixelBuffer) {
             let width = CVPixelBufferGetWidth(pixelBuffer)
@@ -224,9 +268,35 @@ final class MenuBarStripCapture: NSObject, @unchecked Sendable, SCStreamOutput, 
                     changed[key] = (pixels, fingerprint)
                 }
             }
+            if let layout {
+                let pixels = pixelRect(layout, width: width, height: height)
+                let fingerprint = pixels.isEmpty ? nil : Self.fingerprint(base: base, bytesPerRow: bytesPerRow, rect: pixels)
+                if let fingerprint, fingerprint != knownLayoutFingerprint {
+                    let signature = SystemBarLayoutSignature.measure(bgra: base, bytesPerRow: bytesPerRow, pixelRect: pixels, scale: scale, originX: layout.minX)
+                    measuredLayout = (fingerprint, signature)
+                }
+            }
         }
         CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
-        guard !changed.isEmpty else { return }
+        var layoutChanged = false
+        if let measuredLayout {
+            lock.lock()
+            if layoutRegion == layout {
+                layoutFingerprint = measuredLayout.fingerprint
+                if let previous = layoutSignature, measuredLayout.signature.differs(from: previous) {
+                    layoutChangeCount += 1
+                    layoutChanged = true
+                }
+                layoutSignature = measuredLayout.signature
+            }
+            lock.unlock()
+        }
+        guard !changed.isEmpty else {
+            if layoutChanged {
+                onChange()
+            }
+            return
+        }
 
         var frameImage: CGImage?
         VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &frameImage)

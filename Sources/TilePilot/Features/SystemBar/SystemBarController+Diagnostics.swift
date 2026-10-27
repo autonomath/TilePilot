@@ -58,6 +58,7 @@ extension SystemBarController {
         let scan = reader.lastScanStats
         let searched = scan.searchedKeys.map { itemsByKey[$0]?.shortName ?? $0 }
         lines.append("last scan: \(String(format: "%.2f", scan.seconds)) s, \(scan.hitTests) hit tests, searched \(searched)")
+        lines.append(iconScanSummary)
         for bar in bars.values.sorted(by: { $0.key < $1.key }) {
             let shown = bar.view.content.icons.map { item -> String in
                 guard let source = item.pixelSource else { return "\(item.shortName)@-" }
