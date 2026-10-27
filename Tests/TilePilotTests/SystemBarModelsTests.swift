@@ -426,5 +426,82 @@ final class SystemBarModelsTests: XCTestCase {
         let decoded = try JSONDecoder().decode(WorkAreaConfiguration.self, from: data)
         XCTAssertTrue(decoded.systemBarEnabled)
     }
+
+    // MARK: - Icon row state and background look
+
+    private func rowItem(_ name: String, bar: CGRect, x: CGFloat, width: CGFloat = 24, system: Bool = false) -> SystemBarStatusItem {
+        var item = SystemBarStatusItem(
+            id: name,
+            pid: 42,
+            bundleIdentifier: "com.example.\(name)",
+            appName: name,
+            identifier: system ? "com.apple.menuextra.\(name)" : name,
+            title: "",
+            descriptionText: "",
+            value: "",
+            frame: CGRect(x: x, y: bar.minY + 4, width: width, height: 22),
+            menuBarFrame: bar
+        )
+        item.stableKey = "42:\(name)"
+        item.reportedMenuBarFrame = bar
+        item.reportedFrame = item.frame
+        return item
+    }
+
+    func testIconRowStateKeepsEveryPlaceWhenFocusMovesIconsToAnotherDisplay() {
+        let laptop = CGRect(x: 0, y: 0, width: 2000, height: 30)
+        let samsung = CGRect(x: -600, y: -2160, width: 3840, height: 30)
+        var row = SystemBarIconRowState()
+        func places() -> [String: CGFloat] {
+            Dictionary(uniqueKeysWithValues: row.layout([], isShown: { _ in true }).map { ($0.item.appName, $0.metric.rightOffset) })
+        }
+        row.learn(from: [
+            rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: laptop, x: 1030),
+            rowItem("b", bar: laptop, x: 1066), rowItem("clock", bar: laptop, x: 1900, width: 80, system: true),
+        ], livePIDs: [42])
+        let laptopActive = row.layout([
+            rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: laptop, x: 1030),
+            rowItem("b", bar: laptop, x: 1066), rowItem("clock", bar: laptop, x: 1900, width: 80, system: true),
+        ], isShown: { _ in true }).map { "\($0.item.appName)@\($0.metric.rightOffset)" }
+        // Focus moves to the Samsung: macOS now draws "t" and the clock only there.
+        let moved = [
+            rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: samsung, x: 2900),
+            rowItem("b", bar: laptop, x: 1066), rowItem("clock", bar: samsung, x: 3100, width: 80, system: true),
+        ]
+        row.learn(from: moved, livePIDs: [42])
+        XCTAssertEqual(row.order, ["42:a", "42:t", "42:b", "42:clock"])
+        XCTAssertEqual(row.layout(moved, isShown: { _ in true }).map { "\($0.item.appName)@\($0.metric.rightOffset)" }, laptopActive)
+        XCTAssertTrue(places().isEmpty, "only icons present now are laid out")
+    }
+
+    private func solidImage(_ gray: CGFloat) -> CGImage {
+        let context = CGContext(
+            data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 16,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.setFillColor(CGColor(srgbRed: gray, green: gray, blue: gray, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        return context.makeImage()!
+    }
+
+    func testBackgroundLookIgnoresTheFadeOfASwitchingBar() {
+        let black = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
+        let start = Date()
+        var look = SystemBarBackgroundLook()
+        look.update(sample: solidImage(0), now: start)
+        XCTAssertEqual(look.current?.isDark, true)
+        // macOS fades the bar to gray for a moment while focus switches displays.
+        look.update(sample: solidImage(0.5), now: start.addingTimeInterval(0.2))
+        look.update(sample: solidImage(0), now: start.addingTimeInterval(0.6))
+        look.update(sample: nil, now: start.addingTimeInterval(3))
+        XCTAssertTrue(SystemBarBackgroundLook.sameLook(look.current?.color, black))
+        // A color that holds is adopted.
+        look.update(sample: solidImage(0.5), now: start.addingTimeInterval(4))
+        look.update(sample: nil, now: start.addingTimeInterval(4.5))
+        XCTAssertTrue(SystemBarBackgroundLook.sameLook(look.current?.color, black))
+        look.update(sample: nil, now: start.addingTimeInterval(5.6))
+        XCTAssertFalse(SystemBarBackgroundLook.sameLook(look.current?.color, black))
+        XCTAssertEqual(look.current?.isDark, false)
+    }
 }
 #endif

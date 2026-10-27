@@ -15,6 +15,11 @@ enum SystemBarIconRow {
         let minX: CGFloat
     }
 
+    /// Identifies a real menu bar by its top-left corner.
+    static func barKey(_ bar: CGRect) -> String {
+        "\(Int(bar.minX)),\(Int(bar.minY))"
+    }
+
     /// Bars must draw this many more third-party icons than the current reference to replace it,
     /// so the row does not flip back and forth while macOS moves icons around.
     static let referenceSwitchMargin = 3
