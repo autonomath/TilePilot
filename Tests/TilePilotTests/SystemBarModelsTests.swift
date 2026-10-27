@@ -429,10 +429,10 @@ final class SystemBarModelsTests: XCTestCase {
 
     // MARK: - Icon row state and background look
 
-    private func rowItem(_ name: String, bar: CGRect, x: CGFloat, width: CGFloat = 24, system: Bool = false) -> SystemBarStatusItem {
+    private func rowItem(_ name: String, pid: Int32 = 42, bar: CGRect, x: CGFloat, width: CGFloat = 24, system: Bool = false) -> SystemBarStatusItem {
         var item = SystemBarStatusItem(
             id: name,
-            pid: 42,
+            pid: pid,
             bundleIdentifier: "com.example.\(name)",
             appName: name,
             identifier: system ? "com.apple.menuextra.\(name)" : name,
@@ -442,7 +442,7 @@ final class SystemBarModelsTests: XCTestCase {
             frame: CGRect(x: x, y: bar.minY + 4, width: width, height: 22),
             menuBarFrame: bar
         )
-        item.stableKey = "42:\(name)"
+        item.stableKey = "\(pid):\(name)"
         item.reportedMenuBarFrame = bar
         item.reportedFrame = item.frame
         return item
@@ -458,7 +458,7 @@ final class SystemBarModelsTests: XCTestCase {
         row.learn(from: [
             rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: laptop, x: 1030),
             rowItem("b", bar: laptop, x: 1066), rowItem("clock", bar: laptop, x: 1900, width: 80, system: true),
-        ], livePIDs: [42])
+        ])
         let laptopActive = row.layout([
             rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: laptop, x: 1030),
             rowItem("b", bar: laptop, x: 1066), rowItem("clock", bar: laptop, x: 1900, width: 80, system: true),
@@ -468,10 +468,37 @@ final class SystemBarModelsTests: XCTestCase {
             rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: samsung, x: 2900),
             rowItem("b", bar: laptop, x: 1066), rowItem("clock", bar: samsung, x: 3100, width: 80, system: true),
         ]
-        row.learn(from: moved, livePIDs: [42])
-        XCTAssertEqual(row.order, ["42:a", "42:t", "42:b", "42:clock"])
+        row.learn(from: moved)
+        XCTAssertEqual(row.order, ["com.example.a|a", "com.example.t|t", "com.example.b|b", "com.example.clock|clock"])
         XCTAssertEqual(row.layout(moved, isShown: { _ in true }).map { "\($0.item.appName)@\($0.metric.rightOffset)" }, laptopActive)
         XCTAssertTrue(places().isEmpty, "only icons present now are laid out")
+    }
+
+    func testIconRowStateKeepsSlotsAcrossARestartAndAnAppRelaunch() throws {
+        let laptop = CGRect(x: 0, y: 0, width: 2000, height: 30)
+        let samsung = CGRect(x: -600, y: -2160, width: 3840, height: 30)
+        var row = SystemBarIconRowState()
+        let start = Date()
+        row.learn(from: [
+            rowItem("a", bar: laptop, x: 1000), rowItem("t", bar: laptop, x: 1030), rowItem("b", bar: laptop, x: 1066),
+        ], now: start)
+        let saved = try JSONDecoder().decode(
+            SystemBarIconRowState.Snapshot.self,
+            from: try JSONEncoder().encode(row.snapshot)
+        )
+
+        // TilePilot restarts; "t" relaunched with a new process and macOS draws it on the Samsung.
+        var restarted = SystemBarIconRowState(snapshot: saved)
+        restarted.learn(from: [
+            rowItem("a", bar: laptop, x: 1000), rowItem("t", pid: 99, bar: samsung, x: 2900), rowItem("b", bar: laptop, x: 1066),
+        ], now: start.addingTimeInterval(60))
+        XCTAssertEqual(restarted.order, ["com.example.a|a", "com.example.t|t", "com.example.b|b"])
+
+        // An icon not seen for more than 30 days is forgotten.
+        restarted.learn(from: [rowItem("a", bar: laptop, x: 1000)], now: start.addingTimeInterval(30 * 86_400))
+        XCTAssertEqual(restarted.memory, ["com.example.a|a", "com.example.t|t", "com.example.b|b"])
+        restarted.learn(from: [rowItem("a", bar: laptop, x: 1000)], now: start.addingTimeInterval(31 * 86_400))
+        XCTAssertEqual(restarted.memory, ["com.example.a|a"])
     }
 
     private func solidImage(_ gray: CGFloat) -> CGImage {

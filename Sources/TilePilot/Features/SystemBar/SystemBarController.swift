@@ -44,8 +44,10 @@ final class SystemBarController: NSObject, NSMenuDelegate {
     let captureSet = SystemBarCaptureSet()
     /// Per bar: icons seen on that display's real bar, with their place there.
     private var stickyIcons: [String: [String: SystemBarStickyIcon]] = [:]
-    /// The row shown with every display's icons.
+    /// The row shown with every display's icons, saved between launches.
     private(set) var iconRow = SystemBarIconRowState()
+    private var savedIconRow: SystemBarIconRowState.Snapshot?
+    private static let iconRowDefaultsKey = "TilePilot.systemBarIconRow"
     private(set) var backgroundLook = SystemBarBackgroundLook()
     private var activeBackgroundRect: (menuBar: CGRect, rect: CGRect)?
     private var activationScanTask: Task<Void, Never>?
@@ -109,6 +111,11 @@ final class SystemBarController: NSObject, NSMenuDelegate {
 
     override init() {
         super.init()
+        if let data = UserDefaults.standard.data(forKey: Self.iconRowDefaultsKey),
+           let snapshot = try? JSONDecoder().decode(SystemBarIconRowState.Snapshot.self, from: data) {
+            iconRow = SystemBarIconRowState(snapshot: snapshot)
+            savedIconRow = snapshot
+        }
         captureSet.onFrame = { [weak self] in
             self?.scheduleRedraw()
         }
@@ -388,9 +395,17 @@ final class SystemBarController: NSObject, NSMenuDelegate {
             recentStatusItems[item.stableKey] = (item, now)
         }
         statusItems = merged
-        iconRow.learn(from: statusItems, livePIDs: Set(apps.map(\.pid)))
+        iconRow.learn(from: statusItems)
+        saveIconRowIfChanged()
         updateCaptures()
         relayoutAllBars()
+    }
+
+    private func saveIconRowIfChanged() {
+        let snapshot = iconRow.snapshot
+        guard snapshot != savedIconRow, let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: Self.iconRowDefaultsKey)
+        savedIconRow = snapshot
     }
 
     private static func screenIsLocked() -> Bool {

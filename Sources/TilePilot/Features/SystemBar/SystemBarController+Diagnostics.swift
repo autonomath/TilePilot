@@ -48,8 +48,9 @@ extension SystemBarController {
         let look = backgroundLook.current.map { "\($0.color.components?.prefix(3).map { String(format: "%.2f", $0) } ?? []) dark \($0.isDark)" } ?? "none"
         lines.append("active bar \(active); bar look \(look); include other displays \(includeOtherDisplayIcons)")
         let itemsByKey = Dictionary(statusItems.map { ($0.stableKey, $0) }, uniquingKeysWith: { first, _ in first })
+        let itemsByRowKey = Dictionary(SystemBarIconRowState.keyed(statusItems).map { ($0.key, $0.item) }, uniquingKeysWith: { first, _ in first })
         let rowText = iconRow.order.compactMap { key -> String? in
-            guard let item = itemsByKey[key] else { return nil }
+            guard let item = itemsByRowKey[key] else { return nil }
             let bars = item.allPlacements.map { "\(barName($0.menuBar)):\(Int($0.frame.minX))" }
             return "\(item.shortName)[\(bars.joined(separator: "/"))]"
         }
