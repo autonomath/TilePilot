@@ -75,25 +75,6 @@ struct SystemBarLayoutSignature: Equatable, Sendable {
         return SystemBarLayoutSignature(spans: spans)
     }
 
-    /// Measures an image of a stretch of a bar that starts `originX` points from the bar's left
-    /// edge and is `pointsWide` wide.
-    static func measure(_ image: CGImage, originX: CGFloat, pointsWide: CGFloat) -> SystemBarLayoutSignature? {
-        let width = image.width, height = image.height
-        guard width > 0, height > 2, pointsWide > 0,
-              let context = CGContext(
-                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-              ) else { return nil }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        guard let data = context.data else { return nil }
-        return measure(
-            bgra: data, bytesPerRow: width * 4,
-            pixelRect: CGRect(x: 0, y: 0, width: width, height: height),
-            scale: CGFloat(width) / pointsWide, originX: originX
-        )
-    }
-
     /// True when icons appeared, disappeared, or moved by more than the tolerance.
     func differs(from other: SystemBarLayoutSignature) -> Bool {
         guard spans.count == other.spans.count else { return true }

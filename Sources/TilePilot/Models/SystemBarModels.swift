@@ -458,22 +458,6 @@ struct SystemBarStatusItem: Identifiable, Equatable, Sendable {
     }
 }
 
-enum AccessibilityActionName {
-    /// Accessibility reports custom actions as "Name:Show Details\nTarget:…\nSelector:…". Returns
-    /// the label, or the raw name for standard actions such as `AXPress`.
-    static func label(_ raw: String) -> String {
-        let firstLine = raw.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? raw
-        if firstLine.hasPrefix("Name:") {
-            return String(firstLine.dropFirst("Name:".count)).trimmingCharacters(in: .whitespaces)
-        }
-        return firstLine
-    }
-
-    static func isCustomAction(_ raw: String) -> Bool {
-        raw.hasPrefix("Name:")
-    }
-}
-
 /// A rendered position on the System Bar, in bar-local points from the left edge.
 struct SystemBarSlot: Equatable, Sendable {
     enum Kind: Equatable, Sendable {
