@@ -240,9 +240,9 @@ Mini-map details:
 
 ### Work Area
 
-- Four cards, in order: Work Area (display picker, canvas, numeric fields, size and position presets), Menu Bar, Keeping Windows Inside, Exceptions.
+- Two columns: a fixed 400 pt left column holds the Work Area card (display picker, on/off switch, a compact canvas at most 376 × 300 pt, numeric fields, size and position presets); the right column holds Menu Bar, Keeping Windows Inside, and Exceptions, so the settings are visible without scrolling at the minimum window size.
 - The canvas is drawn to the display's shape: drag to move, drag edges to resize, drag outside to draw a new area. It shows window outlines only (never titles), the menu bar and Dock strips, and the mirrored menu bar's position.
-- Menu Bar and containment controls stay visible but disabled until the display's Work Area is on.
+- Containment controls stay visible but disabled until the display's Work Area is on. The menu bar switch works either way, so the bar can be turned off before the area is turned on; its icon options are disabled while it is off.
 - Copy states outcomes: where windows end up and what keeps using the whole display. Teaching material belongs in `How It Works`.
 
 ### Appearance

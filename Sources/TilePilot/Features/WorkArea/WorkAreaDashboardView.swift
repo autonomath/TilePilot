@@ -9,12 +9,20 @@ struct WorkAreaDashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                Group {
                     if let display = selectedDisplay {
-                        editorCard(display: display)
-                        systemBarCard(display: display)
-                        behaviorCard(display: display)
-                        exceptionsCard(display: display)
+                        // The area itself is simple to pick, so it gets a compact column and the
+                        // settings sit beside it.
+                        HStack(alignment: .top, spacing: 16) {
+                            editorCard(display: display)
+                                .frame(width: Self.editorColumnWidth)
+                            VStack(alignment: .leading, spacing: 16) {
+                                systemBarCard(display: display)
+                                behaviorCard(display: display)
+                                exceptionsCard(display: display)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     } else {
                         unavailableCard
                     }
@@ -23,6 +31,18 @@ struct WorkAreaDashboardView: View {
             }
             .navigationTitle("TilePilot")
         }
+    }
+
+    private static let editorColumnWidth: CGFloat = 400
+    /// The preview's largest size: the editor column less the group box's padding.
+    private static let canvasMaxSize = CGSize(width: editorColumnWidth - 24, height: 300)
+
+    /// The preview keeps the display's shape: full column width, or capped height for a
+    /// portrait display.
+    private static func canvasSize(for displaySize: CGSize) -> CGSize {
+        let aspect = displaySize.width / max(displaySize.height, 1)
+        let width = min(canvasMaxSize.width, canvasMaxSize.height * aspect)
+        return CGSize(width: width.rounded(), height: (width / max(aspect, 0.01)).rounded())
     }
 
     // MARK: - Display selection
@@ -62,35 +82,28 @@ struct WorkAreaDashboardView: View {
         let configuration = model.workAreaConfiguration(for: display)
         let rect = model.workAreaEditorNormalizedRect(for: display)
         let displaySize = CGSize(width: display.frameW, height: display.frameH)
+        let canvasSize = Self.canvasSize(for: displaySize)
 
         return GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    if displays.count > 1 {
-                        Picker("Display", selection: Binding(
-                            get: { displayKey(display) },
-                            set: { selectedDisplayKey = $0 }
-                        )) {
-                            ForEach(displays, id: \.id) { item in
-                                Text(verbatim: "\(item.name) · \(Int(item.frameW)) × \(Int(item.frameH))").tag(displayKey(item))
-                            }
+            VStack(alignment: .leading, spacing: 10) {
+                if displays.count > 1 {
+                    Picker("Display", selection: Binding(
+                        get: { displayKey(display) },
+                        set: { selectedDisplayKey = $0 }
+                    )) {
+                        ForEach(displays, id: \.id) { item in
+                            Text(verbatim: "\(item.name) · \(Int(item.frameW)) × \(Int(item.frameH))").tag(displayKey(item))
                         }
-                        .frame(maxWidth: 360)
-                    } else {
-                        Text(verbatim: "\(display.name) · \(Int(display.frameW)) × \(Int(display.frameH)) pt")
-                            .font(.subheadline.weight(.semibold))
                     }
-                    Spacer(minLength: 0)
-                    Toggle("Use a Work Area on this display", isOn: Binding(
-                        get: { configuration?.enabled ?? false },
-                        set: { model.setWorkAreaEnabled($0, for: display) }
-                    ))
-                    .toggleStyle(.switch)
+                } else {
+                    Text(verbatim: "\(display.name) · \(Int(display.frameW)) × \(Int(display.frameH)) pt")
+                        .font(.subheadline.weight(.semibold))
                 }
-
-                Text("Drag the area to move it, drag its edges to resize it, or drag outside it to draw a new one.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Toggle("Use a Work Area on this display", isOn: Binding(
+                    get: { configuration?.enabled ?? false },
+                    set: { model.setWorkAreaEnabled($0, for: display) }
+                ))
+                .toggleStyle(.switch)
 
                 WorkAreaCanvas(
                     displaySize: displaySize,
@@ -103,31 +116,41 @@ struct WorkAreaDashboardView: View {
                     onChange: { model.setWorkAreaNormalizedRect($0, for: display, debounce: true) },
                     onCommit: { model.setWorkAreaNormalizedRect($0, for: display, debounce: false) }
                 )
+                .frame(width: canvasSize.width, height: canvasSize.height)
                 .frame(maxWidth: .infinity)
-                .frame(maxHeight: 420)
 
-                HStack(alignment: .bottom, spacing: 12) {
+                Text("Drag the area to move it, drag its edges to resize it, or drag outside it to draw a new one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(alignment: .bottom, spacing: 8) {
                     pointField("Width", value: pointBinding(display: display, rect: rect, dimension: .width))
                     pointField("Height", value: pointBinding(display: display, rect: rect, dimension: .height))
                     pointField("From left", value: pointBinding(display: display, rect: rect, dimension: .x))
                     pointField("From top", value: pointBinding(display: display, rect: rect, dimension: .y))
-                    Spacer(minLength: 0)
-                    Toggle("Lock aspect ratio", isOn: $lockAspectRatio)
                 }
+                Toggle("Lock aspect ratio", isOn: $lockAspectRatio)
 
-                HStack(spacing: 8) {
-                    Text("Size")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    ForEach(WorkAreaSizePreset.allCases) { preset in
-                        Button(preset.title) { applySizePreset(preset, display: display, rect: rect) }
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                    GridRow {
+                        Text("Size")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            ForEach(WorkAreaSizePreset.allCases) { preset in
+                                Button(preset.title) { applySizePreset(preset, display: display, rect: rect) }
+                            }
+                        }
                     }
-                    Divider().frame(height: 16)
-                    Text("Position")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    ForEach(WorkAreaPositionPreset.allCases) { preset in
-                        Button(preset.title) { applyPositionPreset(preset, display: display, rect: rect) }
+                    GridRow {
+                        Text("Position")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            ForEach(WorkAreaPositionPreset.allCases) { preset in
+                                Button(preset.title) { applyPositionPreset(preset, display: display, rect: rect) }
+                            }
+                        }
                     }
                 }
                 .controlSize(.small)
@@ -200,7 +223,7 @@ struct WorkAreaDashboardView: View {
                 .foregroundStyle(.secondary)
             TextField(title, value: value, format: .number.grouping(.never))
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 84)
+                .frame(width: 82)
         }
     }
 
@@ -297,7 +320,6 @@ struct WorkAreaDashboardView: View {
 
     private func systemBarCard(display: DisplayState) -> some View {
         let configuration = model.workAreaConfiguration(for: display)
-        let workAreaOn = configuration?.enabled == true
         let barOn = configuration?.systemBarEnabled == true
         let screenRecordingOn = model.megamapScreenRecordingAuthorized
         return GroupBox {
@@ -307,9 +329,8 @@ struct WorkAreaDashboardView: View {
                     set: { model.setSystemBarEnabled($0, for: display) }
                 ))
                 .toggleStyle(.switch)
-                .disabled(!workAreaOn)
 
-                Text("Shows the app menus and this display's menu bar icons. Menus open right under it and the frontmost app stays frontmost; icon panels open at the real menu bar.")
+                Text("Shows the app menus and this display's menu bar icons. Menus open right under it and the frontmost app stays frontmost; icon panels open at the real menu bar. Off, the Work Area works the same with only the real menu bar.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -318,7 +339,7 @@ struct WorkAreaDashboardView: View {
                     set: { model.setSystemBarOtherDisplayIconsEnabled($0) }
                 ))
                 .toggleStyle(.switch)
-                .disabled(!workAreaOn || !barOn)
+                .disabled(!barOn)
 
                 Text("Shows every menu bar icon once, in a row that stays put when focus moves between displays. Icons macOS dims on the other display are shown at full brightness; panels open where macOS draws the icon.")
                     .font(.caption)
@@ -329,7 +350,7 @@ struct WorkAreaDashboardView: View {
                     set: { model.setSystemBarMatchingIconsEnabled($0) }
                 ))
                 .toggleStyle(.switch)
-                .disabled(!workAreaOn || !barOn)
+                .disabled(!barOn)
 
                 HStack(spacing: 8) {
                     Text("Menu bar icons: \(model.systemBarIconModeDescription).")
