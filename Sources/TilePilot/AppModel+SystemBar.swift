@@ -51,15 +51,27 @@ extension AppModel {
 
     // MARK: - Settings
 
+    /// True when any saved Work Area is set to show the menu bar (it shows while that area is on).
+    var isSystemBarSettingOn: Bool {
+        workAreas.contains(where: \.systemBarEnabled)
+    }
+
     func setSystemBarEnabled(_ enabled: Bool, for display: DisplayState) {
         let index = ensureWorkAreaConfigurationIndexForSystemBar(for: display)
         workAreas[index].systemBarEnabled = enabled
         persistWorkAreas()
-        lastActionMessage = enabled
-            ? "Menu bar on for \(display.name). Menus and icons open at the top of the Work Area."
-            : "Menu bar off for \(display.name)."
+        lastActionMessage = Self.systemBarChangeMessage(enabled: enabled, workAreaOn: workAreas[index].enabled, displayName: display.name)
         lastErrorMessage = nil
         scheduleWorkAreaApply(delayMilliseconds: 0)
+    }
+
+    /// What changed when the menu bar setting changed, for one display or (nil) every Work Area.
+    static func systemBarChangeMessage(enabled: Bool, workAreaOn: Bool, displayName: String?) -> String {
+        let subject = "Work Area menu bar " + (enabled ? "on" : "off") + (displayName.map { " for \($0)" } ?? "")
+        if !enabled {
+            return subject + ". The Work Area keeps working with only the real menu bar."
+        }
+        return subject + (workAreaOn ? ". Menus and icons open at the top of the Work Area." : ". It appears when the Work Area is on.")
     }
 
     func setSystemBarMatchingIconsEnabled(_ enabled: Bool) {
@@ -77,22 +89,20 @@ extension AppModel {
         systemBarController.includeOtherDisplayIcons = enabled
     }
 
-    /// Turns the menu bar on or off (nil toggles) for every saved Work Area. Used by the
-    /// `tilepilot://internal/system-bar/on|off|toggle` route.
+    /// Turns the menu bar on or off (nil toggles) for every saved Work Area. Used by the TilePilot
+    /// menu and the `tilepilot://internal/system-bar/on|off|toggle` route.
     func setSystemBarEnabledForAllWorkAreas(_ enabled: Bool?) {
         guard !workAreas.isEmpty else {
             lastErrorMessage = "Set up a Work Area in the Work Area tab first."
             lastActionMessage = nil
             return
         }
-        let target = enabled ?? !workAreas.contains { $0.enabled && $0.systemBarEnabled }
+        let target = enabled ?? !isSystemBarSettingOn
         for index in workAreas.indices {
             workAreas[index].systemBarEnabled = target
         }
         persistWorkAreas()
-        lastActionMessage = target
-            ? "Menu bar on. Menus and icons open at the top of the Work Area."
-            : "Menu bar off."
+        lastActionMessage = Self.systemBarChangeMessage(enabled: target, workAreaOn: hasEnabledWorkArea, displayName: nil)
         lastErrorMessage = nil
         scheduleWorkAreaApply(delayMilliseconds: 0)
     }

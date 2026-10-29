@@ -351,6 +351,9 @@ final class StatusBarController: NSObject {
             let workAreaItem = item("Work Area", action: #selector(toggleWorkArea))
             workAreaItem.state = model.hasEnabledWorkArea ? .on : .off
             menu.addItem(workAreaItem)
+            let workAreaBarItem = item("Work Area Menu Bar", action: #selector(toggleWorkAreaMenuBar))
+            workAreaBarItem.state = model.isSystemBarSettingOn ? .on : .off
+            menu.addItem(workAreaBarItem)
         }
         if model.canUndoLastWorkAreaFit {
             menu.addItem(item("Undo Last Work Area Fit", action: #selector(undoLastWorkAreaFit)))
@@ -673,6 +676,11 @@ final class StatusBarController: NSObject {
     @objc private func toggleWorkArea() {
         model.acknowledgeInitialStatusIfNeeded()
         model.toggleAllWorkAreas()
+    }
+
+    @objc private func toggleWorkAreaMenuBar() {
+        model.acknowledgeInitialStatusIfNeeded()
+        model.setSystemBarEnabledForAllWorkAreas(nil)
     }
 
     @objc private func undoLastWorkAreaFit() {
