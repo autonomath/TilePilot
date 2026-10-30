@@ -185,6 +185,7 @@ struct RecentWindowTilerPickerView: View {
             Text("Drag to reorder")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
+            ContextHelpButton(topic: .windowPicker)
 
             Spacer()
 

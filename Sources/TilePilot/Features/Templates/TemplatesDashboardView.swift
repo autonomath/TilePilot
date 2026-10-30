@@ -271,7 +271,7 @@ struct TemplatesDashboardView: View {
 
                 Spacer(minLength: 0)
 
-                InfoBubbleButton(text: "Slots with app rules fill first. Any App slots then use the focused window first, followed by the current desktop order. Extra windows stay unchanged.")
+                ContextHelpButton(topic: .templates)
             }
         }
     }
@@ -532,78 +532,34 @@ struct TemplatesDashboardView: View {
 
         return GroupBox {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        if let assignedCombo, !assignedCombo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text(model.displayShortcutComboSymbols(from: assignedCombo))
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
+                HStack(alignment: .center, spacing: 8) {
+                    ShortcutRecorderField(
+                        symbols: assignedCombo.map { model.displayShortcutComboSymbols(from: $0) } ?? "",
+                        spelledOut: assignedCombo.map { model.displayShortcutComboWords(from: $0) },
+                        isRecording: model.recordingFeatureID == featureID,
+                        onRecord: { model.beginShortcutRecording(for: featureID) },
+                        onCancelRecording: { model.stopShortcutRecording() },
+                        onClear: assignedShortcutExists ? { model.removeShortcut(for: featureID) } : nil,
+                        width: 220
+                    )
 
-                            Text(model.displayShortcutComboWords(from: assignedCombo))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        } else {
-                            Text("No shortcut")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
+                    Button("Test") {
+                        model.runFeatureControl(featureID, source: .shortcutsUI)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(disabledReason != nil || model.activeActionID != nil)
+
+                    Button {
+                        model.toggleFeaturePinned(featureID)
+                    } label: {
+                        Label(isPinned ? "In Right-Click Menu" : "Add to Right-Click Menu", systemImage: isPinned ? "pin.fill" : "pin")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(isPinned ? "Click to remove this template from the right-click menu." : "Show this template when you right-click the TilePilot menu bar icon.")
 
                     Spacer(minLength: 0)
-
-                    HStack(spacing: 6) {
-                        if model.recordingFeatureID == featureID {
-                            HStack(spacing: 4) {
-                                Text("Type Shortcut")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.14), in: Capsule())
-
-                                Button {
-                                    model.stopShortcutRecording()
-                                } label: {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .semibold))
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        } else {
-                            if assignedShortcutExists {
-                                Button("Clear") {
-                                    model.removeShortcut(for: featureID)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-
-                            Button("Record Shortcut") {
-                                model.beginShortcutRecording(for: featureID)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-
-                        Button("Test") {
-                            model.runFeatureControl(featureID, source: .shortcutsUI)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(disabledReason != nil || model.activeActionID != nil)
-
-                        Button(isPinned ? "Unpin" : "Pin") {
-                            model.toggleFeaturePinned(featureID)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
                 }
 
                 HStack(spacing: 8) {
@@ -1484,8 +1440,8 @@ private struct InfoBubbleButton: View {
                 presentPopover()
             }
         } label: {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 14, weight: .semibold))
+            Image(systemName: isPopoverPresented ? "info.circle.fill" : "info.circle")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(isPopoverPresented ? Color.accentColor : .secondary)
         }
         .buttonStyle(.plain)

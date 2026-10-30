@@ -11,17 +11,20 @@ struct WorkAreaDashboardView: View {
             ScrollView {
                 Group {
                     if let display = selectedDisplay {
-                        // The area itself is simple to pick, so it gets a compact column and the
-                        // settings sit beside it.
-                        HStack(alignment: .top, spacing: 16) {
-                            editorCard(display: display)
-                                .frame(width: Self.editorColumnWidth)
-                            VStack(alignment: .leading, spacing: 16) {
-                                systemBarCard(display: display)
-                                behaviorCard(display: display)
-                                exceptionsCard(display: display)
+                        VStack(alignment: .leading, spacing: 16) {
+                            headerCard(display: display)
+                            // The area itself is simple to pick, so it gets a compact column and
+                            // the settings sit beside it.
+                            HStack(alignment: .top, spacing: 16) {
+                                editorCard(display: display)
+                                    .frame(width: Self.editorColumnWidth)
+                                VStack(alignment: .leading, spacing: 16) {
+                                    systemBarCard(display: display)
+                                    behaviorCard(display: display)
+                                    exceptionsCard(display: display)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     } else {
                         unavailableCard
@@ -67,12 +70,60 @@ struct WorkAreaDashboardView: View {
 
     private var unavailableCard: some View {
         GroupBox {
-            Text("Display layout is unavailable right now. Start yabai, then come back to set up a Work Area.")
+            Text("Can't read the displays right now. Start yabai, then come back.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
             Label("Work Area", systemImage: "rectangle.inset.filled")
+        }
+    }
+
+    // MARK: - Header
+
+    /// The display and the switch that turns its Work Area on, across the top of the tab, tinted
+    /// while the area is on.
+    private func headerCard(display: DisplayState) -> some View {
+        let configuration = model.workAreaConfiguration(for: display)
+        let isOn = configuration?.enabled == true
+        let shape = RoundedRectangle(cornerRadius: 10)
+        return HStack(alignment: .center, spacing: 16) {
+            Image(systemName: "rectangle.inset.filled")
+                .font(.title2)
+                .foregroundStyle(isOn ? Color.accentColor : Color.secondary)
+            Text("Use a Work Area on this display")
+                .font(.title3.weight(.semibold))
+            ContextHelpButton(topic: .workArea)
+            Spacer(minLength: 12)
+            displayPicker(selected: display)
+                .frame(maxWidth: 300)
+            Toggle("Use a Work Area on this display", isOn: Binding(
+                get: { isOn },
+                set: { model.setWorkAreaEnabled($0, for: display) }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.large)
+            .labelsHidden()
+        }
+        .padding(14)
+        .background(shape.fill(isOn ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08)))
+        .overlay(shape.stroke(isOn ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func displayPicker(selected display: DisplayState) -> some View {
+        if displays.count > 1 {
+            Picker("Display", selection: Binding(
+                get: { displayKey(display) },
+                set: { selectedDisplayKey = $0 }
+            )) {
+                ForEach(displays, id: \.id) { item in
+                    Text(verbatim: "\(item.name) · \(Int(item.frameW)) × \(Int(item.frameH))").tag(displayKey(item))
+                }
+            }
+        } else {
+            Text(verbatim: "\(display.name) · \(Int(display.frameW)) × \(Int(display.frameH)) pt")
+                .font(.subheadline.weight(.semibold))
         }
     }
 
@@ -86,25 +137,6 @@ struct WorkAreaDashboardView: View {
 
         return GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                if displays.count > 1 {
-                    Picker("Display", selection: Binding(
-                        get: { displayKey(display) },
-                        set: { selectedDisplayKey = $0 }
-                    )) {
-                        ForEach(displays, id: \.id) { item in
-                            Text(verbatim: "\(item.name) · \(Int(item.frameW)) × \(Int(item.frameH))").tag(displayKey(item))
-                        }
-                    }
-                } else {
-                    Text(verbatim: "\(display.name) · \(Int(display.frameW)) × \(Int(display.frameH)) pt")
-                        .font(.subheadline.weight(.semibold))
-                }
-                Toggle("Use a Work Area on this display", isOn: Binding(
-                    get: { configuration?.enabled ?? false },
-                    set: { model.setWorkAreaEnabled($0, for: display) }
-                ))
-                .toggleStyle(.switch)
-
                 WorkAreaCanvas(
                     displaySize: displaySize,
                     normalizedRect: rect,
@@ -119,7 +151,7 @@ struct WorkAreaDashboardView: View {
                 .frame(width: canvasSize.width, height: canvasSize.height)
                 .frame(maxWidth: .infinity)
 
-                Text("Drag the area to move it, drag its edges to resize it, or drag outside it to draw a new one.")
+                Text("Drag to move or resize. Drag outside the area to draw a new one.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -154,33 +186,11 @@ struct WorkAreaDashboardView: View {
                     }
                 }
                 .controlSize(.small)
-
-                statusLine(display: display, configuration: configuration)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Label("Work Area", systemImage: "rectangle.inset.filled")
+            Label("Size and Position", systemImage: "rectangle.dashed")
         }
-    }
-
-    private func statusLine(display: DisplayState, configuration: WorkAreaConfiguration?) -> some View {
-        let text: String
-        if configuration?.enabled == true, let effective = model.resolvedWorkArea(for: display) {
-            let fromLeft = Int((effective.minX - display.frameX).rounded())
-            let fromTop = Int((effective.minY - display.frameY).rounded())
-            var line = "In use: \(Int(effective.width)) × \(Int(effective.height)) pt for windows, \(fromLeft) pt from the left and \(fromTop) pt from the top. Screen Edge Padding (\(model.windowBehaviorPolicyDraft.outerPadding) pt) still applies inside it."
-            if let layout = model.resolvedSystemBarLayout(for: display) {
-                line += layout.isAboveWorkArea
-                    ? " The menu bar sits directly above the area."
-                    : " The menu bar takes the top \(Int(layout.bar.height)) pt of the area."
-            }
-            text = line
-        } else {
-            text = "Off. Windows on this display can use the whole screen."
-        }
-        return Text(text)
-            .font(.caption)
-            .foregroundStyle(.secondary)
     }
 
     private enum PointDimension {
@@ -295,24 +305,21 @@ struct WorkAreaDashboardView: View {
                 .toggleStyle(.switch)
                 .disabled(configuration?.enabled != true)
 
-                Text("Tiled windows always stay inside the area. With this on, floating windows that end up outside move back in after you let go of the mouse. Double-click a title bar to make a window fill the area.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("The Dock and notifications keep using the whole display. The real menu bar stays at the top of the screen even when it is mirrored.")
+                Text("Floating windows dragged outside move back in. Tiled windows always stay inside.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 8) {
                     Button("Undo Last Fit") { model.undoLastWorkAreaFit() }
                         .disabled(!model.canUndoLastWorkAreaFit)
-                    Text("Puts the windows TilePilot just moved back where they were and lets them stay outside.")
+                    Text("Moves the windows TilePilot just fitted back, and lets them stay outside.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Label("Keeping Windows Inside", systemImage: "arrow.down.right.and.arrow.up.left")
+            HelpSectionLabel(title: "Keeping Windows Inside", systemImage: "arrow.down.right.and.arrow.up.left", topic: .workAreaContainment)
         }
     }
 
@@ -330,7 +337,7 @@ struct WorkAreaDashboardView: View {
                 ))
                 .toggleStyle(.switch)
 
-                Text("Shows the app menus and this display's menu bar icons. Menus open right under it and the frontmost app stays frontmost; icon panels open at the real menu bar. Off, the Work Area works the same with only the real menu bar.")
+                Text("App menus and menu bar icons right above your windows. Clicks go to the real ones.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -341,7 +348,7 @@ struct WorkAreaDashboardView: View {
                 .toggleStyle(.switch)
                 .disabled(!barOn)
 
-                Text("Shows every menu bar icon once, in a row that stays put when focus moves between displays. Icons macOS dims on the other display are shown at full brightness; panels open where macOS draws the icon.")
+                Text("Every display's icons once, in a row that stays put when you switch displays.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -353,7 +360,11 @@ struct WorkAreaDashboardView: View {
                 .disabled(!barOn)
 
                 HStack(spacing: 8) {
-                    Text("Menu bar icons: \(model.systemBarIconModeDescription).")
+                    Text(!model.systemBarMatchingIconsEnabled
+                        ? "Off: symbols and app icons. Nothing is captured."
+                        : screenRecordingOn
+                            ? "Copies each icon's pixels, in memory only."
+                            : "Needs Screen Recording. Until then: symbols and app icons.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if model.systemBarMatchingIconsEnabled, !screenRecordingOn {
@@ -361,15 +372,10 @@ struct WorkAreaDashboardView: View {
                             .controlSize(.small)
                     }
                 }
-                Text(model.systemBarMatchingIconsEnabled
-                    ? "Matching copies each icon's pixels from the real menu bar and needs Screen Recording. Simplified draws symbols and app icons instead."
-                    : "Simplified draws symbols, text, and app icons; nothing is captured.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Label("Menu Bar", systemImage: "menubar.rectangle")
+            HelpSectionLabel(title: "Menu Bar", systemImage: "menubar.rectangle", topic: .workAreaMenuBar)
         }
     }
 
@@ -387,7 +393,7 @@ struct WorkAreaDashboardView: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Apps Allowed Outside").font(.headline)
-                    Text("Windows from these apps can sit anywhere on this display.")
+                    Text("These apps' windows can sit anywhere on this display.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     HStack {
@@ -405,7 +411,7 @@ struct WorkAreaDashboardView: View {
                         }
                     }
                     if excludedApps.isEmpty {
-                        Text("No apps configured.")
+                        Text("None yet.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -425,7 +431,7 @@ struct WorkAreaDashboardView: View {
                     Divider()
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Windows That Couldn't Fit").font(.headline)
-                        Text("These windows refused to move or shrink inside the area. TilePilot tries again every 30 seconds.")
+                        Text("These refused to fit. TilePilot tries again every 30 seconds.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ForEach(unfitWindows) { window in

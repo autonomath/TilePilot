@@ -331,6 +331,9 @@ extension AppModel {
             windowBehaviorPolicyDraft.alwaysTileApps.append(trimmed)
             windowBehaviorPolicyDraft.alwaysTileApps = canonicalizeAppRuleList(windowBehaviorPolicyDraft.alwaysTileApps)
         }
+        // Rules now change in one place, so the staged lists follow the draft instead of
+        // waiting for a separate apply step.
+        syncStagedAppRuleListsFromDraft(preservePendingChanges: false)
         recomputeYabaiConfigDiffPreview()
         if autosave {
             scheduleDebouncedWindowBehaviorSave(reason: "app-behavior")

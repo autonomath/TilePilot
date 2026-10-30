@@ -57,7 +57,7 @@ If you want to use TilePilot the way it is intended, the path looks like this:
   - shows displays, desktops, windows, focused state, and recovery when live state is degraded
 - `Behaviors`
   - sets the rules behind the workflow
-  - desktop tiling, desktop scrub, app rules, focus behavior, cursor behavior, and yabai mouse controls
+  - desktop tiling, app rules, mouse dragging, focus and cursor behavior, and desktop scrub
 - `Work Area`
   - limits where windows go on a large display, without changing its resolution
   - draw the area per display, keep floating windows inside, allow exceptions, and show the menu bar at the top of the area
@@ -66,7 +66,7 @@ If you want to use TilePilot the way it is intended, the path looks like this:
   - record shortcuts, edit them, pin frequent ones to the right-click menu, and run the recent-window picker
 - `Appearance`
   - controls visual feedback and tiling spacing
-  - badges, outline overlay, outline width, screen edge padding, and gap between tiled windows
+  - badges, outlines, outline width and colors, screen edge padding, and gap between tiled windows, with a live preview
 - `Templates`
   - manages exact floating layouts for the current display shape
   - draw slots, split and duplicate them, import the current desktop layout, constrain slots to specific apps, and auto-fit the template when the display shape changes slightly
@@ -76,11 +76,11 @@ If you want to use TilePilot the way it is intended, the path looks like this:
 - `Config Files`
   - raw editing for managed config files and scripts
   - includes backups and restore flows
-- `How It Works`
-  - visual explanations of the main concepts so settings tabs can stay focused on changing behavior
 - `System`
   - setup, health, update checks, diagnostics, and Guided Setup reopen paths
   - includes a Mission Control checklist for the two desktop settings TilePilot depends on most
+
+Each section has an ⓘ button beside its title that explains what it does, with a diagram where one helps, so the settings themselves stay short.
 
 ## Screenshots
 
@@ -108,11 +108,10 @@ If you want to use TilePilot the way it is intended, the path looks like this:
 
 ![Actions & Shortcuts](assets/screenshots/actions-shortcuts.png)
 
-### Behaviors and How It Works
+### Behaviors
 
 <p align="center">
-  <img src="assets/screenshots/behaviors.png" alt="Behaviors" width="49%">
-  <img src="assets/screenshots/how-it-works.png" alt="How It Works" width="49%">
+  <img src="assets/screenshots/behaviors.png" alt="Behaviors" width="70%">
 </p>
 
 ## Main Layout Actions

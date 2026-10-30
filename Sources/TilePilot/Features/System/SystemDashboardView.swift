@@ -2,10 +2,11 @@ import SwiftUI
 
 struct SystemDashboardView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var showAdvancedConfig = false
-    @State private var showAdvancedDiagnostics = false
-    @State private var showPerformanceAdvanced = false
-    @State private var showPerformanceDiagnostics = false
+    @State private var showManagedShortcuts = false
+    @State private var showCommandLog = false
+    @State private var showEssentialDetails = false
+    @State private var showFineTuning = false
+    @State private var showMeasurements = false
     @State private var showResetDefaultsConfirm = false
 
     var body: some View {
@@ -13,9 +14,9 @@ struct SystemDashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     summaryCard
+                    essentialsCard
                     appUpdateCard
                     performanceCard
-                    essentialsCard
                     advancedPanelsCard
                 }
                 .padding()
@@ -72,48 +73,36 @@ struct SystemDashboardView: View {
         }
     }
 
+    // MARK: - Status summary
+
     private var summaryCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                Label("System Overview", systemImage: "gearshape.2")
-                    .font(.headline)
+        let needsAttention = model.setupStateNeedsAttention
+        return GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: needsAttention ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+                        .font(.title2)
+                        .foregroundStyle(needsAttention ? Color.orange : Color.green)
+                        .frame(width: 28)
 
-                Text(model.systemSummaryLine)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Text(model.setupGuideCompletionDetail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    if model.setupStateNeedsAttention {
-                        Button("Run Guided Setup") {
-                            model.presentSetupGuide()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    } else {
-                        Button("Run Guided Setup") {
-                            model.presentSetupGuide()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.systemSummaryLine)
+                            .font(.headline)
+                        Text(model.setupGuideCompletionDetail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    Spacer()
+                    Spacer(minLength: 12)
 
                     Button("Recheck") {
                         model.performSetupAction(.recheck)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-
-                    Button(model.releaseDefaultsResetButtonTitle) {
-                        showResetDefaultsConfirm = true
-                    }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+
+                    guidedSetupButton(prominent: needsAttention)
                 }
 
                 if let error = model.lastErrorMessage {
@@ -129,42 +118,67 @@ struct SystemDashboardView: View {
                         .lineLimit(3)
                 }
             }
+            .padding(4)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var essentialsCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(model.systemCheckRows) { row in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: row.status.symbolName)
-                            .foregroundStyle(color(for: row.status))
-                            .frame(width: 16)
+    @ViewBuilder
+    private func guidedSetupButton(prominent: Bool) -> some View {
+        if prominent {
+            Button("Run Guided Setup") {
+                model.presentSetupGuide()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        } else {
+            Button("Run Guided Setup") {
+                model.presentSetupGuide()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(row.title)
-                                .font(.subheadline.weight(.semibold))
-                            Text(row.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            if row.id == "mission-control" {
-                                MissionControlChecklistView(items: model.missionControlChecklistItems)
-                                    .padding(.top, 6)
-                            }
-                            HStack(spacing: 8) {
-                                ForEach(row.actions, id: \.self) { action in
-                                    Button(action.label) {
-                                        model.performSystemCheckAction(action)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .font(.caption)
-                                }
+    // MARK: - Essentials
+
+    private var essentialsCard: some View {
+        let rows = model.systemCheckRows
+        // Warnings and errors need action. Notices (optional permissions, settings TilePilot
+        // can't verify) stay visible as notes without making the setup look broken.
+        let attentionRows = rows.filter { $0.status == .warning || $0.status == .error }
+        let noteRows = rows.filter { $0.status == .notice }
+        let readyRows = rows.filter { $0.status == .good }
+
+        return GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                if attentionRows.isEmpty && noteRows.isEmpty {
+                    Label("All \(rows.count) essentials are ready.", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
+                } else if attentionRows.isEmpty {
+                    Label("Everything required is ready. \(noteRows.count == 1 ? "One item has" : "\(noteRows.count) items have") a note.", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.green)
+                } else {
+                    Label(attentionRows.count == 1 ? "One item needs attention." : "\(attentionRows.count) items need attention.", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.orange)
+                }
+
+                ForEach(attentionRows + noteRows) { row in
+                    essentialRow(row)
+                }
+
+                if !readyRows.isEmpty {
+                    DisclosureGroup("Details", isExpanded: $showEssentialDetails) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(readyRows) { row in
+                                essentialRow(row)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 6)
                     }
-                    .padding(.vertical, 2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -173,83 +187,96 @@ struct SystemDashboardView: View {
         }
     }
 
-    private var appUpdateCard: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center, spacing: 8) {
-                    Label("App Update", systemImage: "arrow.down.app")
-                        .font(.headline)
-                    Spacer()
-                    if model.appUpdateStatus.isChecking {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
+    private func essentialRow(_ row: SystemCheckRow) -> some View {
+        // The status card already has Recheck, so rows only keep actions that do something else.
+        let actions = row.actions.filter { $0 != .recheck }
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: row.status.symbolName)
+                .foregroundStyle(color(for: row.status))
+                .frame(width: 16)
 
-                Text(model.appUpdateStatusTitle)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(row.title)
                     .font(.subheadline.weight(.semibold))
-
-                HStack(spacing: 8) {
-                    Text("Current version")
-                        .font(.caption.weight(.semibold))
-                    Text(model.currentAppVersion)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-
-                    if let release = model.availableAppUpdateRelease {
-                        Spacer(minLength: 0)
-                        Text("Latest")
-                            .font(.caption.weight(.semibold))
-                        Text(release.tagName)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text(model.appUpdateStatusDetail)
+                Text(row.detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    Button("Check for Updates") {
-                        model.checkForAppUpdates(manual: true)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-
-                    if model.availableAppUpdateRelease != nil {
-                        Button("Open Release Page") {
-                            model.openLatestReleasePage()
+                    .fixedSize(horizontal: false, vertical: true)
+                if row.id == "mission-control" {
+                    MissionControlChecklistView(items: model.missionControlChecklistItems)
+                        .padding(.top, 6)
+                }
+                if !actions.isEmpty {
+                    HStack(spacing: 10) {
+                        ForEach(actions, id: \.self) { action in
+                            Button(action.label) {
+                                model.performSystemCheckAction(action)
+                            }
+                            .buttonStyle(.borderless)
+                            .font(.caption)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.vertical, 2)
     }
+
+    // MARK: - App Update
+
+    private var appUpdateCard: some View {
+        GroupBox {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text("Version \(model.currentAppVersion)")
+                            .font(.subheadline.monospacedDigit())
+                        Text("·")
+                            .foregroundStyle(.secondary)
+                        Text(model.appUpdateStatusTitle)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    Text(model.appUpdateStatusDetail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
+
+                Button("Check for Updates") {
+                    model.checkForAppUpdates(manual: true)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(model.appUpdateStatus.isChecking)
+
+                if model.availableAppUpdateRelease != nil {
+                    Button("Open Release Page") {
+                        model.openLatestReleasePage()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            HStack(spacing: 6) {
+                Label("App Update", systemImage: "arrow.down.app")
+                if model.appUpdateStatus.isChecking {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    // MARK: - Performance
 
     private var performanceCard: some View {
         GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.performanceStatusLine)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("Performance Mode: \(model.performanceDegradationMode.title)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(model.performanceDegradationMode == .full ? Color.secondary : Color.orange)
-                    if let detail = model.performanceDegradationMode.detail {
-                        Text(detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text("Use presets for quick tuning, or disable expensive features one by one.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 10) {
                     Picker("Preset", selection: Binding(
                         get: { model.effectivePerformancePreset },
@@ -265,15 +292,7 @@ struct SystemDashboardView: View {
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 220, alignment: .leading)
-
-                    if model.effectivePerformancePreset == .custom {
-                        Text("Custom")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.12), in: Capsule())
-                    }
+                    .help("Pick a preset for quick tuning, or change single settings under Fine-Tuning.")
 
                     Spacer()
 
@@ -290,7 +309,27 @@ struct SystemDashboardView: View {
                     .controlSize(.small)
                 }
 
-                DisclosureGroup("Advanced", isExpanded: $showPerformanceAdvanced) {
+                if model.performanceDegradationMode != .full {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Performance Mode: \(model.performanceDegradationMode.title)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        if let detail = model.performanceDegradationMode.detail {
+                            Text(detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Text(model.performanceStatusLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help("Current preset, refresh mode, foreground and background refresh intervals, and active window helpers.")
+
+                DisclosureGroup("Fine-Tuning", isExpanded: $showFineTuning) {
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle("Keep on Top Enforcement", isOn: Binding(
                             get: { model.keepOnTopEnforcementEnabled },
@@ -335,39 +374,11 @@ struct SystemDashboardView: View {
                             step: 0.5,
                             setter: model.updatePerformanceKeepOnTopEnforcementSeconds
                         )
-
-                        Divider()
-
-                        HStack(spacing: 8) {
-                            Button("Disable Keep on Top") {
-                                model.setKeepOnTopEnforcementEnabled(false)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-
-                            Button("Disable Mini-map Hover Titles") {
-                                model.setMiniMapHoverTitlesEnabled(false)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-
-                            Button("Switch to Passive Baseline") {
-                                model.applyPerformancePreset(.passiveBaseline)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-
-                            Button("Switch to Low CPU Preset") {
-                                model.applyPerformancePreset(.lowCPU)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        }
                     }
                     .padding(.top, 6)
                 }
 
-                DisclosureGroup("Advanced Diagnostics", isExpanded: $showPerformanceDiagnostics) {
+                DisclosureGroup("Measurements", isExpanded: $showMeasurements) {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(model.performanceDiagnosticsRows.enumerated()), id: \.offset) { item in
                             HStack {
@@ -389,19 +400,35 @@ struct SystemDashboardView: View {
         }
     }
 
+    // MARK: - Advanced
+
     private var advancedPanelsCard: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
-                DisclosureGroup("Advanced: Managed skhd Section (Safe Editor)", isExpanded: $showAdvancedConfig) {
+                DisclosureGroup("Managed Shortcut Section (skhdrc)", isExpanded: $showManagedShortcuts) {
                     ConfigDashboardView(showNavigationContainer: false)
                         .frame(minHeight: 380)
                         .padding(.top, 6)
                 }
 
-                DisclosureGroup("Advanced: Diagnostics", isExpanded: $showAdvancedDiagnostics) {
+                DisclosureGroup("Command Log", isExpanded: $showCommandLog) {
                     CommandLogView(showNavigationContainer: false)
                         .frame(minHeight: 280)
                         .padding(.top, 6)
+                }
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    Button(model.releaseDefaultsResetButtonTitle) {
+                        showResetDefaultsConfirm = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Text("Resets TilePilot settings and its managed sections of skhdrc and yabairc.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -409,6 +436,8 @@ struct SystemDashboardView: View {
             Label("Advanced", systemImage: "slider.horizontal.3")
         }
     }
+
+    // MARK: - Helpers
 
     private func color(for status: SystemCheckStatus) -> Color {
         switch status {
@@ -420,34 +449,29 @@ struct SystemDashboardView: View {
     }
 
     private func intervalControl(title: String, value: Double, step: Double, setter: @escaping (Double) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack {
-                Text(title)
-                Spacer()
-                Button {
-                    setter(value - step)
-                } label: {
-                    Image(systemName: "minus.circle")
-                }
-                .buttonStyle(.plain)
-
-                Text(model.formattedSeconds(value))
-                    .font(.caption.monospacedDigit())
-                    .frame(width: 52, alignment: .trailing)
-
-                Button {
-                    setter(value + step)
-                } label: {
-                    Image(systemName: "plus.circle")
-                }
-                .buttonStyle(.plain)
+        HStack {
+            Text(title)
+            Spacer()
+            Button {
+                setter(value - step)
+            } label: {
+                Image(systemName: "minus.circle")
             }
+            .buttonStyle(.plain)
 
-            Text(intervalDescription(for: title))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Text(model.formattedSeconds(value))
+                .font(.caption.monospacedDigit())
+                .frame(width: 52, alignment: .trailing)
+
+            Button {
+                setter(value + step)
+            } label: {
+                Image(systemName: "plus.circle")
+            }
+            .buttonStyle(.plain)
         }
         .font(.caption)
+        .help(intervalDescription(for: title))
     }
 
     private func intervalDescription(for title: String) -> String {
@@ -467,13 +491,13 @@ struct SystemDashboardView: View {
         guard let section = model.consumeRequestedSystemPanelSection() else { return }
         switch section {
         case .essentials:
-            break
+            showEssentialDetails = true
         case .files:
             model.requestOpenTilePilotTab(.files)
         case .managedConfig:
-            showAdvancedConfig = true
+            showManagedShortcuts = true
         case .diagnostics:
-            showAdvancedDiagnostics = true
+            showCommandLog = true
         }
     }
 }

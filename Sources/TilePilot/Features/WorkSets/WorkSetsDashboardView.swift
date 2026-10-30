@@ -184,7 +184,7 @@ struct WorkSetsDashboardView: View {
 
             Spacer(minLength: 0)
 
-            WorkSetInfoBubbleButton(text: "Use the scope picker to switch between visible desktops and saved Work Set scopes. Work Sets are shown left to right, front to back. Import builds one pile from the selected visible desktop.")
+            ContextHelpButton(topic: .workSets)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,7 +435,7 @@ struct WorkSetsDashboardView: View {
                     WorkSetLaneDropTarget(text: "Drop here to add to end") { payload in
                         handleLaneDrop(payload, into: workSet, before: nil)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 74)
+                    .frame(maxWidth: .infinity, minHeight: 74, maxHeight: 96)
                 }
             }
         }
@@ -1176,27 +1176,5 @@ private enum WorkSetDragDrop {
             }
         }
         return true
-    }
-}
-
-private struct WorkSetInfoBubbleButton: View {
-    let text: String
-    @State private var isPopoverPresented = false
-
-    var body: some View {
-        Button {
-            isPopoverPresented.toggle()
-        } label: {
-            Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $isPopoverPresented, arrowEdge: .top) {
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(.primary)
-                .padding(12)
-                .frame(width: 260, alignment: .leading)
-        }
     }
 }

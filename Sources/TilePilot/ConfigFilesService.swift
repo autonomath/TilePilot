@@ -87,7 +87,7 @@ final class ConfigFilesService: @unchecked Sendable {
         }
 
         for shortcut in shortcuts {
-            if let path = referencedPath(from: shortcut.command) {
+            if let path = referencedPath(from: shortcut.command), !isBinaryPath(path) {
                 if seen.insert(path).inserted { paths.append(path) }
             }
         }
@@ -214,6 +214,20 @@ final class ConfigFilesService: @unchecked Sendable {
             return (base as NSString).appendingPathComponent(String(token.dropFirst(2)))
         }
         return nil
+    }
+
+    /// Shortcut commands often start with a system tool such as `/usr/bin/open`. Those are
+    /// programs, not editable scripts, so they stay out of the file list. Missing files are kept
+    /// (they show as missing) and text scripts are kept.
+    private func isBinaryPath(_ path: String) -> Bool {
+        let systemPrefixes = ["/usr/bin/", "/bin/", "/usr/sbin/", "/sbin/", "/System/"]
+        if systemPrefixes.contains(where: { path.hasPrefix($0) }) {
+            return true
+        }
+        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? handle.close() }
+        let head = (try? handle.read(upToCount: 512)) ?? Data()
+        return head.contains(0)
     }
 
     private func listBackups(for filePath: String) -> [ConfigBackupInfo] {

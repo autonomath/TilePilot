@@ -15,6 +15,9 @@ This is code-derived context only. It reflects the app as implemented, including
   - desktop badge and outline overlay system
   - empty state view
   - MegaMap HUD button and notice styling
+  - contextual help (ⓘ) buttons and their popovers
+  - shortcut recorder field
+  - wrapping flow layout
 
 ## Information Architecture
 
@@ -32,8 +35,7 @@ Current top-level tab order:
 6. `Work Sets`
 7. `Appearance`
 8. `Config Files`
-9. `How It Works`
-10. `System`
+9. `System`
 
 Main screen roles:
 
@@ -42,7 +44,7 @@ Main screen roles:
   - purpose: operational dashboard, desktop mini-map, degraded-state messaging, window/app list, quick recovery
 - `Behaviors`
   - file: `Sources/TilePilot/Features/Behaviors/WindowBehaviorDashboardView.swift`
-  - purpose: yabai behavior controls, precedence rules, desktop tiling, app defaults, focus/cursor, mouse dragging
+  - purpose: desktop tiling, app rules (default for new windows plus per-app Tiling and Keep on Top), mouse dragging, focus/cursor, desktop scrub
 - `Work Area`
   - file: `Sources/TilePilot/Features/WorkArea/WorkAreaDashboardView.swift`
   - purpose: per-display placement rectangle, containment, the mirrored menu bar, and exceptions
@@ -57,16 +59,13 @@ Main screen roles:
   - purpose: desktop-scoped window groups, board-style membership editing, backdrop controls, layout modes, launch/restore options
 - `Appearance`
   - file: `Sources/TilePilot/Features/Appearance/AppearanceDashboardView.swift`
-  - purpose: overlay toggles, outline width, global tiling spacing
+  - purpose: overlay toggles, outline width and colors, tiling spacing, and a live preview of all of them
 - `Config Files`
   - file: `Sources/TilePilot/FilesDashboardView.swift`
   - purpose: split-view editor/browser for config and referenced scripts
-- `How It Works`
-  - file: `Sources/TilePilot/Features/HowItWorks/HowItWorksDashboardView.swift`
-  - purpose: compact concept explanations that keep settings screens focused on changing behavior
 - `System`
   - file: `Sources/TilePilot/Features/System/SystemDashboardView.swift`
-  - purpose: setup summary, guided setup entrypoint, essentials, performance, diagnostics
+  - purpose: status summary, essentials (collapsed when everything is ready), app update, performance, advanced editors and logs
 
 Supporting modal/window surfaces:
 
@@ -153,6 +152,17 @@ Supporting modal/window surfaces:
   - file: `Sources/TilePilot/MapWindowPalette.swift`
   - tiled windows use one blue family
   - floating and limited windows use warm per-window families derived from window ID
+- Contextual help:
+  - file: `Sources/TilePilot/Shared/ContextHelp.swift`
+  - `ContextHelpTopic` holds every explanation (title, summary, points, optional diagram)
+  - `HelpSectionLabel` puts the ⓘ beside a GroupBox title; `ContextHelpButton` works anywhere else
+  - clicking the ⓘ opens a popover: 420 pt wide for text, 680 pt wide when it shows a diagram
+- Shortcut recorder field:
+  - file: `Sources/TilePilot/Shared/ShortcutRecorderField.swift`
+  - one rounded field shows the shortcut or "Record Shortcut"; click to record, × to clear; spelled-out keys live in the tooltip
+- Wrapping flow layout:
+  - file: `Sources/TilePilot/Shared/WrappingFlowLayout.swift`
+  - places views left to right at their natural size and wraps; the mini-map uses it for displays and desktop cards
 - Desktop badge and outline overlays:
   - files:
     - `Sources/TilePilot/WindowBadgeView.swift`
@@ -165,8 +175,10 @@ Supporting modal/window surfaces:
 ### Overview
 
 - Light dashboard surface.
-- Desktop mini-map uses white cards with thin black borders and tiny wireframes.
+- Desktop mini-map uses white cards with thin black borders and tiny wireframes. Displays sit side by side when they fit, and desktop cards grow (up to 1.6 times their base size) to use the row.
+- `Open MegaMap` sits at the right of the mini-map card's title row.
 - Desktop cards include state pills like `Focused` and `Visible`.
+- Window rows show one state pill (Floating, Tiled, or Limited; click to switch) plus an app-rule pill only when the app has a rule. The row's ⋯ menu sets floating or tiled, the app rule, and Keep on Top.
 - Degraded or stale states use orange-tinted banners with explicit recovery actions.
 - Primary operational CTA is opening `MegaMap`.
 
@@ -179,17 +191,17 @@ Mini-map details:
 
 ### Behaviors
 
-- Dense, form-like settings layout.
-- Starts with precedence and behavior-order framing because control order is conceptually important.
-- App-rule editing is operational and text-heavy rather than visual.
+- Order follows the tiling decision, then input: Desktop Auto-Tiling, App Rules, Mouse Dragging & Drop beside Focus & Cursor, Desktop Scrub.
+- App Rules is the only place app rules are edited: the default for new windows (Float or Tile), then every app with a rule and every open app in two columns read top to bottom, each with a Tiling menu and a Keep on Top checkbox, then a field to add a rule for an app that isn't open. Changes save on their own.
+- Rows use `Grid` so pickers sit next to their labels.
 - Mouse dragging copy is intentionally plain-language and gesture-based.
-- Pending list changes create a bottom apply bar using `.safeAreaInset(...).background(.ultraThinMaterial)`.
 
 ### Actions & Shortcuts
 
 - More table-like than form-like.
-- Uses fixed columns, search, inline row actions, and reorder mode.
-- The top pinned section mirrors the right-click menu and is explicitly named `Right-Click Menu`.
+- Rows: pin, title and description, a shortcut recorder field, then fixed Test and Edit slots so every row lines up. No per-row category icons; the section header names the category.
+- The top pinned section mirrors the right-click menu and is explicitly named `Right-Click Menu`; its header holds the ⓘ and the `Reorder…` button.
+- Pinned section headers are opaque so rows don't show through while scrolling.
 - Many rows use small semantic chips for state such as pinned or default.
 - First-class actions include dynamic template apply actions and Work Set actions.
 - `Pick Windows to Tile...` belongs with layout actions and should stay discoverable from this surface.
@@ -240,17 +252,21 @@ Mini-map details:
 
 ### Work Area
 
-- Two columns: a fixed 400 pt left column holds the Work Area card (display picker, on/off switch, a compact canvas at most 376 × 300 pt, numeric fields, size and position presets); the right column holds Menu Bar, Keeping Windows Inside, and Exceptions, so the settings are visible without scrolling at the minimum window size.
+- A full-width header holds the primary control: "Use a Work Area on this display" with a large switch and the display picker; it is tinted with the accent color while the area is on. Below it, two columns: a fixed 400 pt left column holds the Size and Position card (a compact canvas at most 376 × 300 pt, numeric fields, size and position presets); the right column holds Menu Bar, Keeping Windows Inside, and Exceptions, so the settings are visible without scrolling at the minimum window size.
 - The canvas is drawn to the display's shape: drag to move, drag edges to resize, drag outside to draw a new area. It shows window outlines only (never titles), the menu bar and Dock strips, and the mirrored menu bar's position.
 - Containment controls stay visible but disabled until the display's Work Area is on. The menu bar switch works either way, so the bar can be turned off before the area is turned on; its icon options are disabled while it is off.
-- Copy states outcomes: where windows end up and what keeps using the whole display. Teaching material belongs in `How It Works`.
+- Copy states outcomes: where windows end up and what keeps using the whole display.
+- The header, Menu Bar, and Keeping Windows Inside each have an ⓘ with the longer explanation.
+
+### Contextual help diagrams
+
+- Diagrams share the website demo's look (`Features/Shared/AdvancedConceptExplainerViews.swift`): sample windows sit on a small dark desktop with a menu bar strip that names the state, are placed by fraction so they fill it, and are drawn like real windows (light title bar with the three window buttons and a centered title, 4 pt corners, content that suggests the app).
+- Outlines say the window state: blue for tiled, orange for floating, the accent color for the focused window in focus diagrams. These match the maps' tiled and floating colors.
+- Diagrams appear inside ⓘ popovers. Paired diagrams are 300 to 420 pt wide and 230 pt tall; diagrams without windows use a plain panel.
 
 ### Appearance
 
-- Intentionally sparse.
-- Split into two cards only:
-  - overlays
-  - tiling layout
+- Two columns: a 400 pt settings column (Overlays, Tiling Spacing) and a live preview that redraws badges, outlines, colors, padding, and gaps as they change. Spacing is drawn to scale for a 1440 pt wide display.
 - Units are explicit, currently `px` and `pt`.
 - Compact numeric controls are preferred over long sliders for small integer-like settings.
 
@@ -264,10 +280,10 @@ Mini-map details:
 
 ### System
 
-- Summary and status dashboard.
-- Emphasizes direct next-step actions.
-- `Run Guided Setup` becomes prominent when setup needs attention.
-- Advanced areas are disclosure groups rather than separate screens.
+- Order: status summary, Essentials, App Update, Performance, Advanced.
+- The status summary is one row: status symbol, summary, Recheck, and `Run Guided Setup` (prominent when setup needs attention).
+- Essentials collapse to one line when everything is ready; items that need attention and notes stay visible, ready items move into Details.
+- Advanced areas are disclosure groups rather than separate screens; `Restore All Default Settings` lives at the bottom of Advanced.
 
 ### Guided Setup
 
@@ -392,7 +408,7 @@ Visual primitives:
 ## High-Value Validation Scenarios
 
 - Main IA:
-  - tab order must remain `Overview`, `Behaviors`, `Work Area`, `Actions & Shortcuts`, `Templates`, `Work Sets`, `Appearance`, `Config Files`, `How It Works`, `System`
+  - tab order must remain `Overview`, `Behaviors`, `Work Area`, `Actions & Shortcuts`, `Templates`, `Work Sets`, `Appearance`, `Config Files`, `System`
 - Overview:
   - degraded state should surface obvious recovery actions
   - mini-map should preserve real vertical display stacking
