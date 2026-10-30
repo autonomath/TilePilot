@@ -999,8 +999,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .appearance
         case "config-files", "files":
             return .files
-        case "how-it-works", "howitworks":
-            return .howItWorks
         case "system":
             return .system
         default:

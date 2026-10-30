@@ -10,7 +10,6 @@ enum TilePilotTab: Hashable {
     case workArea
     case actions
     case shortcuts
-    case howItWorks
     case system
     // legacy route-only cases (mapped to .system)
     case files
@@ -28,7 +27,6 @@ enum TilePilotTab: Hashable {
         .workSets,
         .appearance,
         .files,
-        .howItWorks,
         .system
     ]
 
@@ -48,8 +46,6 @@ enum TilePilotTab: Hashable {
             return "Work Area"
         case .actions, .shortcuts:
             return "Actions & Shortcuts"
-        case .howItWorks:
-            return "How It Works"
         case .system, .config, .health, .setup, .logs:
             return "System"
         case .files:
@@ -73,8 +69,6 @@ enum TilePilotTab: Hashable {
             return "rectangle.inset.filled"
         case .actions, .shortcuts:
             return "square.grid.2x2"
-        case .howItWorks:
-            return "questionmark.bubble"
         case .system, .config, .health, .setup, .logs:
             return "gearshape.2"
         case .files:
@@ -213,8 +207,6 @@ struct TilePilotRootView: View {
             AppearanceDashboardView()
         case .files:
             FilesDashboardView()
-        case .howItWorks:
-            HowItWorksDashboardView()
         case .system, .config, .health, .setup, .logs:
             SystemDashboardView()
         }

@@ -6,6 +6,9 @@ extension AppModel {
         let c = command.lowercased()
         let normalized = normalizedFeatureMatchCommand(c)
 
+        if let orphan = deletedFeatureTargetCopy(normalizedCommand: normalized) {
+            return orphan.explanation
+        }
         if normalized.contains("tilepilot://feature/screen.bring-floating-front") {
             return "Raises floating windows above the other windows on the current desktop."
         }
@@ -145,6 +148,36 @@ extension AppModel {
         return nil
     }
 
+    /// Shortcuts written for a template or Work Set keep their skhd line after the template or set
+    /// is deleted. Without a matching feature they would otherwise be titled with the raw command.
+    private func deletedFeatureTargetCopy(normalizedCommand: String) -> (title: String, explanation: String)? {
+        let explanationSuffix = "Use Edit to change or remove it in skhdrc."
+        let title: String
+        let explanation: String
+        if normalizedCommand.contains("tilepilot://feature/template.apply.") {
+            title = "Apply a Deleted Template"
+            explanation = "Points to a template that no longer exists. \(explanationSuffix)"
+        } else if normalizedCommand.contains("tilepilot://feature/workset.activate.") {
+            title = "Activate a Deleted Work Set"
+            explanation = "Points to a Work Set that no longer exists. \(explanationSuffix)"
+        } else if normalizedCommand.contains("tilepilot://feature/workset.assign-window.") {
+            title = "Assign to a Deleted Work Set"
+            explanation = "Points to a Work Set that no longer exists. \(explanationSuffix)"
+        } else {
+            return nil
+        }
+
+        // Only orphaned targets: a live template or Work Set matches its own feature definition.
+        let matchesLiveFeature = featureDefinitions.contains { definition in
+            guard !definition.commandMatchers.isEmpty else { return false }
+            if definition.matchAllCommandMatchers {
+                return definition.commandMatchers.allSatisfy { normalizedCommand.contains($0) }
+            }
+            return definition.commandMatchers.contains(where: { normalizedCommand.contains($0) })
+        }
+        return matchesLiveFeature ? nil : (title, explanation)
+    }
+
     func shortcutTitle(for entry: ShortcutEntry) -> String {
         if let feature = featureDefinition(for: entry) {
             return feature.title
@@ -152,6 +185,9 @@ extension AppModel {
         let c = entry.command.lowercased()
         let normalized = normalizedFeatureMatchCommand(c)
 
+        if let orphan = deletedFeatureTargetCopy(normalizedCommand: normalized) {
+            return orphan.title
+        }
         if normalized.contains("tilepilot://feature/screen.bring-floating-front") {
             return "Bring Floating Windows to Front"
         }

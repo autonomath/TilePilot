@@ -3,6 +3,8 @@ import SwiftUI
 struct NowDashboardView: View {
     @EnvironmentObject private var model: AppModel
     @State private var selectedWindowID: Int?
+    /// Width available to the mini-map, so desktop cards can grow to use it.
+    @State private var miniMapWidth: CGFloat = 0
 
     var body: some View {
         NavigationStack {
@@ -23,9 +25,9 @@ struct NowDashboardView: View {
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                     HStack {
-                                        Button("Enable Manual Tiling Mode") { model.enableManualTilingMode() }
+                                        Button("Float New Windows by Default") { model.enableManualTilingMode() }
                                         Button("Disable Hover Focus") { model.disableHoverFocus() }
-                                        Button("Open Window Behavior") {
+                                        Button("Open Behaviors") {
                                             model.openWindowBehaviorSettings()
                                         }
                                     }
@@ -167,35 +169,25 @@ struct NowDashboardView: View {
         let maxDisplayArea = previews
             .map { max($0.frameW, 1) * max($0.frameH, 1) }
             .max() ?? 1
+        let cardScale = miniMapCardScale(previews: previews, maxDisplayArea: maxDisplayArea)
         return GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 12) {
-                    Text("Need a higher-resolution view? MegaMap captures real desktop screenshots with a manual sweep.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                    Button("Open MegaMap") {
-                        model.presentMegamap()
-                    }
-                    .buttonStyle(.bordered)
-                }
-
                 if previews.isEmpty {
                     Text("No preview available for current displays.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(previews) { display in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
+                    // Displays sit side by side when they fit, and wrap when they don't.
+                    WrappingFlowLayout(horizontalSpacing: Self.miniMapDisplaySpacing, verticalSpacing: 12) {
+                        ForEach(previews) { display in
+                            let cardWidth = (previewDesktopCardMinimumWidth(for: display, maxDisplayArea: maxDisplayArea) * cardScale).rounded(.down)
+                            VStack(alignment: .leading, spacing: 6) {
                                 Label(display.name, systemImage: display.focused ? "display.and.arrow.down" : "display")
                                     .font(.caption.weight(.semibold))
-                                Spacer(minLength: 0)
-                            }
 
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: previewDesktopCardMinimumWidth(for: display, maxDisplayArea: maxDisplayArea)), spacing: 8)], spacing: 8) {
-                                ForEach(display.desktops) { desktop in
-                                    OverviewDesktopPreviewCard(
+                                WrappingFlowLayout(horizontalSpacing: Self.miniMapCardSpacing, verticalSpacing: Self.miniMapCardSpacing) {
+                                    ForEach(display.desktops) { desktop in
+                                        OverviewDesktopPreviewCard(
                                         desktop: desktop,
                                         displayAspectRatio: display.aspectRatio,
                                         selectedWindowID: selectedWindowID,
@@ -212,19 +204,57 @@ struct NowDashboardView: View {
                                             }
                                             model.focusWindow(windowID: windowID, desktopIndex: desktopIndex)
                                         }
-                                    )
+                                        )
+                                        .frame(width: cardWidth)
+                                    }
                                 }
                             }
+                            .padding(Self.miniMapDisplayPadding)
+                            .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
                         }
-                        .padding(8)
-                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { miniMapWidth = proxy.size.width }
+                        .onChange(of: proxy.size.width) { miniMapWidth = $0 }
+                }
+            )
         } label: {
-            Label("Desktop Mini-map", systemImage: "square.grid.3x3")
+            HStack(spacing: 8) {
+                Label("Desktop Mini-map", systemImage: "square.grid.3x3")
+                Spacer(minLength: 8)
+                Button("Open MegaMap") {
+                    model.presentMegamap()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("See every desktop as a real screenshot.")
+            }
         }
+    }
+
+    private static let miniMapDisplaySpacing: CGFloat = 12
+    private static let miniMapCardSpacing: CGFloat = 8
+    private static let miniMapDisplayPadding: CGFloat = 8
+
+    /// Grows the desktop cards together, up to 1.6 times their base size, when every desktop fits
+    /// on one row with room to spare. Otherwise cards keep their base size and wrap.
+    private func miniMapCardScale(previews: [OverviewDisplayPreview], maxDisplayArea: Double) -> CGFloat {
+        guard miniMapWidth > 0, !previews.isEmpty else { return 1 }
+        var fixedWidth = CGFloat(previews.count - 1) * Self.miniMapDisplaySpacing
+        var flexibleWidth: CGFloat = 0
+        for display in previews {
+            let count = CGFloat(max(display.desktops.count, 1))
+            fixedWidth += Self.miniMapDisplayPadding * 2 + (count - 1) * Self.miniMapCardSpacing
+            flexibleWidth += count * previewDesktopCardMinimumWidth(for: display, maxDisplayArea: maxDisplayArea)
+        }
+        guard flexibleWidth > 0 else { return 1 }
+        let fit = (miniMapWidth - fixedWidth - 1) / flexibleWidth
+        return min(1.6, max(1, fit))
     }
 
     private func degradedBanner(reason: String) -> some View {
@@ -313,7 +343,7 @@ struct NowDashboardView: View {
                                 Label(displaySection.display.name, systemImage: displaySection.display.focused ? "display.and.arrow.down" : "display")
                                     .font(.headline)
                                 Spacer()
-                                Text("Visible: \(displaySection.visibleWindowCount) · Total: \(displaySection.totalWindowCount)")
+                                Text(windowCountText(visible: displaySection.visibleWindowCount, total: displaySection.totalWindowCount))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -336,7 +366,7 @@ struct NowDashboardView: View {
                                             .help("Switch to Desktop \(spaceSection.space.index).")
                                             statusPill(spaceSection.tilingEnabled ? "Tiling On" : "Tiling Off", color: spaceSection.tilingEnabled ? .blue : .orange)
                                             Spacer()
-                                            Text("Visible: \(spaceSection.visibleWindowCount) · Total: \(spaceSection.totalWindowCount)")
+                                            Text(windowCountText(visible: spaceSection.visibleWindowCount, total: spaceSection.totalWindowCount))
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
@@ -419,13 +449,20 @@ struct NowDashboardView: View {
         return parts.joined(separator: " ")
     }
 
+    private func windowCountText(visible: Int, total: Int) -> String {
+        if visible == total {
+            return total == 1 ? "1 window" : "\(total) windows"
+        }
+        return "\(visible) visible · \(total) total"
+    }
+
     private func windowControlRow(
         window: WindowState,
         desktopTilingEnabled: Bool?,
         runtimeEnabled: Bool,
         runtimeDisabledReason: String
     ) -> some View {
-        let defaultBehavior = defaultBehaviorBadge(for: window.app, desktopTilingEnabled: desktopTilingEnabled)
+        let appRule = model.appTilingBehavior(for: window.app)
         let effectiveFloating = desktopTilingEnabled == false || window.floating
         let trimmedTitle = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
         return HStack(alignment: .center, spacing: 8) {
@@ -455,23 +492,16 @@ struct NowDashboardView: View {
             } else if window.isHidden {
                 statusPill("Hidden", color: .secondary)
             }
-            if desktopTilingEnabled == false {
-                statusPill("Floating (Desktop tiling off)", color: .orange)
+            if appRule != .useDefault {
+                statusPill(appRule.displayName, color: .secondary)
+                    .help("App rule for \(window.app). Change it from this row's menu or in Behaviors.")
             }
-
-            Button {
-                model.toggleAppDefaultTilingBehavior(for: window.app)
-            } label: {
-                statusPill(defaultBehavior.text, color: defaultBehavior.color)
-            }
-            .buttonStyle(.plain)
-            .help(defaultBehavior.help + " Click to toggle default behavior for this app.")
 
             Button {
                 model.toggleWindowFloating(windowID: window.id)
             } label: {
                 if window.isRuntimeManageable {
-                    statusPill(effectiveFloating ? "Floating" : "Tiled", color: effectiveFloating ? .orange : .green)
+                    statusPill(effectiveFloating ? "Floating" : "Tiled", color: effectiveFloating ? .orange : .blue)
                 } else {
                     statusPill("Limited", color: .gray)
                 }
@@ -481,25 +511,45 @@ struct NowDashboardView: View {
             .help(
                 !window.isRuntimeManageable
                 ? "\(window.app) does not expose move/control hooks for this window right now."
-                : (runtimeEnabled ? "Toggle floating/tiled state." : runtimeDisabledReason)
+                : (runtimeEnabled
+                   ? (desktopTilingEnabled == false
+                      ? "Floating because tiling is Off on this desktop. Click to tile it anyway."
+                      : "Click to switch between floating and tiled.")
+                   : runtimeDisabledReason)
             )
 
             Menu {
                 Button("Set Floating") {
                     model.setWindowFloating(windowID: window.id, shouldFloat: true)
                 }
-                .disabled(effectiveFloating)
+                .disabled(effectiveFloating || !runtimeEnabled || !window.isRuntimeManageable)
                 Button("Set Tiled") {
                     model.setWindowFloating(windowID: window.id, shouldFloat: false)
                 }
-                .disabled(!effectiveFloating)
+                .disabled(!effectiveFloating || !runtimeEnabled || !window.isRuntimeManageable)
+
+                Divider()
+
+                Picker("Rule for \(window.app)", selection: Binding(
+                    get: { model.appTilingBehavior(for: window.app) },
+                    set: { model.setAppTilingBehavior($0, for: window.app) }
+                )) {
+                    ForEach(AppTilingBehavior.allCases, id: \.self) { behavior in
+                        Text(behavior.displayName).tag(behavior)
+                    }
+                }
+
+                Toggle("Keep \(window.app) on Top", isOn: Binding(
+                    get: { model.appForegroundPolicy(for: window.app) == .keepFrontWhenFloating },
+                    set: { model.setAppForegroundPolicy($0 ? .keepFrontWhenFloating : .useDefault, for: window.app) }
+                ))
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             .menuStyle(.borderlessButton)
-            .disabled(!runtimeEnabled || !window.isRuntimeManageable)
+            .fixedSize()
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -520,23 +570,6 @@ struct NowDashboardView: View {
                 .stroke(selectedWindowID == window.id ? Color.accentColor.opacity(0.35) : Color.clear, lineWidth: 1)
         )
         .id("overview-window-\(window.id)")
-    }
-
-    private func defaultBehaviorBadge(for appName: String, desktopTilingEnabled: Bool?) -> (text: String, color: Color, help: String) {
-        let behavior = model.appTilingBehavior(for: appName)
-        let desktopNote = desktopTilingEnabled == false ? " Desktop tiling is currently off here." : ""
-        switch behavior {
-        case .neverTile:
-            return ("Default Float", .orange, "App rule says this app should stay floating by default.\(desktopNote)")
-        case .alwaysTile:
-            return ("Default Tiled", .green, "App rule says this app should be auto-tiled by default.\(desktopNote)")
-        case .useDefault:
-            if model.windowBehaviorPolicyDraft.manualTilingModeEnabled {
-                return ("Default Float", .orange, "No app-specific rule. Global default is floating because Manual Tiling Mode is enabled.\(desktopNote)")
-            } else {
-                return ("Default Tiled", .green, "No app-specific rule. Global default is auto-tiled.\(desktopNote)")
-            }
-        }
     }
 
     private func statusPill(_ text: String, color: Color) -> some View {

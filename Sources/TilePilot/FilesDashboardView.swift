@@ -6,7 +6,6 @@ struct FilesDashboardView: View {
     let showNavigationContainer: Bool
     @State private var searchText = ""
     @State private var editorJumpLine: Int?
-    @State private var showResetDefaultsConfirm = false
 
     init(showNavigationContainer: Bool = true) {
         self.showNavigationContainer = showNavigationContainer
@@ -66,38 +65,31 @@ struct FilesDashboardView: View {
                 editorJumpLine = nil
             }
         }
-        .alert("Restore All Default Settings?", isPresented: $showResetDefaultsConfirm) {
-            Button("Cancel", role: .cancel) {}
-            Button("Restore", role: .destructive) {
-                model.resetToReleaseDefaults()
-            }
-        } message: {
-            Text("This restores TilePilot app settings and the TilePilot-managed sections of skhdrc and yabairc to their default values. Any non-managed lines stay unchanged.")
-        }
     }
 
     private var leftPane: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label("Config & Script Files", systemImage: "folder")
+                HStack(spacing: 6) {
+                    Label("Config Files", systemImage: "folder")
                         .font(.headline)
+                        .lineLimit(1)
                     Spacer()
-                    Button("Restore All Default Settings") {
-                        showResetDefaultsConfirm = true
+                    if model.isRefreshingEditableFiles || model.isLoadingEditableFile {
+                        ProgressView().controlSize(.small)
                     }
-                    .font(.caption)
-                    Button(model.isRefreshingEditableFiles ? "Reloading..." : "Reload") {
+                    Button {
                         Task {
                             await model.refreshEditableFiles()
                             await syncFilesTabState(allowRefresh: false)
                         }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
-                    .font(.caption)
+                    .buttonStyle(.borderless)
+                    .help("Reload files")
+                    .accessibilityLabel("Reload files")
                     .disabled(model.isRefreshingEditableFiles)
-                    if model.isRefreshingEditableFiles || model.isLoadingEditableFile {
-                        ProgressView().controlSize(.small)
-                    }
                 }
                 TextField("Search files", text: $searchText)
                     .textFieldStyle(.roundedBorder)

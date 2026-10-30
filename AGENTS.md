@@ -42,7 +42,7 @@ graphify update .
 - Run yabai/skhd through the managed helper command wrappers with explicit timeouts; report command failures instead of assuming state changed.
 - Treat yabai, WindowServer, and Accessibility as complementary sources. Verify live postconditions for limited/AX-only windows; yabai frame and resize flags can lag or disagree.
 - Mission Control, App Exposé, Show Desktop, and their animations move and scale window-server bounds (`CGWindowListCopyWindowInfo`) while Accessibility frames stay put. Never move or resize a window from window-server bounds alone; containment re-reads the real frame by window ID (`AccessibilityWindowFrames`) first.
-- Keep settings copy short and outcome-based. Say whether windows end tiled or floating; put teaching material in `How It Works`, not settings cards.
+- Keep settings copy short and outcome-based. Say whether windows end tiled or floating; put teaching material in the section's ⓘ help (`ContextHelpTopic` in `Shared/ContextHelp.swift`, shown with `HelpSectionLabel` or `ContextHelpButton`), not in settings cards. There is no separate help tab.
 - Preserve existing user behavior by default. Defaults changes require a release-default profile version bump and reset-flow coverage.
 - Present Guided Setup immediately on a genuine first launch; startup readiness grace applies only to existing installations recovering after launch or login.
 - Add focused XCTest coverage for pure models/planners and regressions when the test runner is available.

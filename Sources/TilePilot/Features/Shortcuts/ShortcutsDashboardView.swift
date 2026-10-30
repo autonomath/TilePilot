@@ -4,12 +4,10 @@ import SwiftUI
 struct ShortcutsDashboardView: View {
     @EnvironmentObject private var model: AppModel
     private let shortcutDescriptionColumnWidth: CGFloat = 410
-    private let shortcutComboColumnWidth: CGFloat = 220
-    private let shortcutRecordColumnWidth: CGFloat = 168
-    private let shortcutActionsColumnWidth: CGFloat = 104
-    private let shortcutRecordButtonMinWidth: CGFloat = 108
-    private let shortcutActionButtonMinWidth: CGFloat = 46
-    private let shortcutClearButtonMinWidth: CGFloat = 50
+    private let shortcutRecorderWidth: CGFloat = 196
+    private let shortcutActionSlotWidth: CGFloat = 52
+    private let shortcutActionButtonLabelWidth: CGFloat = 34
+    private let shortcutLeadingSlotWidth: CGFloat = 24
     private let reorderRowHeight: CGFloat = 48
     @State private var searchText = ""
     @State private var showDesktopMoveAdvanced = false
@@ -167,7 +165,7 @@ struct ShortcutsDashboardView: View {
         Group {
             if reorderEnabled {
                 VStack(alignment: .leading, spacing: 10) {
-                    reorderControlBar
+                    reorderModeHeader
 
                     Text("Drag pinned items to reorder the right-click menu.")
                         .font(.caption)
@@ -194,10 +192,6 @@ struct ShortcutsDashboardView: View {
         List {
             quickMenuCard
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                .listRowSeparator(.hidden)
-
-            reorderControlBar
-                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 6, trailing: 0))
                 .listRowSeparator(.hidden)
 
             if filteredSections.isEmpty {
@@ -235,6 +229,7 @@ struct ShortcutsDashboardView: View {
                         }
                     } header: {
                         shortcutsSectionHeader(section.group)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                     }
                     .textCase(nil)
                 }
@@ -262,12 +257,13 @@ struct ShortcutsDashboardView: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
-                Label("Right-Click Menu", systemImage: "pin.circle.fill")
-                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: 5) {
+                    Label("Right-Click Menu", systemImage: "pin.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                    ContextHelpButton(topic: .rightClickMenu)
+                }
                 Spacer(minLength: 0)
-                Text("Right-click the TilePilot menu bar icon")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                reorderToggleButton
             }
 
             Text(
@@ -295,23 +291,38 @@ struct ShortcutsDashboardView: View {
         .background(Color.secondary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    private var reorderControlBar: some View {
-        HStack(spacing: 10) {
-            Button {
-                if !isReordering && isSearchActive {
-                    searchText = ""
-                }
-                isReordering.toggle()
-            } label: {
-                Label(isReordering ? "Done Reordering Right-Click Menu" : "Reorder Right-Click Menu", systemImage: isReordering ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle.fill")
+    /// Header shown in reorder mode, mirroring the Right-Click Menu card so the Done control sits
+    /// where the Reorder button was.
+    private var reorderModeHeader: some View {
+        HStack(alignment: .center, spacing: 8) {
+            HStack(spacing: 5) {
+                Label("Right-Click Menu", systemImage: "pin.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                ContextHelpButton(topic: .rightClickMenu)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .environment(\.controlActiveState, .key)
-            .help("Click to reorder pinned right-click menu items")
-
             Spacer(minLength: 0)
+            reorderToggleButton
         }
+        .padding(.horizontal, 8)
+    }
+
+    private var reorderToggleButton: some View {
+        Button {
+            if !isReordering && isSearchActive {
+                searchText = ""
+            }
+            isReordering.toggle()
+        } label: {
+            if isReordering {
+                Label("Done", systemImage: "checkmark")
+            } else {
+                Label("Reorder…", systemImage: "arrow.up.arrow.down")
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .environment(\.controlActiveState, .key)
+        .help(isReordering ? "Finish reordering the right-click menu" : "Change the order of pinned items in the right-click menu")
     }
 
     @ViewBuilder
@@ -323,7 +334,7 @@ struct ShortcutsDashboardView: View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "pin.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color.accentColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(reorderPinnedItemTitle(for: item))
@@ -399,10 +410,11 @@ struct ShortcutsDashboardView: View {
                 } label: {
                     Image(systemName: model.isFeaturePinned(featureID) ? "pin.fill" : "pin")
                         .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(model.isFeaturePinned(featureID) ? Color.accentColor : Color.secondary)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
-                .help(model.isFeaturePinned(featureID) ? "Unpin from Quick Menu" : "Pin to Quick Menu")
+                .help(model.isFeaturePinned(featureID) ? "Remove from the right-click menu" : "Add to the right-click menu")
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -431,10 +443,11 @@ struct ShortcutsDashboardView: View {
             } label: {
                 Image(systemName: model.isShortcutPinned(entry) ? "pin.fill" : "pin")
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(model.isShortcutPinned(entry) ? Color.accentColor : Color.secondary)
             }
             .buttonStyle(.bordered)
             .controlSize(.mini)
-            .help(model.isShortcutPinned(entry) ? "Unpin from Quick Menu" : "Pin to Quick Menu")
+            .help(model.isShortcutPinned(entry) ? "Remove from the right-click menu" : "Add to the right-click menu")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.shortcutTitle(entry))
@@ -460,16 +473,13 @@ struct ShortcutsDashboardView: View {
     @ViewBuilder
     private func quickMenuComboView(comboRaw: String?) -> some View {
         if let comboRaw, !comboRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(model.displayShortcutComboSymbols(from: comboRaw))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(model.displayShortcutComboWords(from: comboRaw))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text(model.displayShortcutComboSymbols(from: comboRaw))
+                .font(.system(size: 13, weight: .semibold))
+                .tracking(1.5)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .help(model.displayShortcutComboWords(from: comboRaw))
+                .accessibilityLabel(model.displayShortcutComboWords(from: comboRaw))
         } else {
             Text("No shortcut")
                 .font(.caption)
@@ -547,8 +557,9 @@ struct ShortcutsDashboardView: View {
         let displayed = Array(mapped.prefix(3))
         let hasMore = mapped.count > displayed.count
 
-        return HStack(alignment: .top, spacing: 10) {
-            catalogGroupIcon(.desktops)
+        return HStack(alignment: .top, spacing: 8) {
+            Color.clear
+                .frame(width: shortcutLeadingSlotWidth, height: 1)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center, spacing: 8) {
@@ -626,8 +637,9 @@ struct ShortcutsDashboardView: View {
             return lhs.sourceLine < rhs.sourceLine
         }
 
-        return HStack(alignment: .top, spacing: 10) {
-            catalogGroupIcon(.experimental)
+        return HStack(alignment: .top, spacing: 8) {
+            Color.clear
+                .frame(width: shortcutLeadingSlotWidth, height: 1)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center, spacing: 8) {
@@ -665,26 +677,17 @@ struct ShortcutsDashboardView: View {
     private func shortcutRow(_ entry: ShortcutEntry) -> some View {
         let featureRow = model.featureControlRow(forShortcutEntry: entry)
         let featureID = featureRow?.featureID
-        let group = featureRow?.group ?? model.unifiedGroup(for: entry)
         let title = model.shortcutTitle(entry)
         let secondaryText = model.shortcutSecondaryText(entry)
-        return HStack(alignment: .center, spacing: 4) {
-            Button {
+        let isPinned = featureID.map(model.isFeaturePinned) ?? model.isShortcutPinned(entry)
+        return HStack(alignment: .center, spacing: 8) {
+            catalogPinButton(isPinned: isPinned) {
                 if let featureID {
                     model.toggleFeaturePinned(featureID)
                 } else {
                     model.toggleShortcutPinned(entry)
                 }
-            } label: {
-                Image(systemName: (featureID.map(model.isFeaturePinned) ?? model.isShortcutPinned(entry)) ? "pin.fill" : "pin")
-                    .font(.system(size: 12, weight: .semibold))
             }
-            .help((featureID.map(model.isFeaturePinned) ?? model.isShortcutPinned(entry)) ? "Unpin from quick menu" : "Pin to quick menu")
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .frame(minWidth: 24)
-
-            catalogGroupIcon(group)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -705,25 +708,19 @@ struct ShortcutsDashboardView: View {
                         .lineLimit(1)
                 }
             }
-            .frame(width: shortcutDescriptionColumnWidth, alignment: .leading)
-            .layoutPriority(5)
-
-            comboSummaryView(for: entry)
-                .frame(width: shortcutComboColumnWidth, alignment: .leading)
-                .layoutPriority(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Group {
                 if let featureID {
-                    shortcutRecordControl(for: featureID)
+                    featureRecorderField(featureID, entry: entry)
                 } else {
-                    shortcutRecordControl(for: entry)
+                    entryRecorderField(entry)
                 }
             }
-            .frame(width: shortcutRecordColumnWidth, alignment: .leading)
-            .layoutPriority(3)
+            .layoutPriority(1)
 
-            HStack(spacing: 4) {
-                Button("Test") {
+            catalogActionSlot {
+                catalogActionButton("Test", help: "Run this action now") {
                     if let featureID {
                         model.runFeatureControl(featureID, source: .shortcutsUI)
                     } else {
@@ -731,25 +728,13 @@ struct ShortcutsDashboardView: View {
                     }
                 }
                 .disabled(featureRow?.disabledReason != nil)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .frame(minWidth: shortcutActionButtonMinWidth)
+            }
 
-                Button("Edit") {
+            catalogActionSlot {
+                catalogActionButton("Edit", help: "Open this shortcut's line in skhdrc") {
                     model.openShortcutSource(entry)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .frame(minWidth: shortcutActionButtonMinWidth)
             }
-            .frame(width: shortcutActionsColumnWidth, alignment: .trailing)
-            .layoutPriority(2)
-
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -769,23 +754,15 @@ struct ShortcutsDashboardView: View {
     }
 
     private func unifiedActionOnlyRow(_ row: FeatureControlRow) -> some View {
-        HStack(alignment: .center, spacing: 4) {
+        HStack(alignment: .center, spacing: 8) {
             if let featureID = row.featureID {
-                Button {
+                catalogPinButton(isPinned: model.isFeaturePinned(featureID)) {
                     model.toggleFeaturePinned(featureID)
-                } label: {
-                    Image(systemName: model.isFeaturePinned(featureID) ? "pin.fill" : "pin")
-                        .font(.system(size: 12, weight: .semibold))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .frame(minWidth: 24)
             } else {
                 Color.clear
-                    .frame(width: 24, height: 1)
+                    .frame(width: shortcutLeadingSlotWidth, height: 1)
             }
-
-            catalogGroupIcon(row.group)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
@@ -796,35 +773,22 @@ struct ShortcutsDashboardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .frame(width: shortcutDescriptionColumnWidth, alignment: .leading)
-            .layoutPriority(5)
-
-            if let entry = row.shortcutEntry {
-                comboSummaryView(for: entry)
-                    .frame(width: shortcutComboColumnWidth, alignment: .leading)
-                    .layoutPriority(8)
-            } else {
-                Text("—")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: shortcutComboColumnWidth, alignment: .leading)
-                    .layoutPriority(8)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Group {
                 if let featureID = row.featureID, row.preferredCommand != nil {
-                    shortcutRecordControl(for: featureID)
+                    featureRecorderField(featureID, entry: row.shortcutEntry)
                 } else if let entry = row.shortcutEntry {
-                    shortcutRecordControl(for: entry)
+                    entryRecorderField(entry)
                 } else {
-                    Color.clear.frame(height: 1)
+                    Color.clear
+                        .frame(width: shortcutRecorderWidth, height: 1)
                 }
             }
-            .frame(width: shortcutRecordColumnWidth, alignment: .leading)
-            .layoutPriority(3)
+            .layoutPriority(1)
 
-            HStack(spacing: 4) {
-                Button("Test") {
+            catalogActionSlot {
+                catalogActionButton("Test", help: "Run this action now") {
                     if let featureID = row.featureID {
                         model.runFeatureControl(featureID, source: .shortcutsUI)
                     } else if let actionID = row.actionID {
@@ -832,27 +796,15 @@ struct ShortcutsDashboardView: View {
                     }
                 }
                 .disabled(row.disabledReason != nil || model.activeActionID != nil)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .frame(minWidth: shortcutActionButtonMinWidth)
+            }
 
+            catalogActionSlot {
                 if let entry = row.shortcutEntry {
-                    Button("Edit") {
+                    catalogActionButton("Edit", help: "Open this shortcut's line in skhdrc") {
                         model.openShortcutSource(entry)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                    .frame(minWidth: shortcutActionButtonMinWidth)
                 }
             }
-            .frame(width: shortcutActionsColumnWidth, alignment: .trailing)
-            .layoutPriority(2)
-
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -862,106 +814,66 @@ struct ShortcutsDashboardView: View {
         )
     }
 
-    @ViewBuilder
-    private func shortcutRecordControl(for featureID: FeatureControlID) -> some View {
-        if model.recordingFeatureID == featureID {
-            HStack(spacing: 4) {
-                Text("Type Shortcut")
-                    .help("Press and release a key combination. Escape cancels.")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.14), in: Capsule())
-
-                Button {
-                    model.stopShortcutRecording()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Cancel recording")
-            }
-        } else if model.featureControlRow(forID: featureID)?.shortcutEntry != nil {
-            HStack(spacing: 4) {
-                Button {
-                    model.removeShortcut(for: featureID)
-                } label: {
-                    Text("Clear")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Clear shortcut")
-                .frame(minWidth: shortcutClearButtonMinWidth)
-
-                Button("Record Shortcut") {
-                    model.beginShortcutRecording(for: featureID)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+    private func catalogPinButton(isPinned: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: isPinned ? "pin.fill" : "pin")
                 .font(.system(size: 12, weight: .semibold))
-                .frame(minWidth: shortcutRecordButtonMinWidth)
-            }
-        } else {
-            Button("Record Shortcut") {
-                model.beginShortcutRecording(for: featureID)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .font(.system(size: 12, weight: .semibold))
-            .frame(minWidth: shortcutRecordButtonMinWidth)
+                .foregroundStyle(isPinned ? Color.accentColor : Color.secondary)
         }
+        .buttonStyle(.bordered)
+        .controlSize(.mini)
+        .frame(width: shortcutLeadingSlotWidth)
+        .help(isPinned ? "Remove from the right-click menu" : "Add to the right-click menu")
+        .accessibilityLabel(isPinned ? "Unpin from right-click menu" : "Pin to right-click menu")
     }
 
-    @ViewBuilder
-    private func shortcutRecordControl(for entry: ShortcutEntry) -> some View {
-        if model.recordingShortcutStableKey == entry.stableKey {
-            HStack(spacing: 4) {
-                Text("Type Shortcut")
-                    .help("Press and release a key combination. Escape cancels.")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.14), in: Capsule())
-
-                Button {
-                    model.stopShortcutRecording()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Cancel recording")
-            }
-        } else {
-            Button("Record Shortcut") {
-                model.beginShortcutRecording(for: entry)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .font(.system(size: 12, weight: .semibold))
-            .frame(minWidth: shortcutRecordButtonMinWidth)
+    /// A fixed-width trailing slot, so Test and Edit line up on every row even when a row has
+    /// no Edit button.
+    private func catalogActionSlot<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        // An empty slot (EmptyView) collapses even with a fixed frame, so a clear spacer holds
+        // the width.
+        ZStack {
+            Color.clear
+                .frame(width: shortcutActionSlotWidth, height: 1)
+            content()
         }
+        .frame(width: shortcutActionSlotWidth, alignment: .center)
     }
 
-    @ViewBuilder
-    private func comboSummaryView(for entry: ShortcutEntry) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(model.displayShortcutComboSymbolsSpaced(entry))
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-
-            Text(model.displayShortcutComboWords(entry))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+    private func catalogActionButton(_ title: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .frame(width: shortcutActionButtonLabelWidth)
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .font(.system(size: 12, weight: .semibold))
+        .lineLimit(1)
+        .help(help)
+    }
+
+    private func featureRecorderField(_ featureID: FeatureControlID, entry: ShortcutEntry?) -> some View {
+        let canClear = model.featureControlRow(forID: featureID)?.shortcutEntry != nil
+        return ShortcutRecorderField(
+            symbols: entry.map { model.displayShortcutComboSymbols($0) } ?? "",
+            spelledOut: entry.map { model.displayShortcutComboWords($0) },
+            isRecording: model.recordingFeatureID == featureID,
+            onRecord: { model.beginShortcutRecording(for: featureID) },
+            onCancelRecording: { model.stopShortcutRecording() },
+            onClear: canClear ? { model.removeShortcut(for: featureID) } : nil,
+            width: shortcutRecorderWidth
+        )
+    }
+
+    private func entryRecorderField(_ entry: ShortcutEntry) -> some View {
+        ShortcutRecorderField(
+            symbols: model.displayShortcutComboSymbols(entry),
+            spelledOut: model.displayShortcutComboWords(entry),
+            isRecording: model.recordingShortcutStableKey == entry.stableKey,
+            onRecord: { model.beginShortcutRecording(for: entry) },
+            onCancelRecording: { model.stopShortcutRecording() },
+            width: shortcutRecorderWidth
+        )
     }
 
     private struct DesktopShortcutFamilySummary: Identifiable {
@@ -1079,33 +991,19 @@ struct ShortcutsDashboardView: View {
             return lhs.entry.sourceLine < rhs.entry.sourceLine
         }
         let byDirection = Dictionary(uniqueKeysWithValues: orderedEntries.map { ($0.direction, $0.entry) })
-        let catalogGroup = switch summary.kind {
-        case .moveWindow, .swapWindow:
-            UnifiedControlGroup.windowPlacement
-        case .resizeWindow:
-            UnifiedControlGroup.windowSize
-        case .focusWindow:
-            UnifiedControlGroup.focus
-        }
-
-        return HStack(alignment: .center, spacing: 10) {
-            catalogGroupIcon(catalogGroup)
+        return HStack(alignment: .center, spacing: 8) {
+            if let group = directionalGroup(from: summary.kind) {
+                catalogPinButton(isPinned: model.isDirectionalGroupPinned(group)) {
+                    model.toggleDirectionalGroupPinned(group)
+                }
+            } else {
+                Color.clear
+                    .frame(width: shortcutLeadingSlotWidth, height: 1)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .center, spacing: 8) {
-                    Text(directionalFamilyTitle(summary.kind))
-                        .font(emphasized ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
-                    if let group = directionalGroup(from: summary.kind) {
-                        Button {
-                            model.toggleDirectionalGroupPinned(group)
-                        } label: {
-                            Image(systemName: model.isDirectionalGroupPinned(group) ? "pin.fill" : "pin")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .help(model.isDirectionalGroupPinned(group) ? "Unpin this directional group from right-click menu" : "Pin this directional group to right-click menu")
-                    }
-                }
+                Text(directionalFamilyTitle(summary.kind))
+                    .font(emphasized ? .headline.weight(.semibold) : .subheadline.weight(.semibold))
 
                 Text(directionalFamilyDescription(summary.kind))
                     .font(emphasized ? .subheadline : .caption)
@@ -1361,20 +1259,27 @@ struct ShortcutsDashboardView: View {
             Image(systemName: group.systemImage)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 14)
+                .frame(width: shortcutLeadingSlotWidth)
             Text(group.title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
+            if group == .tilingLayout {
+                ContextHelpButton(topic: .layoutOutcomes)
+            }
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 8)
         .padding(.top, 8)
-        .padding(.bottom, 2)
-    }
-
-    private func catalogGroupIcon(_ group: UnifiedControlGroup) -> some View {
-        Image(systemName: group.systemImage)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 18)
+        .padding(.bottom, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            // Pinned headers float over the rows while scrolling; an opaque window-colored band
+            // keeps rows from showing through. It extends past the header's own bounds to cover
+            // the side insets and the few points the plain List leaves above a pinned header.
+            Color(nsColor: .windowBackgroundColor)
+                .padding(.horizontal, -16)
+                .padding(.top, -6)
+        )
     }
 
     private func directionArrowSymbolName(_ direction: DirectionalShortcutFamilySummary.Direction) -> String {

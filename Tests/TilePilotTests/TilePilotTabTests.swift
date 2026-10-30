@@ -17,7 +17,6 @@ final class TilePilotTabTests: XCTestCase {
                 .workSets,
                 .appearance,
                 .files,
-                .howItWorks,
                 .system,
             ]
         )
@@ -32,7 +31,6 @@ final class TilePilotTabTests: XCTestCase {
                 "Work Sets",
                 "Appearance",
                 "Config Files",
-                "How It Works",
                 "System",
             ]
         )
@@ -54,10 +52,10 @@ final class TilePilotTabTests: XCTestCase {
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .now, moving: .previous), .now)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .now, moving: .next), .windowBehavior)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .actions, moving: .next), .templates)
-        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .system, moving: .previous), .howItWorks)
+        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .system, moving: .previous), .files)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .system, moving: .next), .system)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .shortcuts, moving: .next), .templates)
-        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .config, moving: .previous), .howItWorks)
+        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .config, moving: .previous), .files)
     }
 
     @MainActor

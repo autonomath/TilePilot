@@ -43,12 +43,12 @@ TilePilot is a native macOS menu bar app that makes `yabai` + `skhd` practical f
 - Main tabs:
   - `Overview`
   - `Behaviors`
+  - `Work Area`
   - `Actions & Shortcuts`
   - `Templates`
   - `Work Sets`
   - `Appearance`
   - `Config Files`
-  - `How It Works`
   - `System`
 - Bundled helper install and management:
   - install bundled helpers into the user account
@@ -111,8 +111,8 @@ TilePilot is a native macOS menu bar app that makes `yabai` + `skhd` practical f
   - managed `yabairc` / `skhdrc` sections
   - backups and restore flows
   - raw file editing in `Config Files`
-- How It Works:
-  - visual/copy explainers for concepts that should not clutter settings tabs
+- Contextual help:
+  - an ⓘ beside each section title opens its explanation, with a diagram where text alone is not enough
 - Signed/notarized DMG release flow.
 
 ## 2.2 Important Recent Behavior Decisions
@@ -293,13 +293,15 @@ TilePilot is a native macOS menu bar app that makes `yabai` + `skhd` practical f
 - Backups and restore must remain available through the product UI.
 - First-save behavior must backfill existing unmanaged config when adopting new controlled settings such as spacing or yabai mouse controls.
 
-## 3.10 How It Works
-- Advanced explanations belong in `How It Works`, not inside dense settings tabs.
-- The tab must explain:
+## 3.10 Contextual Help
+- Explanations live behind the ⓘ beside the section they explain, not in settings copy and not in a separate tab.
+- Help must explain:
   - desktop auto-tiling
   - app rules
+  - mouse dragging
   - focus/cursor behavior
   - desktop scrub
+  - the Work Area, its menu bar, and windows that can't fit
   - right-click menu pinning
   - floating vs tiled layout outcomes
   - Templates vs Work Sets
@@ -369,8 +371,8 @@ Why:
 Why:
 - MegaMap is valuable, but users notice correctness bugs immediately
 
-## 5.4 Priority 4 - How It Works Expansion
-- Keep compact explainers current for:
+## 5.4 Priority 4 - Contextual Help Coverage
+- Keep the ⓘ explainers current for:
   - Pick Windows to Tile
   - Templates
   - Work Sets layout modes
@@ -382,8 +384,8 @@ Why:
 - Add richer visuals where text is still doing too much work
 
 Why:
-- The product now has several powerful concepts that need a teaching surface
-- These explainers should clarify concepts without reintroducing jargon
+- The product now has several powerful concepts that need teaching where they are used
+- These explainers should clarify concepts next to their controls without reintroducing jargon
 
 ## 5.5 Priority 5 - Ongoing Window/Junk Heuristic Hardening
 - Keep tightening overlay/map exclusion heuristics for:
