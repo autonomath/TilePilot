@@ -37,6 +37,7 @@ graphify update .
 ```
 
 ## Conventions
+- Public releases and the website use `autonomath/TilePilot` on `main`; `origin` may still point to legacy private `nostitos/TilePilot` on `master`. Fetch the public branch and check its latest release before choosing a version or preparing release source.
 - Keep app/UI/runtime state on `@MainActor`; use async `Task` work for helper and OS calls.
 - The main window is found by its title (`hasOnScreenTilePilotWindow` looks for "TilePilot"). Every tab that shows live window data must keep `.navigationTitle("TilePilot")`, or its live state stops updating.
 - Run yabai/skhd through the managed helper command wrappers with explicit timeouts; report command failures instead of assuming state changed.
