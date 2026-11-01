@@ -288,6 +288,36 @@ final class ManagedHelperService: @unchecked Sendable {
         return manifest.helpers.allSatisfy { bundledHelperURL(for: $0.helper, bundle: bundle) != nil }
     }
 
+    /// Current error-log sizes. Pass them to `helperErrorLogText(for:since:)` to read only
+    /// what a helper wrote after this point.
+    func helperErrorLogMarks() -> [ManagedHelperKind: UInt64] {
+        var marks: [ManagedHelperKind: UInt64] = [:]
+        for helper in ManagedHelperKind.allCases {
+            let attributes = try? FileManager.default.attributesOfItem(atPath: helperErrorLogURL(for: helper).path)
+            marks[helper] = (attributes?[.size] as? NSNumber)?.uint64Value ?? 0
+        }
+        return marks
+    }
+
+    func helperErrorLogText(for helper: ManagedHelperKind, since mark: UInt64?, maxBytes: UInt64 = 16_384) -> String {
+        guard let handle = try? FileHandle(forReadingFrom: helperErrorLogURL(for: helper)) else { return "" }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return "" }
+        var start = mark ?? 0
+        if start > size {
+            // The log was replaced since the mark was taken.
+            start = 0
+        }
+        if size - start > maxBytes {
+            start = size - maxBytes
+        }
+        guard (try? handle.seek(toOffset: start)) != nil,
+              let data = try? handle.readToEnd() else {
+            return ""
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     func hasOperationalHelpers() -> Bool {
         resolvedHelperURL(for: .yabai) != nil && resolvedHelperURL(for: .skhd) != nil
     }
@@ -419,6 +449,10 @@ final class ManagedHelperService: @unchecked Sendable {
         managedSupportDirectory().appendingPathComponent("Logs", isDirectory: true)
     }
 
+    private func helperErrorLogURL(for helper: ManagedHelperKind) -> URL {
+        managedLogsDirectory().appendingPathComponent("\(helper.rawValue).stderr.log")
+    }
+
     private func installStateURL() -> URL {
         managedStateDirectory().appendingPathComponent("managed-helper-install-state.json")
     }
@@ -522,7 +556,7 @@ final class ManagedHelperService: @unchecked Sendable {
     func launchAgentPlist(for helper: ManagedHelperKind) -> String {
         let executablePath = managedHelperURL(for: helper).path
         let stdoutPath = managedLogsDirectory().appendingPathComponent("\(helper.rawValue).stdout.log").path
-        let stderrPath = managedLogsDirectory().appendingPathComponent("\(helper.rawValue).stderr.log").path
+        let stderrPath = helperErrorLogURL(for: helper).path
         let workingDirectory = FileManager.default.homeDirectoryForCurrentUser.path
         let path = environmentWithManagedHelpers()["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
 

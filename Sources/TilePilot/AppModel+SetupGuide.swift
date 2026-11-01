@@ -43,6 +43,15 @@ extension AppModel {
         let helperDaemonsRunning = helperDaemonStatus == .good
         let windowControlNeedsStart = !helperDaemonsRunning
         let windowControlNeedsQueryConfirmation = helperDaemonsRunning && yabaiQueryStatus != .good
+        let startFailureAdvice = windowControlNeedsStart
+            ? HelperStartFailureDiagnosis.advice(for: windowControlStartFailures)
+            : nil
+        // yabai quits at launch while Displays have separate Spaces is off.
+        let separateSpacesLooksOff = missionControlChecks.contains { $0.key == "spans-displays" && $0.status == .warning }
+        let separateSpacesBlocksStart = windowControlNeedsStart
+            && (separateSpacesLooksOff || windowControlStartFailures.contains { $0.reason == .separateSpacesOff })
+        let startSecondaryActions: [SystemCheckAction] = (separateSpacesBlocksStart ? [.openMissionControlSettings] : [])
+            + [.openAccessibilitySettings, .recheck]
 
         let accessibilityStatus = mergedGuideStatus([
             mappedGuideStatus(from: accessibilitySetup?.state),
@@ -67,9 +76,11 @@ extension AppModel {
                 title: "Prepare Window Control",
                 summary: helperInstallStatus == .good ? "TilePilot has installed its local yabai/skhd components." : "TilePilot is still preparing the local components it uses for window control and shortcuts.",
                 whyItMatters: "TilePilot uses yabai to read and move windows/desktops. It uses skhd to listen for global keyboard shortcuts. Both run as local user services managed by TilePilot.",
-                whatToDo: setupGuideItemsByID["bundled-helpers"]?.state == .installed
-                    ? "TilePilot normally does this automatically on first launch. If this step stays incomplete, retry the component install."
-                    : "Use the packaged TilePilot app from /Applications. This build does not include the local yabai/skhd components.",
+                whatToDo: bundledHelpersSetup == nil
+                    ? "TilePilot is still checking this Mac. This takes a few seconds."
+                    : (bundledHelpersSetup?.state == .installed
+                        ? "TilePilot normally does this automatically on first launch. If this step stays incomplete, retry the component install."
+                        : "Use the packaged TilePilot app from /Applications. This build does not include the local yabai/skhd components."),
                 detail: firstNonEmptyGuideDetail([
                     bundledHelpersSetup?.detail,
                     yabaiBinarySetup?.detail,
@@ -90,15 +101,17 @@ extension AppModel {
                 title: helperServicesStatus == .good ? "Window Control Running" : (windowControlNeedsStart ? "Start Window Control" : "Confirm Window Control"),
                 summary: helperServicesStatus == .good
                     ? "Window control and shortcut services are running."
-                    : (windowControlNeedsStart
+                    : (startFailureAdvice?.problem ?? (windowControlNeedsStart
                         ? "TilePilot installed yabai and skhd. Start them when you are ready; macOS will then ask you to allow them in Accessibility."
-                        : "yabai and skhd are running. TilePilot is waiting for yabai to answer window-state queries."),
+                        : "yabai and skhd are running. TilePilot is waiting for yabai to answer window-state queries.")),
                 whyItMatters: "yabai is the window-control service. skhd is the shortcut listener. macOS may ask you to allow these entries in Accessibility because they need to observe and move windows.",
-                whatToDo: windowControlNeedsStart
-                    ? "Use Start Window Control when you are ready. macOS will show an Accessibility prompt for yabai and skhd; approve those exact entries so they can observe and move windows, then wait for the recheck."
-                    : "Wait a few seconds. If macOS shows an Accessibility prompt for yabai, approve that exact entry, then use Recheck.",
+                whatToDo: startFailureAdvice?.fix ?? (windowControlNeedsStart
+                    ? "Click Start Window Control. macOS will ask you to allow yabai and skhd in Accessibility. Approve both, then click Start Window Control again so they start with access."
+                    : "Wait a few seconds. If macOS shows an Accessibility prompt for yabai, approve that exact entry, then use Recheck."),
                 detail: firstNonEmptyGuideDetail([
-                    helperServicesStatus == .good ? nil : "Do not keep pressing Start repeatedly. Startup and macOS permission registration can take a few seconds.",
+                    separateSpacesBlocksStart && startFailureAdvice == nil
+                        ? "Displays have separate Spaces looks turned off. yabai will not start until it is on: turn it on in System Settings > Desktop & Dock > Mission Control, then log out and back in."
+                        : nil,
                     windowControlNeedsQueryConfirmation ? "The helper services are already running; TilePilot is only waiting for the yabai query check to pass." : nil,
                     helperServicesStatus == .good ? nil : "No Screen Recording permission is needed here. Screen Recording is only for optional MegaMap screenshots.",
                     yabaiServiceSetup?.detail,
@@ -107,12 +120,12 @@ extension AppModel {
                     capabilityByKey["skhd-daemon"]?.message,
                     capabilityByKey["yabai-query"]?.message,
                 ]),
-                verificationText: "TilePilot will recheck after startup. If macOS blocks a service, approve the named item in Accessibility and use Recheck.",
+                verificationText: "TilePilot checks again a few seconds after each start and names the reason if yabai or skhd stops.",
                 status: helperServicesStatus,
                 isBlocking: true,
                 isSkippable: true,
                 primaryAction: helperServicesStatus == .good ? nil : (windowControlNeedsStart ? .startYabai : .recheck),
-                secondaryActions: helperServicesStatus == .good ? [] : [.openAccessibilitySettings, .recheck]
+                secondaryActions: helperServicesStatus == .good ? [] : startSecondaryActions
             ),
             SetupGuideStep(
                 kind: .accessibility,
@@ -154,7 +167,11 @@ extension AppModel {
                 kind: .missionControl,
                 category: .featureOptional,
                 title: "Review Mission Control Settings",
-                summary: missionControlStatus == .good ? "Mission Control settings look compatible." : "Mission Control settings only affect desktop-navigation reliability. They are not required to finish setup.",
+                summary: missionControlStatus == .good
+                    ? "Mission Control settings look compatible."
+                    : (separateSpacesLooksOff
+                        ? "yabai needs Displays have separate Spaces turned on. The other Mission Control settings only affect desktop navigation."
+                        : "Mission Control settings only affect desktop-navigation reliability. They are not required to finish setup."),
                 whyItMatters: "Desktop scrub and some desktop-navigation previews work best when desktop ordering and display grouping are predictable.",
                 whatToDo: missionControlWhatToDo(missionControlChecks),
                 detail: missionControlGuideDetail(missionControlChecks),
@@ -259,7 +276,8 @@ extension AppModel {
     }
 
     func dismissSetupGuide() {
-        if setupGuidePresentationState.source == .automatic, hasIncompleteEssentialSetupGuideSteps {
+        // A first-launch guide counts too; otherwise the next refresh reopens it as automatic.
+        if setupGuidePresentationState.source != .manual, hasIncompleteEssentialSetupGuideSteps {
             hasDismissedAutomaticSetupGuideThisSession = true
         }
         setupGuidePresentationState = .hidden

@@ -56,7 +56,7 @@ extension AppModel {
         case .reviewAccessibility:
             return "Optional. Review Accessibility only if macOS prompts for TilePilot, yabai, or skhd, or if focus/bring-to-front fallbacks do not work."
         case .startHelperServices:
-            return "TilePilot installed yabai and skhd. Start window control when you are ready; macOS will ask you to allow yabai and skhd in Accessibility. Approve the exact named entries and recheck."
+            return "TilePilot installed yabai and skhd. Start window control when you are ready; macOS will ask you to allow yabai and skhd in Accessibility. Approve both, then click Start Window Control again."
         case .recheck:
             return "TilePilot is still checking this Mac. Recheck setup if the status looks stale."
         case .ready:

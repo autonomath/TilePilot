@@ -270,7 +270,7 @@ Add a GroupBox to the Work Area tab titled "Menu Bar and Notifications":
   - "Open icon panels inside the Work Area" (`panelMirrorEnabled`)
 - **Status line:** "Menu bar icons: Matching" when Screen Recording is on, otherwise "Simplified". When it is off, add an "Allow Screen Recording…" button that reuses `requestScreenRecordingAccessPrompt()`.
 - The canvas preview draws the bar strip above or inside the area.
-- Keep copy short and outcome-based. Explanations go in How It Works.
+- Keep copy short and outcome-based. Explanations go in the section's ⓘ help (`ContextHelpTopic.workAreaMenuBar` in `Shared/ContextHelp.swift`).
 
 ### 6.8 Permissions
 
@@ -329,7 +329,7 @@ Go/no-go: Phase 1 needs S1–S3 and S6 (S6 only for Matching icons). Phase 2 nee
 
 ### Phase 1 — System Bar: app menus and icons
 
-Tasks: models and planner, geometry and the configuration fields, the Accessibility reader, the bar panel and view, the menu builder, icon enumeration, Matching and Simplified rendering, the three click behaviors from 6.3 (panels press through for now), the TilePilot-icon special case, overflow, the settings card, and How It Works.
+Tasks: models and planner, geometry and the configuration fields, the Accessibility reader, the bar panel and view, the menu builder, icon enumeration, Matching and Simplified rendering, the three click behaviors from 6.3 (panels press through for now), the TilePilot-icon special case, overflow, the settings card, and its ⓘ help.
 
 Acceptance:
 
@@ -364,7 +364,7 @@ Commits: `feat: show notifications in the Work Area`, then `feat: show the notif
 
 ### Phase 4 — Polish
 
-Hover-to-switch between open menus, overflow refinements, a background closer to the real bar, How It Works and the AGENTS.md domain line, screenshots, and `graphify update .`.
+Hover-to-switch between open menus, overflow refinements, a background closer to the real bar, the ⓘ help and the AGENTS.md domain line, screenshots, and `graphify update .`.
 
 ## 9. Test plan
 

@@ -991,6 +991,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .workArea
         case "actions", "shortcuts", "actions-shortcuts":
             return .actions
+        case "keyboard-layers", "layers":
+            return .keyboardLayers
         case "templates":
             return .templates
         case "work-sets", "worksets":

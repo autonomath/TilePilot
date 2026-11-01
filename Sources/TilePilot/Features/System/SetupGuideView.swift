@@ -470,7 +470,7 @@ struct SetupGuideView: View {
                 Text("What are yabai and skhd?")
                     .font(.headline)
                 wrappingText("yabai reads and moves windows/desktops. skhd listens for global keyboard shortcuts. TilePilot installs its own local copies under your user account and starts them as user LaunchAgents.", font: .body, style: .secondary)
-                wrappingText("If macOS asks for Accessibility access, approve only the exact TilePilot, yabai, or skhd entry macOS names, then come back to TilePilot.", font: .body, style: .secondary)
+                wrappingText("If macOS asks for Accessibility access, approve only the exact TilePilot, yabai, or skhd entry macOS names, then come back to TilePilot and click Start Window Control again.", font: .body, style: .secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

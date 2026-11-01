@@ -136,6 +136,7 @@ extension AppModel {
         lastActionMessage = "Starting TilePilot window-control services..."
         lastErrorMessage = nil
 
+        let errorLogMarks = helperService.helperErrorLogMarks()
         let startResult = await helperService.startManagedServices()
 
         isLaunchingSetupInstaller = false
@@ -145,7 +146,9 @@ extension AppModel {
             return await bootstrapService.runBootstrapChecks()
         }
 
-        return await waitForBootstrapWindowControlServicesToSettle()
+        let settled = await waitForBootstrapWindowControlServicesToSettle()
+        windowControlStartFailures = diagnoseWindowControlStartFailures(since: errorLogMarks, in: settled.snapshot)
+        return settled
     }
 
     func repairManagedHelperPromptLoopIfNeeded() async {
@@ -339,6 +342,12 @@ extension AppModel {
     func enableStartAtLogon() {
         acknowledgeInitialStatusIfNeeded()
 
+        guard !isRunningFromTemporaryAppLocation else {
+            lastErrorMessage = "Move TilePilot to the Applications folder and open it from there, then turn on Start at Login."
+            lastActionMessage = nil
+            return
+        }
+
         do {
             try writeStartAtLogonLaunchAgent()
             lastActionMessage = "Enabled start at logon."
@@ -353,6 +362,8 @@ extension AppModel {
     }
 
     func updateStartAtLogonLaunchAgentIfNeeded() {
+        // Keep the login item pointing at the installed copy while a disk-image copy runs.
+        guard !isRunningFromTemporaryAppLocation else { return }
         let plistURL = startAtLogonLaunchAgentURL()
         guard FileManager.default.fileExists(atPath: plistURL.path),
               let currentPlist = try? String(contentsOf: plistURL, encoding: .utf8),
@@ -490,19 +501,81 @@ extension AppModel {
         HelperStartConsentPolicy.recordUserInitiatedStart()
         Task { [weak self] in
             guard let self else { return }
+            let errorLogMarks = self.helperService.helperErrorLogMarks()
             await MainActor.run {
                 self.isLaunchingSetupInstaller = true
                 self.hasAttemptedAutomaticManagedHelperServiceStart = true
+                self.windowControlStartFailures = []
             }
             let result = await self.helperService.startManagedServices()
 
             await MainActor.run {
-                self.isLaunchingSetupInstaller = false
                 self.applyManagedHelperOperationResult(result)
             }
 
+            // Stay in flight until startup settles so Start cannot launch a second round meanwhile.
             await self.refreshSetupAfterWindowControlStart()
+            await MainActor.run {
+                self.isLaunchingSetupInstaller = false
+                self.reportWindowControlStartOutcome(since: errorLogMarks, startErrorMessage: result.errorMessage)
+            }
         }
+    }
+
+    /// Reports the state after startup settles. launchd accepts a helper even when it quits
+    /// right away, so the start command's own result cannot tell whether window control runs.
+    private func reportWindowControlStartOutcome(since errorLogMarks: [ManagedHelperKind: UInt64], startErrorMessage: String?) {
+        if windowControlReadyForSetup {
+            windowControlStartFailures = []
+            lastActionMessage = "Window control is running."
+            lastErrorMessage = nil
+            return
+        }
+        guard let snapshot = bootstrapSnapshot else { return }
+
+        let failures = diagnoseWindowControlStartFailures(since: errorLogMarks, in: snapshot)
+        windowControlStartFailures = failures
+        if let advice = HelperStartFailureDiagnosis.advice(for: failures) {
+            lastErrorMessage = "\(advice.problem) \(advice.fix)"
+            lastActionMessage = nil
+        } else if !bootstrapWindowControlServicesRunning(in: snapshot) {
+            lastErrorMessage = startErrorMessage
+                ?? "yabai or skhd stopped right after starting. If macOS asked for Accessibility, approve yabai and skhd, then click Start Window Control again."
+            lastActionMessage = nil
+        } else {
+            lastActionMessage = "yabai and skhd are running. TilePilot is waiting for yabai to answer."
+            lastErrorMessage = nil
+        }
+    }
+
+    private func diagnoseWindowControlStartFailures(
+        since errorLogMarks: [ManagedHelperKind: UInt64],
+        in snapshot: SetupBootstrapSnapshot
+    ) -> [HelperStartFailure] {
+        let itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
+        return ManagedHelperKind.allCases.compactMap { helper in
+            guard itemsByID["helper-service-\(helper.rawValue)"]?.state != .installed else { return nil }
+            let errorLog = helperService.helperErrorLogText(for: helper, since: errorLogMarks[helper])
+            return HelperStartFailureDiagnosis.failure(for: helper, errorLog: errorLog)
+        }
+    }
+
+    /// Drops start failures for helpers that are running now.
+    func pruneWindowControlStartFailures(using snapshot: SetupBootstrapSnapshot) {
+        guard !windowControlStartFailures.isEmpty else { return }
+        let itemsByID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) })
+        let remaining = windowControlStartFailures.filter {
+            itemsByID["helper-service-\($0.helper.rawValue)"]?.state != .installed
+        }
+        if remaining != windowControlStartFailures {
+            windowControlStartFailures = remaining
+        }
+    }
+
+    private var isRunningFromTemporaryAppLocation: Bool {
+        let bundleURL = Bundle.main.bundleURL
+        let readOnly = (try? bundleURL.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
+        return TilePilotLaunchPolicy.isTemporaryAppLocation(bundlePath: bundleURL.path, volumeIsReadOnly: readOnly)
     }
 
     private func refreshSetupAfterWindowControlStart(maxAttempts: Int = 6, delaySeconds: Double = 0.7) async {

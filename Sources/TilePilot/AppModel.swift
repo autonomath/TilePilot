@@ -300,6 +300,8 @@ final class AppModel: ObservableObject {
     @Published var isRestoringConfig = false
     @Published var activeActionID: TilePilotActionID?
     @Published var isLaunchingSetupInstaller = false
+    /// Why yabai/skhd quit after the latest start attempt, read from their error logs.
+    @Published var windowControlStartFailures: [HelperStartFailure] = []
     @Published var isLaunchingScriptingAdditionFix = false
     @Published private(set) var hasAcknowledgedInitialStatus = false
     @Published var actionsLastErrorMessage: String?
@@ -452,6 +454,10 @@ final class AppModel: ObservableObject {
     @Published var desktopScrubInvertDirection: Bool = AppModel.loadDesktopScrubInvertDirection()
     @Published var desktopScrubStatusMessage: String?
     @Published var desktopScrubStatusIsError = false
+    @Published var keyboardLayers: [KeyboardLayer] = AppModel.loadKeyboardLayers()
+    @Published var keyboardLayerRecordingTarget: KeyboardLayerRecordingTarget?
+    @Published var keyboardLayerStatus = KeyboardLayerRuntimeStatus()
+    @Published var keyboardLayerMessage: String?
 
     let doctorService = DoctorService()
     let bootstrapService = BootstrapService()
@@ -464,6 +470,10 @@ final class AppModel: ObservableObject {
     let megamapCaptureService = MegamapCaptureService()
     let appUpdateService = AppUpdateService()
     let nativeSpacesScrubSpikeCoordinator = NativeSpacesScrubSpikeCoordinator()
+    let keyboardLayerEventTap = KeyboardLayerEventTap()
+    let capsLockRemapper = CapsLockRemapper()
+    var keyboardLayerObservers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    var keyboardLayerReapplyTask: Task<Void, Never>?
     private let keepOnTopCoordinator = KeepOnTopCoordinator()
     let workAreaContainmentCoordinator = WorkAreaContainmentCoordinator()
     let systemBarController = SystemBarController()
@@ -582,6 +592,7 @@ final class AppModel: ObservableObject {
         updateStartAtLogonLaunchAgentIfNeeded()
         scheduleAutomaticSetupGuideAfterStartupGrace()
         refreshDesktopScrubConfiguration()
+        startKeyboardLayers()
         Task { [weak self] in
             await self?.ensureReleaseDefaultsInitializedIfNeeded()
         }
@@ -593,6 +604,7 @@ final class AppModel: ObservableObject {
                 try? await Task.sleep(for: .seconds(30))
                 if Task.isCancelled { break }
                 await self.refreshDoctor()
+                self.keyboardLayerHealthCheck()
             }
         }
 
@@ -647,6 +659,7 @@ final class AppModel: ObservableObject {
         windowBehaviorAutoSaveTask = nil
         stopShortcutRecording()
         nativeSpacesScrubSpikeCoordinator.disableInteractiveScrubMode()
+        stopKeyboardLayers()
         systemBarController.stop()
     }
 
@@ -697,6 +710,7 @@ final class AppModel: ObservableObject {
         result = await bootstrapResultAfterAutomaticManagedHelperInstallIfNeeded(result)
         result = await bootstrapResultAfterAutomaticManagedHelperStartIfNeeded(result)
         bootstrapSnapshot = result.snapshot
+        pruneWindowControlStartFailures(using: result.snapshot)
         managedHelperInstallState = result.managedHelperInstallState
         prependCommandLogs(result.commandLogs)
         megamapScreenRecordingAuthorized = megamapCaptureService.screenRecordingAuthorized()

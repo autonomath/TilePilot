@@ -39,9 +39,32 @@ extension AppModel {
         shortcutGlobalRecordMonitor = nil
         recordingFeatureID = nil
         recordingShortcutStableKey = nil
+        keyboardLayerRecordingTarget = nil
+        keyboardLayerEventTap.setSuspended(false)
     }
 
     private func startShortcutRecording(assign: @escaping (String) -> Void) {
+        startKeyRecordingSession { [weak self] event in
+            guard let self else { return }
+            guard let combo = ShortcutRecordingKey.combo(
+                keyCode: event.keyCode,
+                modifiers: event.modifierFlags,
+                unmodifiedCharacters: event.characters(byApplyingModifiers: [])
+            ) else {
+                self.lastErrorMessage = "That key cannot be recorded. Press another key combination, or Escape to cancel."
+                self.lastActionMessage = nil
+                return
+            }
+            // Stop intercepting before an asynchronous save or configuration
+            // reload. The key release has already been consumed by the session.
+            self.stopShortcutRecording()
+            assign(combo)
+        }
+    }
+
+    /// Records the next key pressed while TilePilot's window is key. Escape, or leaving the
+    /// window, cancels.
+    func startKeyRecordingSession(onKey: @escaping (NSEvent) -> Void) {
         NSApp.activate(ignoringOtherApps: true)
         let targetWindow = NSApp.keyWindow
             ?? NSApp.mainWindow
@@ -57,6 +80,8 @@ extension AppModel {
 
         lastErrorMessage = nil
         lastActionMessage = nil
+        // Keyboard layers would otherwise act on the keys being recorded.
+        keyboardLayerEventTap.setSuspended(true)
         let session = ShortcutRecordingSession()
         shortcutRecordingSession = session
         let capturesGlobalShortcuts = session.start(window: targetWindow) { [weak self] event in
@@ -65,19 +90,7 @@ extension AppModel {
                 self.stopShortcutRecording()
                 return
             }
-            guard let combo = ShortcutRecordingKey.combo(
-                keyCode: event.keyCode,
-                modifiers: event.modifierFlags,
-                unmodifiedCharacters: event.characters(byApplyingModifiers: [])
-            ) else {
-                self.lastErrorMessage = "That key cannot be recorded. Press another key combination, or Escape to cancel."
-                self.lastActionMessage = nil
-                return
-            }
-            // Stop intercepting before an asynchronous save or configuration
-            // reload. The key release has already been consumed by the session.
-            self.stopShortcutRecording()
-            assign(combo)
+            onKey(event)
         } onCancel: { [weak self] in
             self?.stopShortcutRecording()
         }

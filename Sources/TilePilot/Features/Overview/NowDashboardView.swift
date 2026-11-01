@@ -612,7 +612,7 @@ struct NowDashboardView: View {
             || normalized.contains("socket is unavailable")
             || normalized.contains("socket unavailable") {
             return LiveStateHelp(
-                message: "TilePilot cannot talk to yabai yet. Start window control from Guided Setup, then approve any yabai/skhd Accessibility prompt macOS shows.",
+                message: "TilePilot cannot talk to yabai yet. Start window control from Guided Setup, approve any yabai/skhd Accessibility prompt macOS shows, then start it again.",
                 actions: [
                     .init(label: "Run Guided Setup", prominent: true, handler: {
                         presentOverviewRecoveryGuide(for: message)

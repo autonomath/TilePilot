@@ -13,6 +13,7 @@ final class TilePilotTabTests: XCTestCase {
                 .windowBehavior,
                 .workArea,
                 .actions,
+                .keyboardLayers,
                 .templates,
                 .workSets,
                 .appearance,
@@ -27,6 +28,7 @@ final class TilePilotTabTests: XCTestCase {
                 "Behaviors",
                 "Work Area",
                 "Actions & Shortcuts",
+                "Keyboard Layers",
                 "Templates",
                 "Work Sets",
                 "Appearance",
@@ -51,10 +53,10 @@ final class TilePilotTabTests: XCTestCase {
     func testKeyboardNavigationMovesBetweenTabsAndStopsAtBoundaries() {
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .now, moving: .previous), .now)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .now, moving: .next), .windowBehavior)
-        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .actions, moving: .next), .templates)
+        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .actions, moving: .next), .keyboardLayers)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .system, moving: .previous), .files)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .system, moving: .next), .system)
-        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .shortcuts, moving: .next), .templates)
+        XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .shortcuts, moving: .next), .keyboardLayers)
         XCTAssertEqual(TilePilotTab.adjacentVisibleTab(from: .config, moving: .previous), .files)
     }
 

@@ -10,6 +10,7 @@ enum TilePilotTab: Hashable {
     case workArea
     case actions
     case shortcuts
+    case keyboardLayers
     case system
     // legacy route-only cases (mapped to .system)
     case files
@@ -23,6 +24,7 @@ enum TilePilotTab: Hashable {
         .windowBehavior,
         .workArea,
         .actions,
+        .keyboardLayers,
         .templates,
         .workSets,
         .appearance,
@@ -46,6 +48,8 @@ enum TilePilotTab: Hashable {
             return "Work Area"
         case .actions, .shortcuts:
             return "Actions & Shortcuts"
+        case .keyboardLayers:
+            return "Keyboard Layers"
         case .system, .config, .health, .setup, .logs:
             return "System"
         case .files:
@@ -69,6 +73,8 @@ enum TilePilotTab: Hashable {
             return "rectangle.inset.filled"
         case .actions, .shortcuts:
             return "square.grid.2x2"
+        case .keyboardLayers:
+            return "keyboard"
         case .system, .config, .health, .setup, .logs:
             return "gearshape.2"
         case .files:
@@ -199,6 +205,12 @@ struct TilePilotRootView: View {
             WorkAreaDashboardView()
         case .actions, .shortcuts:
             UnifiedControlsDashboardView()
+        case .keyboardLayers:
+            ScrollView {
+                KeyboardLayersCard()
+                    .padding()
+            }
+            .navigationTitle("TilePilot")
         case .templates:
             TemplatesDashboardView()
         case .workSets:

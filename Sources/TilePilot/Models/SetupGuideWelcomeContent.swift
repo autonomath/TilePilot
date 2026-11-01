@@ -54,7 +54,7 @@ enum SetupGuideWelcomeContent {
                 .init(id: "local", symbolName: "lock.shield", title: "Runs locally", detail: "Both helpers are installed inside your user account. Nothing phones home."),
             ],
             permission: .required(name: "Accessibility access for yabai and skhd"),
-            permissionExplanation: "When you click Start Window Control in the next part, macOS shows an Accessibility prompt for each helper. Approving the exact entries named yabai and skhd is what lets them see and move windows. TilePilot never starts them before you do."
+            permissionExplanation: "When you click Start Window Control in the next part, macOS shows an Accessibility prompt for each helper. Approve the entries named yabai and skhd, then click Start Window Control again so they start with access. TilePilot never starts them before you do."
         ),
         SetupGuideWelcomePage(
             id: "shortcuts",

@@ -13,6 +13,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
     case workAreaMenuBar
     case workAreaContainment
     case rightClickMenu
+    case keyboardLayers
     case layoutOutcomes
     case templates
     case workSets
@@ -31,6 +32,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
         case .workAreaMenuBar: return "Work Area Menu Bar"
         case .workAreaContainment: return "Keeping Windows Inside"
         case .rightClickMenu: return "Right-Click Menu"
+        case .keyboardLayers: return "Keyboard Layers"
         case .layoutOutcomes: return "Floating or Tiled Results"
         case .templates: return "Templates"
         case .workSets: return "Work Sets"
@@ -58,6 +60,8 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
             return "Some windows have a minimum size or refuse to move. TilePilot tries twice, lists the window under Exceptions, and tries again every 30 seconds."
         case .rightClickMenu:
             return "Pinned actions appear when you right-click the TilePilot icon in the menu bar, in the order shown here. Right-clicking a window badge shows them too."
+        case .keyboardLayers:
+            return "Hold a trigger key, such as Tab, and press another key to run its action. Each trigger has its own keys, so Tab + C and Caps Lock + C can do different things. Tapping the trigger alone still types it. Layer keys are separate from the shortcuts in Actions & Shortcuts."
         case .layoutOutcomes:
             return "Each layout action's name says how it ends. Some arrange windows and leave them floating; others end with the desktop tiled."
         case .templates:
@@ -124,6 +128,16 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
             ]
         case .rightClickMenu:
             return []
+        case .keyboardLayers:
+            return [
+                .init("A key pressed within 0.2 seconds of the trigger counts as typing unless you let go of it first, so fast typing comes out as typed", systemImage: "keyboard"),
+                .init("Held for a second or more and released alone, the trigger types nothing", systemImage: "timer"),
+                .init("With ⇧, ⌃, ⌥, ⌘, or another app's Hyper Key held, the trigger keeps its usual job: Shift+Tab and ⌘Tab work as always", systemImage: "command"),
+                .init("Keys you haven't listed type as usual. A Caps Lock layer can instead make them act as Hyper (⌃⌥⇧⌘ + key), so shortcuts made for a Hyper Key keep working", systemImage: "rectangle.3.group"),
+                .init("Caps Lock works only while no other app remaps it, such as Raycast's Hyper Key or Karabiner-Elements. A tap still toggles Caps Lock", systemImage: "capslock"),
+                .init("Secure Input, used by password fields and Terminal's Secure Keyboard Entry, hides keys from TilePilot; keys type normally until it ends", systemImage: "lock"),
+                .init("Layers need Accessibility access, and pause while you record a shortcut", systemImage: "hand.raised"),
+            ]
         case .layoutOutcomes:
             return [
                 .init("Float and Floating Grid actions leave windows floating where they land", systemImage: "rectangle.3.group"),
@@ -161,7 +175,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
         switch self {
         case .desktopAutoTiling, .appRules, .focusAndCursor, .desktopScrub, .rightClickMenu, .layoutOutcomes:
             return true
-        case .mouseDragging, .workArea, .workAreaMenuBar, .workAreaContainment, .templates, .workSets, .windowPicker:
+        case .mouseDragging, .workArea, .workAreaMenuBar, .workAreaContainment, .keyboardLayers, .templates, .workSets, .windowPicker:
             return false
         }
     }
@@ -267,7 +281,7 @@ struct ContextHelpCard: View {
             RightClickMenuExplainerDiagram()
         case .layoutOutcomes:
             LayoutOutcomeExplainerDiagram()
-        case .mouseDragging, .workArea, .workAreaMenuBar, .workAreaContainment, .templates, .workSets, .windowPicker:
+        case .mouseDragging, .workArea, .workAreaMenuBar, .workAreaContainment, .keyboardLayers, .templates, .workSets, .windowPicker:
             EmptyView()
         }
     }

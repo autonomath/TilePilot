@@ -11,6 +11,7 @@ struct ShortcutRecorderField: View {
     let onCancelRecording: () -> Void
     var onClear: (() -> Void)? = nil   // nil hides the clear button
     var width: CGFloat = 196
+    var placeholder = "Record Shortcut"
 
     @State private var isHovering = false
 
@@ -84,7 +85,7 @@ struct ShortcutRecorderField: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         } else {
-            Text("Record Shortcut")
+            Text(placeholder)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -141,7 +142,7 @@ struct ShortcutRecorderField: View {
             let spoken = (spelledOut?.isEmpty == false) ? spelledOut! : trimmedSymbols
             return "Shortcut: \(spoken)"
         }
-        return "No shortcut. Record Shortcut"
+        return "No shortcut. \(placeholder)"
     }
 
     private var fieldFill: Color {

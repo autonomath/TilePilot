@@ -210,6 +210,7 @@ enum FeatureShortcutBindingState: Sendable, Equatable {
 enum FeatureRunSource: String, Sendable {
     case shortcutsUI
     case statusMenu
+    case keyboardLayer
 }
 
 struct FeatureControlRow: Identifiable, Sendable {

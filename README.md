@@ -64,6 +64,9 @@ If you want to use TilePilot the way it is intended, the path looks like this:
 - `Actions & Shortcuts`
   - the action catalog and shortcut learning surface
   - record shortcuts, edit them, pin frequent ones to the right-click menu, and run the recent-window picker
+- `Keyboard Layers`
+  - hold a trigger key such as Tab and press a second key to run an action
+  - each trigger has its own keys, kept apart from the shortcuts in `Actions & Shortcuts`
 - `Appearance`
   - controls visual feedback and tiling spacing
   - badges, outlines, outline width and colors, screen edge padding, and gap between tiled windows, with a live preview
@@ -155,6 +158,19 @@ TilePilot also supports mouse-driven desktop scrubbing:
 - let go of the trigger keys and macOS settles on the desktop you scrubbed to
 
 You can enable it and change the trigger keys in `Behaviors`.
+
+## Keyboard Layers
+
+A layer turns a key you already have into a second set of shortcuts, without giving up what that key normally does:
+
+- tap Tab and it types a Tab; hold Tab and press C, and TilePilot opens Chrome instead
+- each trigger (Tab, Caps Lock, backtick, or backslash) has its own keys, so Tab + C and Caps Lock + C can do different things
+- a key can run any TilePilot action, open an app, or press another shortcut
+- Shift+Tab, ⌘Tab, and fast typing that overlaps the trigger come out as typed
+- a Caps Lock layer works only while no other app remaps Caps Lock, such as Raycast's Hyper Key or Karabiner-Elements; a tap still toggles Caps Lock, and keys you haven't listed can act as Hyper (⌃⌥⇧⌘ + key)
+- layers need Accessibility access; while Secure Input is on (password fields, Terminal's Secure Keyboard Entry), keys type normally
+
+New layers start off, and TilePilot does not watch the keyboard until you turn one on in `Keyboard Layers`.
 
 ## Work Area and the Menu Bar
 
