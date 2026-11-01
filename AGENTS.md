@@ -37,7 +37,7 @@ graphify update .
 ```
 
 ## Conventions
-- Public releases and the website use `autonomath/TilePilot` on `main`; `origin` may still point to legacy private `nostitos/TilePilot` on `master`. Fetch the public branch and check its latest release before choosing a version or preparing release source.
+- Public releases and the website use `autonomath/TilePilot` on `main`; `origin` may still point to legacy private `nostitos/TilePilot` on `master`. Fetch the public branch and check its latest release before choosing a version or preparing release source. Publish as Autonomath only (`nostitos` has no push access): signed Autonomath commits and tags, the pinned SSH key, and `gh-autonomath` from `~/Documents/ChatGPT/DevPloy` (see `publisher_guard.py` and the staging checkout's `.git/publisher-identity.json`). Notarize with `TILEPILOT_NOTARY_PROFILE=TilePilot`.
 - Keep app/UI/runtime state on `@MainActor`; use async `Task` work for helper and OS calls.
 - The main window is found by its title (`hasOnScreenTilePilotWindow` looks for "TilePilot"). Every tab that shows live window data must keep `.navigationTitle("TilePilot")`, or its live state stops updating.
 - Run yabai/skhd through the managed helper command wrappers with explicit timeouts; report command failures instead of assuming state changed.

@@ -55,7 +55,7 @@ extension AppModel {
 
     /// Whether some layer is on and has a finished key, so the tap should run.
     var keyboardLayersWanted: Bool {
-        keyboardLayers.contains { $0.isEnabled && $0.hasUsableBinding }
+        keyboardLayers.contains { $0.isEnabled && $0.isUsable }
     }
 
     /// Whether the tap should be running, given who owns Caps Lock right now.
@@ -81,11 +81,7 @@ extension AppModel {
     func addKeyboardLayer() {
         let taken = Set(keyboardLayers.map(\.trigger))
         let trigger = [KeyboardLayerTrigger.tab, .grave, .backslash, .capsLock].first { !taken.contains($0) } ?? .tab
-        let layer = KeyboardLayer(
-            name: "\(Self.keyboardLayerTriggerName(trigger)) Layer",
-            trigger: trigger,
-            bindings: [KeyboardLayerBinding()]
-        )
+        let layer = KeyboardLayer(trigger: trigger, bindings: [KeyboardLayerBinding()])
         keyboardLayerMessage = nil
         updateKeyboardLayers { $0.append(layer) }
     }
@@ -94,10 +90,6 @@ extension AppModel {
         if keyboardLayerRecordingTarget?.layerID == id { stopShortcutRecording() }
         keyboardLayerMessage = nil
         updateKeyboardLayers { $0.removeAll { $0.id == id } }
-    }
-
-    func renameKeyboardLayer(_ id: UUID, to name: String) {
-        updateKeyboardLayer(id, applyingRuntime: false) { $0.name = name }
     }
 
     func setKeyboardLayerEnabled(_ id: UUID, _ enabled: Bool) {
@@ -120,10 +112,6 @@ extension AppModel {
         let capsLockOwner = keyboardLayerStatus.capsLockOwner
         var message: String?
         updateKeyboardLayer(id) { layer in
-            // A name nobody edited follows the trigger.
-            if layer.name == "\(Self.keyboardLayerTriggerName(layer.trigger)) Layer" {
-                layer.name = "\(Self.keyboardLayerTriggerName(trigger)) Layer"
-            }
             layer.trigger = trigger
             if layer.isEnabled,
                let reason = KeyboardLayerPlanner.enableBlockReason(for: layer, in: others, capsLockOwner: capsLockOwner) {
@@ -186,19 +174,20 @@ extension AppModel {
         }
     }
 
-    private func updateKeyboardLayerBinding(_ layerID: UUID, _ bindingID: UUID, _ change: (inout KeyboardLayerBinding) -> Void) {
-        updateKeyboardLayer(layerID) { layer in
-            guard let index = layer.bindings.firstIndex(where: { $0.id == bindingID }) else { return }
-            change(&layer.bindings[index])
-        }
+    func setKeyboardLayerBindingNote(_ note: String, layerID: UUID, bindingID: UUID) {
+        // A description never changes what keys do, so typing it leaves the event tap alone.
+        updateKeyboardLayerBinding(layerID, bindingID, applyingRuntime: false) { $0.note = note.isEmpty ? nil : note }
     }
 
-    private static func keyboardLayerTriggerName(_ trigger: KeyboardLayerTrigger) -> String {
-        switch trigger {
-        case .tab: return "Tab"
-        case .capsLock: return "Caps Lock"
-        case .grave: return "Backtick"
-        case .backslash: return "Backslash"
+    private func updateKeyboardLayerBinding(
+        _ layerID: UUID,
+        _ bindingID: UUID,
+        applyingRuntime: Bool = true,
+        _ change: (inout KeyboardLayerBinding) -> Void
+    ) {
+        updateKeyboardLayer(layerID, applyingRuntime: applyingRuntime) { layer in
+            guard let index = layer.bindings.firstIndex(where: { $0.id == bindingID }) else { return }
+            change(&layer.bindings[index])
         }
     }
 
@@ -277,7 +266,7 @@ extension AppModel {
         var status = keyboardLayerStatus
         status.accessibilityTrusted = AXIsProcessTrusted()
         status.capsLockRemapFailed = false
-        let wantsCapsLock = keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.hasUsableBinding }
+        let wantsCapsLock = keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.isUsable }
         var capsLockReady = false
         if wantsCapsLock {
             let owner = capsLockRemapper.currentOwner(tilePilotApplied: capsLockRemapApplied)
@@ -309,7 +298,7 @@ extension AppModel {
     /// Runs with the 30-second health check: turns a paused tap back on, catches Accessibility
     /// being granted or removed, and notices another tool taking or releasing Caps Lock.
     func keyboardLayerHealthCheck() {
-        let capsLockLayerOn = keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.hasUsableBinding }
+        let capsLockLayerOn = keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.isUsable }
         if capsLockLayerOn,
            capsLockRemapper.currentOwner(tilePilotApplied: capsLockRemapApplied) != keyboardLayerStatus.capsLockOwner {
             applyKeyboardLayerRuntime()
@@ -457,7 +446,9 @@ extension AppModel {
             return ("Keyboard layers need Accessibility access for TilePilot.", true)
         }
         if status.tapState == .failed {
-            return ("Keyboard layers couldn't start. Turn a layer off and on again, or relaunch TilePilot.", false)
+            // Accessibility reads as allowed, yet macOS refused the keyboard tap: almost always a
+            // stale Accessibility entry left by an earlier TilePilot build.
+            return ("macOS blocked TilePilot from reading the keyboard. In Accessibility settings, remove TilePilot with −, add it back, then relaunch TilePilot.", true)
         }
         if let app = status.secureInputApp {
             return ("Secure Input is on in \(app), so keys type normally until it turns off.", false)
@@ -510,8 +501,8 @@ extension AppModel {
                 issues.append("Paused. \(owner.explanation)")
             } else if layer.trigger == .capsLock, keyboardLayerStatus.capsLockRemapFailed {
                 issues.append("Paused: TilePilot couldn't remap Caps Lock on this keyboard.")
-            } else if !layer.hasUsableBinding {
-                issues.append("Add a key and an action to start this layer.")
+            } else if !layer.isUsable {
+                issues.append("Add a key and an action, or turn on Hyper, to start this layer.")
             }
         } else if let reason = keyboardLayerEnableBlockReason(layer) {
             issues.append(reason)

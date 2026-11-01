@@ -142,6 +142,8 @@ struct KeyboardLayerBinding: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
     var key: KeyboardLayerKey?
     var action: KeyboardLayerAction?
+    /// What the key is for, in the user's words. Optional so older saved layers still decode.
+    var note: String?
 }
 
 enum KeyboardLayerTrigger: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -202,30 +204,22 @@ enum KeyboardLayerUnboundKeys: String, Codable, CaseIterable, Identifiable, Send
     case sendHyper
 
     var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .typeNormally: return "Type as usual"
-        case .sendHyper: return "Act as Hyper (⌃⌥⇧⌘ + key)"
-        }
-    }
 }
 
 /// Holding the trigger turns the layer's keys into actions.
 struct KeyboardLayer: Codable, Hashable, Identifiable, Sendable {
     var id = UUID()
-    var name: String
     var isEnabled = false
     var trigger: KeyboardLayerTrigger
     var unboundKeys: KeyboardLayerUnboundKeys = .typeNormally
     var bindings: [KeyboardLayerBinding] = []
 
-    /// Only Caps Lock replaces a Hyper Key; Tab and the others keep unlisted keys typing.
-    var sendsHyperForUnboundKeys: Bool { trigger == .capsLock && unboundKeys == .sendHyper }
+    var sendsHyperForUnboundKeys: Bool { unboundKeys == .sendHyper }
 
-    /// At least one binding has both a key and an action, and the key isn't the trigger.
-    var hasUsableBinding: Bool {
-        bindings.contains { binding in
+    /// A Hyper layer works with no keys listed; otherwise at least one binding needs a key
+    /// (other than the trigger) and an action.
+    var isUsable: Bool {
+        sendsHyperForUnboundKeys || bindings.contains { binding in
             guard let key = binding.key, binding.action != nil else { return false }
             return key.keyCode != trigger.eventKeyCode
         }
@@ -238,7 +232,7 @@ enum KeyboardLayerPlanner {
     static func activeLayers(_ layers: [KeyboardLayer], capsLockAvailable: Bool) -> [KeyboardLayerEngine.Layer] {
         var usedTriggers: Set<KeyboardLayerTrigger> = []
         var result: [KeyboardLayerEngine.Layer] = []
-        for layer in layers where layer.isEnabled && layer.hasUsableBinding {
+        for layer in layers where layer.isEnabled && layer.isUsable {
             guard usedTriggers.insert(layer.trigger).inserted else { continue }
             if layer.trigger == .capsLock && !capsLockAvailable { continue }
             var bindings: [KeyboardLayerChord: KeyboardLayerAction] = [:]
@@ -265,8 +259,8 @@ enum KeyboardLayerPlanner {
         in layers: [KeyboardLayer],
         capsLockOwner: CapsLockOwner?
     ) -> String? {
-        if let other = layers.first(where: { $0.id != layer.id && $0.isEnabled && $0.trigger == layer.trigger }) {
-            return "“\(other.name)” already uses \(layer.trigger.title). Turn it off or choose another key."
+        if layers.contains(where: { $0.id != layer.id && $0.isEnabled && $0.trigger == layer.trigger }) {
+            return "Another layer already uses \(layer.trigger.title). Turn it off or choose another trigger."
         }
         if layer.trigger == .capsLock, let capsLockOwner {
             return capsLockOwner.explanation

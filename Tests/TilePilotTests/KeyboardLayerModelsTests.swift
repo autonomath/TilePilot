@@ -11,17 +11,16 @@ final class KeyboardLayerModelsTests: XCTestCase {
     func testLayersRoundTripThroughJSON() throws {
         let layers = [
             KeyboardLayer(
-                name: "Tab Layer",
                 isEnabled: true,
                 trigger: .tab,
                 bindings: [
-                    binding(keyCode: 8, label: "C", chrome),
+                    KeyboardLayerBinding(key: key(8, "C"), action: chrome, note: "Browser"),
                     binding(keyCode: 46, label: "M", .feature(id: "app.open-megamap", title: "Open MegaMap")),
                     binding(keyCode: 4, label: "H", .sendShortcut(KeyboardLayerKey(keyCode: 123, modifiers: [], keyLabel: "←"))),
                     KeyboardLayerBinding(),
                 ]
             ),
-            KeyboardLayer(name: "Caps", trigger: .capsLock, unboundKeys: .sendHyper),
+            KeyboardLayer(trigger: .capsLock, unboundKeys: .sendHyper),
         ]
 
         let decoded = try JSONDecoder().decode([KeyboardLayer].self, from: JSONEncoder().encode(layers))
@@ -29,10 +28,19 @@ final class KeyboardLayerModelsTests: XCTestCase {
         XCTAssertEqual(decoded, layers)
     }
 
+    func testLayersSavedBeforeDescriptionsStillLoad() throws {
+        let saved = #"[{"id":"6F1C2A10-0000-4000-8000-000000000001","name":"Tab Layer","isEnabled":true,"trigger":"tab","unboundKeys":"typeNormally","bindings":[{"id":"6F1C2A10-0000-4000-8000-000000000002","key":{"keyCode":8,"modifiers":0,"keyLabel":"C"}}]}]"#
+
+        let layers = try JSONDecoder().decode([KeyboardLayer].self, from: Data(saved.utf8))
+
+        XCTAssertEqual(layers.first?.bindings.first?.key?.keyLabel, "C")
+        XCTAssertNil(layers.first?.bindings.first?.note)
+    }
+
     func testOnlyLayersThatAreOnAndHaveAFinishedKeyBecomeActive() {
-        let off = KeyboardLayer(name: "Off", trigger: .tab, bindings: [binding(keyCode: 8, label: "C", chrome)])
-        let unfinished = KeyboardLayer(name: "Unfinished", isEnabled: true, trigger: .grave, bindings: [KeyboardLayerBinding(key: key(8, "C"))])
-        let ready = KeyboardLayer(name: "Ready", isEnabled: true, trigger: .backslash, bindings: [binding(keyCode: 8, label: "C", chrome)])
+        let off = KeyboardLayer(trigger: .tab, bindings: [binding(keyCode: 8, label: "C", chrome)])
+        let unfinished = KeyboardLayer(isEnabled: true, trigger: .grave, bindings: [KeyboardLayerBinding(key: key(8, "C"))])
+        let ready = KeyboardLayer(isEnabled: true, trigger: .backslash, bindings: [binding(keyCode: 8, label: "C", chrome)])
 
         let active = KeyboardLayerPlanner.activeLayers([off, unfinished, ready], capsLockAvailable: true)
 
@@ -43,14 +51,14 @@ final class KeyboardLayerModelsTests: XCTestCase {
     }
 
     func testFirstLayerWinsADuplicateTrigger() {
-        let first = KeyboardLayer(name: "First", isEnabled: true, trigger: .tab, bindings: [binding(keyCode: 8, label: "C", chrome)])
-        let second = KeyboardLayer(name: "Second", isEnabled: true, trigger: .tab, bindings: [binding(keyCode: 8, label: "C", chrome)])
+        let first = KeyboardLayer(isEnabled: true, trigger: .tab, bindings: [binding(keyCode: 8, label: "C", chrome)])
+        let second = KeyboardLayer(isEnabled: true, trigger: .tab, bindings: [binding(keyCode: 8, label: "C", chrome)])
 
         XCTAssertEqual(KeyboardLayerPlanner.activeLayers([first, second], capsLockAvailable: true).map(\.id), [first.id])
     }
 
     func testCapsLockLayerRunsOnlyWhileCapsLockIsFree() {
-        let capsLock = KeyboardLayer(name: "Caps", isEnabled: true, trigger: .capsLock, bindings: [binding(keyCode: 8, label: "C", chrome)])
+        let capsLock = KeyboardLayer(isEnabled: true, trigger: .capsLock, bindings: [binding(keyCode: 8, label: "C", chrome)])
 
         let active = KeyboardLayerPlanner.activeLayers([capsLock], capsLockAvailable: true)
         XCTAssertEqual(active.first?.triggerKeyCode, 79)
@@ -59,30 +67,28 @@ final class KeyboardLayerModelsTests: XCTestCase {
     }
 
     func testABindingOnTheTriggerItselfNeverCounts() {
-        let layer = KeyboardLayer(name: "Tab", isEnabled: true, trigger: .tab, bindings: [binding(keyCode: 48, label: "⇥", chrome)])
+        let layer = KeyboardLayer(isEnabled: true, trigger: .tab, bindings: [binding(keyCode: 48, label: "⇥", chrome)])
 
-        XCTAssertFalse(layer.hasUsableBinding)
+        XCTAssertFalse(layer.isUsable)
         XCTAssertTrue(KeyboardLayerPlanner.activeLayers([layer], capsLockAvailable: true).isEmpty)
     }
 
-    func testOnlyCapsLockLayersActAsHyper() {
-        let tab = KeyboardLayer(name: "Tab", isEnabled: true, trigger: .tab, unboundKeys: .sendHyper, bindings: [binding(keyCode: 8, label: "C", chrome)])
-        var capsLock = tab
-        capsLock.trigger = .capsLock
+    func testAnyLayerCanBeAHyperKeyWithNoKeysListed() {
+        let hyper = KeyboardLayer(isEnabled: true, trigger: .grave, unboundKeys: .sendHyper)
 
-        XCTAssertEqual(KeyboardLayerPlanner.activeLayers([tab], capsLockAvailable: true).first?.sendsHyperForUnboundKeys, false)
-        XCTAssertEqual(KeyboardLayerPlanner.activeLayers([capsLock], capsLockAvailable: true).first?.sendsHyperForUnboundKeys, true)
+        XCTAssertTrue(hyper.isUsable)
+        XCTAssertEqual(KeyboardLayerPlanner.activeLayers([hyper], capsLockAvailable: true).first?.sendsHyperForUnboundKeys, true)
     }
 
     func testEnableIsBlockedByADuplicateTriggerOrAnotherCapsLockOwner() {
-        let existing = KeyboardLayer(name: "Apps", isEnabled: true, trigger: .tab)
-        let duplicate = KeyboardLayer(name: "More apps", trigger: .tab)
-        let capsLock = KeyboardLayer(name: "Caps", trigger: .capsLock)
+        let existing = KeyboardLayer(isEnabled: true, trigger: .tab)
+        let duplicate = KeyboardLayer(trigger: .tab)
+        let capsLock = KeyboardLayer(trigger: .capsLock)
         let layers = [existing, duplicate, capsLock]
 
         XCTAssertEqual(
             KeyboardLayerPlanner.enableBlockReason(for: duplicate, in: layers, capsLockOwner: nil),
-            "“Apps” already uses Tab. Turn it off or choose another key."
+            "Another layer already uses Tab. Turn it off or choose another trigger."
         )
         XCTAssertEqual(
             KeyboardLayerPlanner.enableBlockReason(for: capsLock, in: layers, capsLockOwner: .raycastHyperKey),

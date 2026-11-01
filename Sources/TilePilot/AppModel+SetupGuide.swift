@@ -106,7 +106,7 @@ extension AppModel {
                         : "yabai and skhd are running. TilePilot is waiting for yabai to answer window-state queries.")),
                 whyItMatters: "yabai is the window-control service. skhd is the shortcut listener. macOS may ask you to allow these entries in Accessibility because they need to observe and move windows.",
                 whatToDo: startFailureAdvice?.fix ?? (windowControlNeedsStart
-                    ? "Click Start Window Control. macOS will ask you to allow yabai and skhd in Accessibility. Approve both, then click Start Window Control again so they start with access."
+                    ? "Click Start Window Control. macOS then shows two prompts in a row, one for yabai and one for skhd. Click Open System Settings on the first; either button is fine on the second because Settings is already open. Turn on yabai and skhd, then click Start Window Control again."
                     : "Wait a few seconds. If macOS shows an Accessibility prompt for yabai, approve that exact entry, then use Recheck."),
                 detail: firstNonEmptyGuideDetail([
                     separateSpacesBlocksStart && startFailureAdvice == nil

@@ -139,10 +139,10 @@ struct KeyboardLayerEngine: Sendable {
         if isRepeat { return .pass }
 
         let chord = KeyboardLayerChord(keyCode: keyCode, modifiers: modifiers)
-        if let action = layer.bindings[chord] {
-            let mayBeTyping = !layer.sendsHyperForUnboundKeys
-                && !current.used
-                && time - current.downAt < Self.holdThreshold
+        // In a Hyper layer an unlisted key is a binding that presses ⌃⌥⇧⌘ + key.
+        let hyper = KeyboardLayerKey(keyCode: keyCode, modifiers: .hyper, keyLabel: "")
+        if let action = layer.bindings[chord] ?? (layer.sendsHyperForUnboundKeys ? .sendShortcut(hyper) : nil) {
+            let mayBeTyping = !current.used && time - current.downAt < Self.holdThreshold
             if mayBeTyping {
                 current.buffered.append(BufferedKey(chord: chord, action: action))
                 hold = current
@@ -152,14 +152,6 @@ struct KeyboardLayerEngine: Sendable {
             effects += fire(action, keyCode: keyCode, hold: &current)
             hold = current
             return Output(consumesEvent: true, effects: effects)
-        }
-
-        if layer.sendsHyperForUnboundKeys {
-            let hyper = KeyboardLayerChord(keyCode: keyCode, modifiers: .hyper)
-            ownedKeys[keyCode] = .resend(hyper)
-            current.used = true
-            hold = current
-            return Output(consumesEvent: true, effects: [.send(hyper)])
         }
 
         // After an action, unassigned keys type as usual and the layer stays on.

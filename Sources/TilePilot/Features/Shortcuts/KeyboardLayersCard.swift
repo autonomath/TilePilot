@@ -43,7 +43,7 @@ struct KeyboardLayersCard: View {
             }
         }
         .confirmationDialog(
-            "Remove “\(layerPendingRemoval?.name ?? "")”?",
+            "Remove the \(layerPendingRemoval?.trigger.title ?? "") layer?",
             isPresented: Binding(
                 get: { layerPendingRemoval != nil },
                 set: { if !$0 { layerPendingRemoval = nil } }
@@ -116,7 +116,7 @@ private struct KeyboardLayerEditor: View {
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
-                Toggle("Use \(layer.name)", isOn: Binding(
+                Toggle("Use the \(layer.trigger.title) layer", isOn: Binding(
                     get: { layer.isEnabled },
                     set: { model.setKeyboardLayerEnabled(layer.id, $0) }
                 ))
@@ -126,27 +126,7 @@ private struct KeyboardLayerEditor: View {
                 .disabled(blockReason != nil)
                 .help(blockReason ?? (layer.isEnabled ? "Turn this layer off" : "Turn this layer on"))
 
-                TextField("Layer name", text: Binding(
-                    get: { layer.name },
-                    set: { model.renameKeyboardLayer(layer.id, to: $0) }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 200)
-
-                Spacer(minLength: 0)
-
-                Button(action: onRemove) {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-                .help("Remove this layer")
-                .accessibilityLabel("Remove \(layer.name)")
-            }
-
-            HStack(spacing: 6) {
-                Text("Hold")
-                Picker("Hold", selection: Binding(
+                Picker("Trigger", selection: Binding(
                     get: { layer.trigger },
                     set: { model.setKeyboardLayerTrigger(layer.id, $0) }
                 )) {
@@ -156,9 +136,26 @@ private struct KeyboardLayerEditor: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                Text("and press:")
+                .help("The key you hold for this layer")
+
+                Toggle("Other keys act as Hyper (⌃⌥⇧⌘)", isOn: Binding(
+                    get: { layer.unboundKeys == .sendHyper },
+                    set: { model.setKeyboardLayerUnboundKeys(layer.id, $0 ? .sendHyper : .typeNormally) }
+                ))
+                .toggleStyle(.checkbox)
+                .padding(.leading, 6)
+                .help("Holding \(layer.trigger.title) and pressing a key not listed below sends ⌃⌥⇧⌘ + that key, like a Hyper Key. Off: those keys type as usual.")
+
+                Spacer(minLength: 0)
+
+                Button(action: onRemove) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Remove this layer")
+                .accessibilityLabel("Remove the \(layer.trigger.title) layer")
             }
-            .font(.callout)
 
             ForEach(model.keyboardLayerIssues(layer), id: \.self) { issue in
                 Label(issue, systemImage: "exclamationmark.triangle.fill")
@@ -186,24 +183,6 @@ private struct KeyboardLayerEditor: View {
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
-
-            if layer.trigger == .capsLock {
-                HStack(spacing: 6) {
-                    Text("Keys not listed above:")
-                    Picker("Keys not listed above", selection: Binding(
-                        get: { layer.unboundKeys },
-                        set: { model.setKeyboardLayerUnboundKeys(layer.id, $0) }
-                    )) {
-                        ForEach(KeyboardLayerUnboundKeys.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                .font(.callout)
-                .help("Act as Hyper keeps shortcuts made for a Hyper Key, such as Raycast's, working.")
-            }
         }
         .padding(8)
         .background(
@@ -241,10 +220,10 @@ private struct KeyboardLayerBindingRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
-                Text("\(layer.trigger.symbol) +")
+                Text("Hold \(layer.trigger.symbol) +")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
-                    .frame(width: 30, alignment: .trailing)
+                    .frame(width: 56, alignment: .trailing)
                     .help("Hold \(layer.trigger.title), then press this key")
 
                 ShortcutRecorderField(
@@ -274,7 +253,13 @@ private struct KeyboardLayerBindingRow: View {
                     )
                 }
 
-                Spacer(minLength: 0)
+                TextField("Description", text: Binding(
+                    get: { binding.note ?? "" },
+                    set: { model.setKeyboardLayerBindingNote($0, layerID: layer.id, bindingID: binding.id) }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(minWidth: 140, maxWidth: .infinity)
+                .help("What this key is for")
 
                 Button {
                     model.removeKeyboardLayerBinding(layer.id, binding.id)

@@ -165,9 +165,10 @@ A layer turns a key you already have into a second set of shortcuts, without giv
 
 - tap Tab and it types a Tab; hold Tab and press C, and TilePilot opens Chrome instead
 - each trigger (Tab, Caps Lock, backtick, or backslash) has its own keys, so Tab + C and Caps Lock + C can do different things
-- a key can run any TilePilot action, open an app, or press another shortcut
+- a key can run any TilePilot action, open an app, or press another shortcut, and can carry a short description of what it's for
+- turn on Hyper and keys you haven't listed send ⌃⌥⇧⌘ + key, so the trigger also works as a Hyper Key
 - Shift+Tab, ⌘Tab, and fast typing that overlaps the trigger come out as typed
-- a Caps Lock layer works only while no other app remaps Caps Lock, such as Raycast's Hyper Key or Karabiner-Elements; a tap still toggles Caps Lock, and keys you haven't listed can act as Hyper (⌃⌥⇧⌘ + key)
+- a Caps Lock layer works only while no other app remaps Caps Lock, such as Raycast's Hyper Key or Karabiner-Elements; a tap still toggles Caps Lock
 - layers need Accessibility access; while Secure Input is on (password fields, Terminal's Secure Keyboard Entry), keys type normally
 
 New layers start off, and TilePilot does not watch the keyboard until you turn one on in `Keyboard Layers`.

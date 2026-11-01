@@ -256,18 +256,29 @@ final class KeyboardLayerEngineTests: XCTestCase {
         XCTAssertEqual(engine.keyUp(k, at: 1.0), .consume)
     }
 
-    func testHyperLayerSendsHyperForUnassignedKeysAndRunsBoundKeysAtOnce() {
+    func testHyperLayerSendsHyperForUnlistedKeysAndRunsListedOnes() {
         var engine = makeEngine(capsLockLayer([chord(c): codex], sendsHyper: true))
         let hyperX = KeyboardLayerChord(keyCode: x, modifiers: .hyper)
 
         _ = engine.keyDown(capsLockTrigger, modifiers: [], isRepeat: false, at: 0)
-        // No 0.2-second wait in a Hyper layer: every key is a layer key.
-        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05), output(consuming: true, [.run(codex)]))
-        XCTAssertEqual(engine.keyUp(c, at: 0.1), .consume)
-        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: false, at: 0.15), output(consuming: true, [.send(hyperX)]))
-        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: true, at: 0.6), output(consuming: true, [.send(hyperX)]))
-        XCTAssertEqual(engine.keyUp(x, at: 0.65), .consume)
-        XCTAssertEqual(engine.keyUp(capsLockTrigger, at: 0.7), .consume)
+        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.3), output(consuming: true, [.run(codex)]))
+        XCTAssertEqual(engine.keyUp(c, at: 0.35), .consume)
+        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: false, at: 0.4), output(consuming: true, [.send(hyperX)]))
+        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: true, at: 0.9), output(consuming: true, [.send(hyperX)]))
+        XCTAssertEqual(engine.keyUp(x, at: 0.95), .consume)
+        XCTAssertEqual(engine.keyUp(capsLockTrigger, at: 1.0), .consume)
+    }
+
+    func testHyperLayerStillTypesFastOverlapsAndSendsQuickChords() {
+        var typing = makeEngine(layer(trigger: tab, sendsHyper: true, [:]))
+        _ = typing.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(typing.keyDown(x, modifiers: [], isRepeat: false, at: 0.05), .consume)
+        XCTAssertEqual(typing.keyUp(tab, at: 0.08), output(consuming: true, [replay(tab), replay(x)]))
+
+        var chorded = makeEngine(layer(trigger: tab, sendsHyper: true, [:]))
+        _ = chorded.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
+        _ = chorded.keyDown(x, modifiers: [], isRepeat: false, at: 0.05)
+        XCTAssertEqual(chorded.keyUp(x, at: 0.1), output(consuming: true, [.send(KeyboardLayerChord(keyCode: x, modifiers: .hyper))]))
     }
 
     func testCapsLockRolloverTogglesCapsLockBeforeTheKey() {

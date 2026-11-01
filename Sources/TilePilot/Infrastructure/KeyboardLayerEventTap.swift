@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import IOKit
 import IOKit.hidsystem
+import os
 
 /// Runs the keyboard-layer event tap on its own thread, so typing never waits on TilePilot's
 /// main thread. KeyboardLayerEngine decides what each key means; this class feeds it key
@@ -21,6 +22,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
     static let staleKeyCheckDelay: TimeInterval = 0.5
     /// F18, F19, and F20: the keys Hyper Key tools remap Caps Lock to. Raycast uses F20.
     static let hyperKeyStandIns: [UInt16] = [79, 80, 90]
+    private static let logger = Logger(subsystem: "com.klode.tilepilot", category: "KeyboardLayers")
 
     private let lock = NSLock()
     // Guarded by lock: shared by the main thread and the tap thread.
@@ -143,6 +145,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             callback: callback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
+            Self.logger.error("Keyboard tap refused: accessibility=\(AXIsProcessTrusted()) postEvents=\(CGPreflightPostEventAccess()) listenEvents=\(CGPreflightListenEventAccess())")
             return .failed
         }
         guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
@@ -168,7 +171,11 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
         thread.start()
         ready.wait()
         CGEvent.tapEnable(tap: tap, enable: true)
-        return CGEvent.tapIsEnabled(tap: tap) ? .running : .failed
+        guard CGEvent.tapIsEnabled(tap: tap) else {
+            Self.logger.error("Keyboard tap created but stayed disabled")
+            return .failed
+        }
+        return .running
     }
 
     /// Runs on the tap thread.

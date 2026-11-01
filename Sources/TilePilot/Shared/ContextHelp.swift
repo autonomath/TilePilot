@@ -133,7 +133,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
                 .init("A key pressed within 0.2 seconds of the trigger counts as typing unless you let go of it first, so fast typing comes out as typed", systemImage: "keyboard"),
                 .init("Held for a second or more and released alone, the trigger types nothing", systemImage: "timer"),
                 .init("With ⇧, ⌃, ⌥, ⌘, or another app's Hyper Key held, the trigger keeps its usual job: Shift+Tab and ⌘Tab work as always", systemImage: "command"),
-                .init("Keys you haven't listed type as usual. A Caps Lock layer can instead make them act as Hyper (⌃⌥⇧⌘ + key), so shortcuts made for a Hyper Key keep working", systemImage: "rectangle.3.group"),
+                .init("Keys you haven't listed type as usual. Turn on Hyper and they send ⌃⌥⇧⌘ + key instead, so the trigger works as a Hyper Key, even with no keys listed", systemImage: "rectangle.3.group"),
                 .init("Caps Lock works only while no other app remaps it, such as Raycast's Hyper Key or Karabiner-Elements. A tap still toggles Caps Lock", systemImage: "capslock"),
                 .init("Secure Input, used by password fields and Terminal's Secure Keyboard Entry, hides keys from TilePilot; keys type normally until it ends", systemImage: "lock"),
                 .init("Layers need Accessibility access, and pause while you record a shortcut", systemImage: "hand.raised"),
