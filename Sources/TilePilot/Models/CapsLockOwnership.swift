@@ -28,33 +28,26 @@ enum CapsLockOwnership {
     static let capsLockUsage: UInt64 = 0x7_0000_0039
     /// F18 (usage 0x6D), which macOS reports as key code 79.
     static let tilePilotTargetUsage: UInt64 = 0x7_0000_006D
-    /// Raycast stores the Hyper Key as a macOS key code; 57 is Caps Lock.
-    static let raycastCapsLockKeyCode = 57
+    /// F20 (usage 0x6F): Raycast's Hyper Key maps Caps Lock here while it's on.
+    static let raycastTargetUsage: UInt64 = 0x7_0000_006F
 
-    /// Decides who owns Caps Lock. A Caps Lock → F18 entry counts as TilePilot's only while
-    /// TilePilot remembers adding it.
+    /// Decides who owns Caps Lock from the live keyboard mappings. A Caps Lock → F18 entry
+    /// counts as TilePilot's only while TilePilot remembers adding it.
     static func owner(
         keyboardMappings: [[[String: Any]]],
         tilePilotApplied: Bool,
-        raycastHyperKeyState: Any?,
+        raycastRunning: Bool,
         karabinerRunning: Bool
     ) -> CapsLockOwner? {
-        if raycastHyperKeyUsesCapsLock(raycastHyperKeyState) { return .raycastHyperKey }
         if karabinerRunning { return .karabiner }
         for entries in keyboardMappings {
             for entry in entries where usage(entry[sourceKey]) == capsLockUsage {
-                if tilePilotApplied, usage(entry[destinationKey]) == tilePilotTargetUsage { continue }
-                return .otherRemap
+                let destination = usage(entry[destinationKey])
+                if tilePilotApplied, destination == tilePilotTargetUsage { continue }
+                return raycastRunning && destination == raycastTargetUsage ? .raycastHyperKey : .otherRemap
             }
         }
         return nil
-    }
-
-    static func raycastHyperKeyUsesCapsLock(_ state: Any?) -> Bool {
-        guard let state = state as? [String: Any] else { return false }
-        let enabled = (state["enabled"] as? NSNumber)?.boolValue ?? false
-        let keyCode = (state["keyCode"] as? NSNumber)?.intValue
-        return enabled && keyCode == raycastCapsLockKeyCode
     }
 
     /// Karabiner's remapping engine: karabiner_grabber in older versions, Karabiner-Core-Service

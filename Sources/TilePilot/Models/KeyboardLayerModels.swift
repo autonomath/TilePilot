@@ -16,49 +16,30 @@ struct KeyboardLayerModifiers: OptionSet, Codable, Hashable, Sendable {
     static let command = KeyboardLayerModifiers(rawValue: 1 << 3)
     static let hyper: KeyboardLayerModifiers = [.control, .option, .shift, .command]
 
+    /// Each modifier with its event flag, symbol, and name, in macOS order: ⌃⌥⇧⌘.
+    private static let table: [(modifier: KeyboardLayerModifiers, flag: CGEventFlags, symbol: String, word: String)] = [
+        (.control, .maskControl, "⌃", "Control"),
+        (.option, .maskAlternate, "⌥", "Option"),
+        (.shift, .maskShift, "⇧", "Shift"),
+        (.command, .maskCommand, "⌘", "Command"),
+    ]
+
     init(_ flags: CGEventFlags) {
-        var modifiers: KeyboardLayerModifiers = []
-        if flags.contains(.maskControl) { modifiers.insert(.control) }
-        if flags.contains(.maskAlternate) { modifiers.insert(.option) }
-        if flags.contains(.maskShift) { modifiers.insert(.shift) }
-        if flags.contains(.maskCommand) { modifiers.insert(.command) }
-        self = modifiers
+        self.init(Self.table.filter { flags.contains($0.flag) }.map(\.modifier))
     }
 
+    /// NSEvent uses the same bits as CGEventFlags for these four modifiers.
     init(_ flags: NSEvent.ModifierFlags) {
-        var modifiers: KeyboardLayerModifiers = []
-        if flags.contains(.control) { modifiers.insert(.control) }
-        if flags.contains(.option) { modifiers.insert(.option) }
-        if flags.contains(.shift) { modifiers.insert(.shift) }
-        if flags.contains(.command) { modifiers.insert(.command) }
-        self = modifiers
+        self.init(CGEventFlags(rawValue: UInt64(flags.rawValue)))
     }
 
-    var cgEventFlags: CGEventFlags {
-        var flags: CGEventFlags = []
-        if contains(.control) { flags.insert(.maskControl) }
-        if contains(.option) { flags.insert(.maskAlternate) }
-        if contains(.shift) { flags.insert(.maskShift) }
-        if contains(.command) { flags.insert(.maskCommand) }
-        return flags
+    private var entries: [(modifier: KeyboardLayerModifiers, flag: CGEventFlags, symbol: String, word: String)] {
+        Self.table.filter { contains($0.modifier) }
     }
 
-    /// macOS order: ⌃⌥⇧⌘.
-    var symbols: String {
-        (contains(.control) ? "⌃" : "")
-            + (contains(.option) ? "⌥" : "")
-            + (contains(.shift) ? "⇧" : "")
-            + (contains(.command) ? "⌘" : "")
-    }
-
-    var words: [String] {
-        var words: [String] = []
-        if contains(.control) { words.append("Control") }
-        if contains(.option) { words.append("Option") }
-        if contains(.shift) { words.append("Shift") }
-        if contains(.command) { words.append("Command") }
-        return words
-    }
+    var cgEventFlags: CGEventFlags { CGEventFlags(entries.map(\.flag)) }
+    var symbols: String { entries.map(\.symbol).joined() }
+    var words: [String] { entries.map(\.word) }
 }
 
 /// A physical key plus the exact modifiers held with it.
@@ -72,18 +53,6 @@ struct KeyboardLayerKey: Codable, Hashable, Sendable {
     var keyCode: UInt16
     var modifiers: KeyboardLayerModifiers
     var keyLabel: String
-
-    init(keyCode: UInt16, modifiers: KeyboardLayerModifiers, keyLabel: String) {
-        self.keyCode = keyCode
-        self.modifiers = modifiers
-        self.keyLabel = keyLabel
-    }
-
-    /// Returns nil for modifier keys, which can't be a layer key or a shortcut on their own.
-    init?(keyCode: UInt16, modifiers: KeyboardLayerModifiers, characters: String?) {
-        guard keyCode < 128, !Self.modifierKeyCodes.contains(keyCode) else { return nil }
-        self.init(keyCode: keyCode, modifiers: modifiers, keyLabel: Self.label(keyCode: keyCode, characters: characters))
-    }
 
     var chord: KeyboardLayerChord { KeyboardLayerChord(keyCode: keyCode, modifiers: modifiers) }
     var symbols: String { modifiers.symbols + keyLabel }
@@ -112,17 +81,21 @@ struct KeyboardLayerKey: Codable, Hashable, Sendable {
     ]
 }
 
+extension KeyboardLayerKey {
+    /// Returns nil for modifier keys, which can't be a layer key or a shortcut on their own.
+    init?(keyCode: UInt16, modifiers: KeyboardLayerModifiers, characters: String?) {
+        guard keyCode < 128, !Self.modifierKeyCodes.contains(keyCode) else { return nil }
+        self.init(keyCode: keyCode, modifiers: modifiers, keyLabel: Self.label(keyCode: keyCode, characters: characters))
+    }
+}
+
 struct KeyboardLayerApp: Codable, Hashable, Sendable {
     var bundleID: String?
     var name: String
     var path: String
+}
 
-    init(bundleID: String?, name: String, path: String) {
-        self.bundleID = bundleID
-        self.name = name
-        self.path = path
-    }
-
+extension KeyboardLayerApp {
     init(url: URL) {
         var name = FileManager.default.displayName(atPath: url.path)
         if name.hasSuffix(".app") { name = String(name.dropLast(4)) }

@@ -1,6 +1,13 @@
 import AppKit
 import SwiftUI
 
+private func warningLabel(_ text: String) -> some View {
+    Label(text, systemImage: "exclamationmark.triangle.fill")
+        .font(.caption)
+        .foregroundStyle(.orange)
+        .fixedSize(horizontal: false, vertical: true)
+}
+
 /// Hold a trigger key and press another key to run an action. Each trigger has its own keys.
 struct KeyboardLayersCard: View {
     @EnvironmentObject private var model: AppModel
@@ -80,10 +87,7 @@ struct KeyboardLayersCard: View {
     private var statusMessages: some View {
         if let status = model.keyboardLayerStatusMessage {
             HStack(spacing: 8) {
-                Label(status.text, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                warningLabel(status.text)
                 if status.offersAccessibilitySettings {
                     Button("Open Accessibility Settings") {
                         model.openAccessibilitySettings()
@@ -158,10 +162,7 @@ private struct KeyboardLayerEditor: View {
             }
 
             ForEach(model.keyboardLayerIssues(layer), id: \.self) { issue in
-                Label(issue, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                warningLabel(issue)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -273,10 +274,7 @@ private struct KeyboardLayerBindingRow: View {
             }
 
             if let issue = model.keyboardLayerBindingIssue(binding, in: layer, featureTitles: featureTitles) {
-                Label(issue, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                warningLabel(issue)
                     .padding(.leading, 38)
             }
         }

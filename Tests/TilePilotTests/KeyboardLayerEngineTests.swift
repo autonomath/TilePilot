@@ -10,6 +10,7 @@ final class KeyboardLayerEngineTests: XCTestCase {
     private let h: UInt16 = 4
     private let k: UInt16 = 40
     private let x: UInt16 = 7
+    private let one: UInt16 = 18
 
     private let chrome = KeyboardLayerAction.openApp(
         KeyboardLayerApp(bundleID: "com.google.Chrome", name: "Google Chrome", path: "/Applications/Google Chrome.app")
@@ -124,70 +125,34 @@ final class KeyboardLayerEngineTests: XCTestCase {
         XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 1.0), .pass)
     }
 
-    func testQuickKeyReleasedBeforeTheTriggerIsALayerPress() {
-        var engine = makeEngine(tabLayer([chord(c): chrome]))
+    // MARK: Fast presses
 
-        _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05), .consume)
-        XCTAssertEqual(engine.keyUp(c, at: 0.1), output(consuming: true, [.run(chrome)]))
-        XCTAssertEqual(engine.keyUp(tab, at: 0.15), .consume)
-    }
+    func testListedKeyRightAfterTheTriggerActsEvenWhenTheTriggerIsReleasedFirst() {
+        var engine = makeEngine(layer(trigger: grave, [chord(one): codex]))
 
-    func testQuickKeyThatAutoRepeatsIsALayerPress() {
-        var engine = makeEngine(tabLayer([chord(c): chrome]))
-
-        _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        _ = engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05)
-        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: true, at: 0.5), output(consuming: true, [.run(chrome)]))
-        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: true, at: 0.55), .consume)
-        XCTAssertEqual(engine.keyUp(c, at: 0.6), .consume)
-        XCTAssertEqual(engine.keyUp(tab, at: 0.7), .consume)
-    }
-
-    // MARK: Fast typing
-
-    func testRolloverTypesTheTriggerThenTheKey() {
-        var engine = makeEngine(tabLayer([chord(c): chrome]))
-
-        _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05), .consume)
-        XCTAssertEqual(engine.keyUp(tab, at: 0.09), output(consuming: true, [replay(tab), replay(c)]))
-        XCTAssertEqual(engine.keyUp(c, at: 0.12), .consume)
+        _ = engine.keyDown(grave, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(engine.keyDown(one, modifiers: [], isRepeat: false, at: 0.03), output(consuming: true, [.run(codex)]))
+        XCTAssertEqual(engine.keyUp(grave, at: 0.06), .consume)
+        XCTAssertEqual(engine.keyUp(one, at: 0.08), .consume)
         XCTAssertFalse(engine.isTrackingKeys)
     }
 
-    func testSecondQuickBoundKeyWaitsWithTheFirst() {
-        var typing = makeEngine(tabLayer([chord(c): chrome, chord(h): megamap]))
-        _ = typing.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        _ = typing.keyDown(c, modifiers: [], isRepeat: false, at: 0.05)
-        XCTAssertEqual(typing.keyDown(h, modifiers: [], isRepeat: false, at: 0.1), .consume)
-        XCTAssertEqual(typing.keyUp(tab, at: 0.12), output(consuming: true, [replay(tab), replay(c), replay(h)]))
-
-        var chorded = makeEngine(tabLayer([chord(c): chrome, chord(h): megamap]))
-        _ = chorded.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        _ = chorded.keyDown(c, modifiers: [], isRepeat: false, at: 0.05)
-        _ = chorded.keyDown(h, modifiers: [], isRepeat: false, at: 0.1)
-        XCTAssertEqual(chorded.keyUp(c, at: 0.15), output(consuming: true, [.run(chrome), .run(megamap)]))
-        XCTAssertEqual(chorded.keyUp(h, at: 0.16), .consume)
-    }
-
-    func testBoundKeyAfterTheHoldThresholdSettlesEarlierQuickKeysAsActions() {
+    func testTwoQuickListedKeysEachAct() {
         var engine = makeEngine(tabLayer([chord(c): chrome, chord(h): megamap]))
 
         _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        _ = engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05)
-        XCTAssertEqual(engine.keyDown(h, modifiers: [], isRepeat: false, at: 0.25), output(consuming: true, [.run(chrome), .run(megamap)]))
+        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05), output(consuming: true, [.run(chrome)]))
+        XCTAssertEqual(engine.keyDown(h, modifiers: [], isRepeat: false, at: 0.1), output(consuming: true, [.run(megamap)]))
+        XCTAssertEqual(engine.keyUp(tab, at: 0.12), .consume)
     }
 
-    func testUnassignedKeyAfterAQuickBoundKeyMeansTyping() {
+    func testQuickUnlistedKeyTypesTheTriggerThenItself() {
         var engine = makeEngine(tabLayer([chord(c): chrome]))
 
         _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        _ = engine.keyDown(c, modifiers: [], isRepeat: false, at: 0.05)
-        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: false, at: 0.08), output(consuming: false, [replay(tab), replay(c)]))
-        XCTAssertEqual(engine.keyUp(tab, at: 0.1), .consume)
-        XCTAssertEqual(engine.keyUp(c, at: 0.11), .consume)
-        XCTAssertEqual(engine.keyUp(x, at: 0.12), .pass)
+        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: false, at: 0.03), output(consuming: false, [replay(tab)]))
+        XCTAssertEqual(engine.keyUp(tab, at: 0.05), .consume)
+        XCTAssertEqual(engine.keyUp(x, at: 0.07), .pass)
         XCTAssertFalse(engine.isTrackingKeys)
     }
 
@@ -269,16 +234,13 @@ final class KeyboardLayerEngineTests: XCTestCase {
         XCTAssertEqual(engine.keyUp(capsLockTrigger, at: 1.0), .consume)
     }
 
-    func testHyperLayerStillTypesFastOverlapsAndSendsQuickChords() {
-        var typing = makeEngine(layer(trigger: tab, sendsHyper: true, [:]))
-        _ = typing.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        XCTAssertEqual(typing.keyDown(x, modifiers: [], isRepeat: false, at: 0.05), .consume)
-        XCTAssertEqual(typing.keyUp(tab, at: 0.08), output(consuming: true, [replay(tab), replay(x)]))
+    func testHyperLayerSendsHyperForAQuickKeyToo() {
+        var engine = makeEngine(layer(trigger: tab, sendsHyper: true, [:]))
 
-        var chorded = makeEngine(layer(trigger: tab, sendsHyper: true, [:]))
-        _ = chorded.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
-        _ = chorded.keyDown(x, modifiers: [], isRepeat: false, at: 0.05)
-        XCTAssertEqual(chorded.keyUp(x, at: 0.1), output(consuming: true, [.send(KeyboardLayerChord(keyCode: x, modifiers: .hyper))]))
+        _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: false, at: 0.03), output(consuming: true, [.send(KeyboardLayerChord(keyCode: x, modifiers: .hyper))]))
+        XCTAssertEqual(engine.keyUp(tab, at: 0.05), .consume)
+        XCTAssertEqual(engine.keyUp(x, at: 0.07), .consume)
     }
 
     func testCapsLockRolloverTogglesCapsLockBeforeTheKey() {

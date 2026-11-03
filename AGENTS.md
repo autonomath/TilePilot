@@ -60,7 +60,7 @@ graphify update .
 - **System Bar:** optional per-Work-Area mirror of the menu bar (`WorkAreaConfiguration.systemBarEnabled`): a non-activating `NSPanel` above (or inside) the area showing the frontmost app's menu titles and the mirrored display's menu bar icons (other displays' icons are opt-in), read through `AccessibilityMirrorReader`. Menus pop locally; third-party icons get a real click at the real icon because many apps ignore `AXPress`, and their panels open where macOS puts them (Phase 2 would mirror them). Icons crop pixels from `MenuBarStripCapture` (ScreenCaptureKit, memory only) when Screen Recording is on, otherwise draw symbols/app icons; copies from an inactive display's bar are undimmed by `SystemBarIconBrightness`, and icon scans are driven by events and by `SystemBarLayoutSignature` instead of a fast poll. `resolvedWorkArea(for:)` returns the window area under the bar.
 - **Limited window:** visible window that cannot be managed reliably through normal yabai state; AX fallback may still support selected operations.
 - **MegaMap:** per-display overview of multiple desktops. Captured screenshots are session-memory-only.
-- **Keyboard Layer:** holding a trigger (Tab, Caps Lock, backtick, backslash) turns that layer's own keys into actions; layers live as JSON in `TilePilot.keyboardLayers`. `KeyboardLayerEngine` (pure, unit-tested) decides tap, layer key, or typing; `KeyboardLayerEventTap` runs the active tap on its own thread, replays typed keys through the tap proxy to keep their order, and posts shortcuts at the HID level so skhd and Raycast see them. No tap and no remap exist until a layer is on with a finished key.
+- **Keyboard Layer:** holding a trigger (Tab, Caps Lock, backtick, backslash) turns that layer's own keys into actions the moment they go down (no hold delay); layers live as JSON in `TilePilot.keyboardLayers`. `KeyboardLayerEngine` (pure, unit-tested) decides tap, layer key, or typing; `KeyboardLayerEventTap` runs the active tap on its own thread, types a tapped trigger through the tap proxy so it lands ahead of the next key, and posts shortcuts at the HID level so skhd and Raycast see them. No tap and no remap exist until a layer is on with a finished key.
 - **Managed config:** only content between `TILEPILOT MANAGED` / `TILEPILOT YABAI CONFIG` markers belongs to TilePilot.
 
 ## Boundaries
@@ -74,9 +74,8 @@ graphify update .
 - Preserve unrelated dirty-worktree changes. Do not reset or restore files you did not own.
 
 ## Known issues
-- The selected Command Line Tools compile XCTest bundles but list/execute zero tests. Run XCTest with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test -Xswiftc -swift-version -Xswiftc 5 -Xswiftc -enable-bare-slash-regex` and check the executed count; Xcode's newer compiler turns the Templates drag/drop Sendable warning into an error in Swift 6 mode.
+- The selected Command Line Tools compile XCTest bundles but list/execute zero tests. Run XCTest with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` and check the executed count.
 - UNVERIFIED: no project SwiftFormat/SwiftLint configuration or CI workflow exists. Repo-wide `swift format lint` emits thousands of default-style warnings and is not a usable gate.
-- Builds currently emit a Swift 6 Sendable-capture warning in the Templates drag/drop provider.
 - Bundled skhd 0.3.9 builds with an existing deprecated FSEvents warning and an unused-function warning.
 - Development notes still mention a user-facing Auto-Tiled picker mode; the current picker exposes Floating Grid and Template only.
 - Native full screen is unsupported with an active Work Area: containment can pull a window out of full screen. The user chose title-bar double-click (zoom, then fit to the Work Area) instead; do not spend effort on full-screen support unless asked.

@@ -58,6 +58,11 @@ extension AppModel {
         keyboardLayers.contains { $0.isEnabled && $0.isUsable }
     }
 
+    /// Whether a Caps Lock layer is on with a finished key, so it needs the Caps Lock remap.
+    private var capsLockLayerWanted: Bool {
+        keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.isUsable }
+    }
+
     /// Whether the tap should be running, given who owns Caps Lock right now.
     var keyboardLayersExpectTap: Bool {
         let capsLockFree = keyboardLayerStatus.capsLockOwner == nil && !keyboardLayerStatus.capsLockRemapFailed
@@ -266,9 +271,8 @@ extension AppModel {
         var status = keyboardLayerStatus
         status.accessibilityTrusted = AXIsProcessTrusted()
         status.capsLockRemapFailed = false
-        let wantsCapsLock = keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.isUsable }
         var capsLockReady = false
-        if wantsCapsLock {
+        if capsLockLayerWanted {
             let owner = capsLockRemapper.currentOwner(tilePilotApplied: capsLockRemapApplied)
             status.capsLockOwner = owner
             // Without the tap, a remapped Caps Lock would do nothing at all.
@@ -298,8 +302,7 @@ extension AppModel {
     /// Runs with the 30-second health check: turns a paused tap back on, catches Accessibility
     /// being granted or removed, and notices another tool taking or releasing Caps Lock.
     func keyboardLayerHealthCheck() {
-        let capsLockLayerOn = keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock && $0.isUsable }
-        if capsLockLayerOn,
+        if capsLockLayerWanted,
            capsLockRemapper.currentOwner(tilePilotApplied: capsLockRemapApplied) != keyboardLayerStatus.capsLockOwner {
             applyKeyboardLayerRuntime()
             return
@@ -327,8 +330,7 @@ extension AppModel {
         let stillNeedsAccessibility = status.tapState == .needsAccessibility && !status.accessibilityTrusted
         let tapOutOfStep = keyboardLayersExpectTap && status.tapState != .running && !stillNeedsAccessibility
         let lostAccessibility = !status.accessibilityTrusted && status.tapState == .running
-        let capsLockChanged = previousOwner != status.capsLockOwner
-            && keyboardLayers.contains { $0.isEnabled && $0.trigger == .capsLock }
+        let capsLockChanged = previousOwner != status.capsLockOwner && capsLockLayerWanted
         if tapOutOfStep || lostAccessibility || capsLockChanged { applyKeyboardLayerRuntime() }
     }
 
@@ -385,45 +387,28 @@ extension AppModel {
     private func installKeyboardLayerObservers() {
         guard keyboardLayerObservers.isEmpty else { return }
         let workspace = NSWorkspace.shared.notificationCenter
+        let distributed = DistributedNotificationCenter.default()
         // Held keys can't be trusted across sleep, a lock, or a user switch: their releases may
         // never arrive. Waking and unlocking also restore a remap a keyboard may have dropped.
-        let resetOnly: [Notification.Name] = [
-            NSWorkspace.willSleepNotification,
-            NSWorkspace.screensDidSleepNotification,
-            NSWorkspace.sessionDidResignActiveNotification,
+        let events: [(center: NotificationCenter, name: Notification.Name, reapply: Bool)] = [
+            (workspace, NSWorkspace.willSleepNotification, false),
+            (workspace, NSWorkspace.screensDidSleepNotification, false),
+            (workspace, NSWorkspace.sessionDidResignActiveNotification, false),
+            (distributed, Notification.Name("com.apple.screenIsLocked"), false),
+            (workspace, NSWorkspace.didWakeNotification, true),
+            (workspace, NSWorkspace.screensDidWakeNotification, true),
+            (workspace, NSWorkspace.sessionDidBecomeActiveNotification, true),
+            (distributed, Notification.Name("com.apple.screenIsUnlocked"), true),
         ]
-        let resetAndReapply: [Notification.Name] = [
-            NSWorkspace.didWakeNotification,
-            NSWorkspace.screensDidWakeNotification,
-            NSWorkspace.sessionDidBecomeActiveNotification,
-        ]
-        for name in resetOnly {
-            let token = workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.keyboardLayerEventTap.reset() }
-            }
-            keyboardLayerObservers.append((workspace, token))
-        }
-        for name in resetAndReapply {
-            let token = workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+        for event in events {
+            let token = event.center.addObserver(forName: event.name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.keyboardLayerEventTap.reset()
-                    self?.applyKeyboardLayerRuntime()
+                    if event.reapply { self?.applyKeyboardLayerRuntime() }
                 }
             }
-            keyboardLayerObservers.append((workspace, token))
+            keyboardLayerObservers.append((event.center, token))
         }
-        let distributed = DistributedNotificationCenter.default()
-        let locked = distributed.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.keyboardLayerEventTap.reset() }
-        }
-        let unlocked = distributed.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.keyboardLayerEventTap.reset()
-                self?.applyKeyboardLayerRuntime()
-            }
-        }
-        keyboardLayerObservers.append((distributed, locked))
-        keyboardLayerObservers.append((distributed, unlocked))
     }
 
     private static func secureInputAppName() -> String? {

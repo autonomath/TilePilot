@@ -29,7 +29,8 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
     private var engine = KeyboardLayerEngine()
     private var suspended = false
     private var lastKeyEventTime: TimeInterval = 0
-    private var originalKeyDowns: [UInt16: CGEvent] = [:]
+    /// The held trigger's own press, so a tap types it exactly as pressed.
+    private var triggerKeyDown: CGEvent?
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var tapRunLoop: CFRunLoop?
@@ -60,7 +61,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
         lock.withLock {
             guard engine.layers != layers else { return }
             engine.configure(layers)
-            originalKeyDowns.removeAll()
+            triggerKeyDown = nil
         }
         if hasTap { return ensureRunning() }
         state = start()
@@ -89,7 +90,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
     func reset() {
         lock.withLock {
             engine.reset()
-            originalKeyDowns.removeAll()
+            triggerKeyDown = nil
         }
     }
 
@@ -99,7 +100,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             guard suspended != value else { return }
             suspended = value
             engine.reset()
-            originalKeyDowns.removeAll()
+            triggerKeyDown = nil
         }
     }
 
@@ -110,7 +111,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             runLoopSource = nil
             tapRunLoop = nil
             engine.configure([])
-            originalKeyDowns.removeAll()
+            triggerKeyDown = nil
             return parts
         }
         if let tap {
@@ -185,7 +186,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             // macOS paused the tap. Forget held keys so nothing stays stuck, then resume.
             lock.withLock {
                 engine.reset()
-                originalKeyDowns.removeAll()
+                triggerKeyDown = nil
                 if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             }
             return passThrough
@@ -216,20 +217,15 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
                 modifiers = .hyper
             }
             output = engine.keyDown(keyCode, modifiers: modifiers, isRepeat: isRepeat, at: now)
-            if output.consumesEvent, !isRepeat, let copy = event.copy() {
-                // Kept so a key that turns out to be typing is replayed exactly as pressed.
-                originalKeyDowns[keyCode] = copy
+            if output.consumesEvent, !isRepeat, engine.heldTriggerKeyCode == keyCode {
+                triggerKeyDown = event.copy()
             }
         } else {
             output = engine.keyUp(keyCode, at: now)
         }
         lastKeyEventTime = now
         perform(output.effects, proxy: proxy)
-        if !engine.isTrackingKeys {
-            originalKeyDowns.removeAll()
-        } else if type == .keyUp {
-            originalKeyDowns[keyCode] = nil
-        }
+        if engine.heldTriggerKeyCode == nil { triggerKeyDown = nil }
         return output.consumesEvent ? nil : passThrough
     }
 
@@ -253,7 +249,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
     }
 
     private func replayEvents(for chord: KeyboardLayerChord) -> [CGEvent] {
-        let original = originalKeyDowns[chord.keyCode]?.copy()
+        let original = triggerKeyDown?.copy()
         guard let down = original
             ?? CGEvent(keyboardEventSource: eventSource, virtualKey: chord.keyCode, keyDown: true) else {
             return []

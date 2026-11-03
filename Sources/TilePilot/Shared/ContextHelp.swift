@@ -130,7 +130,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
             return []
         case .keyboardLayers:
             return [
-                .init("A key pressed within 0.2 seconds of the trigger counts as typing unless you let go of it first, so fast typing comes out as typed", systemImage: "keyboard"),
+                .init("A key you've listed acts as soon as you press it while holding the trigger, however fast", systemImage: "keyboard"),
                 .init("Held for a second or more and released alone, the trigger types nothing", systemImage: "timer"),
                 .init("With ⇧, ⌃, ⌥, ⌘, or another app's Hyper Key held, the trigger keeps its usual job: Shift+Tab and ⌘Tab work as always", systemImage: "command"),
                 .init("Keys you haven't listed type as usual. Turn on Hyper and they send ⌃⌥⇧⌘ + key instead, so the trigger works as a Hyper Key, even with no keys listed", systemImage: "rectangle.3.group"),

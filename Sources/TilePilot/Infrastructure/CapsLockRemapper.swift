@@ -15,13 +15,13 @@ final class CapsLockRemapper {
 
     func currentOwner(tilePilotApplied: Bool) -> CapsLockOwner? {
         let mappings = withKeyboardServices { services in services.map(Self.entries(of:)) }
-        let raycastDomain = "com.raycast.macos" as CFString
-        CFPreferencesAppSynchronize(raycastDomain)
+        let processes = Self.processNames()
         return CapsLockOwnership.owner(
             keyboardMappings: mappings,
             tilePilotApplied: tilePilotApplied,
-            raycastHyperKeyState: CFPreferencesCopyAppValue("raycast_hyperKey_state" as CFString, raycastDomain),
-            karabinerRunning: Self.processNames().contains(where: CapsLockOwnership.isKarabinerEngine(processName:))
+            // Raycast's saved Hyper Key preference goes stale; its live Caps Lock mapping doesn't.
+            raycastRunning: processes.contains("Raycast"),
+            karabinerRunning: processes.contains(where: CapsLockOwnership.isKarabinerEngine(processName:))
         )
     }
 

@@ -1,4 +1,5 @@
 #if canImport(XCTest)
+import AppKit
 import CoreGraphics
 import XCTest
 @testable import TilePilot
@@ -112,6 +113,7 @@ final class KeyboardLayerModelsTests: XCTestCase {
         let flags: CGEventFlags = [.maskAlphaShift, .maskSecondaryFn, .maskNumericPad, .maskShift, .maskCommand]
 
         XCTAssertEqual(KeyboardLayerModifiers(flags), [.shift, .command])
+        XCTAssertEqual(KeyboardLayerModifiers(NSEvent.ModifierFlags([.capsLock, .function, .control, .option])), [.control, .option])
         XCTAssertEqual(KeyboardLayerModifiers.hyper.cgEventFlags, [.maskControl, .maskAlternate, .maskShift, .maskCommand])
         XCTAssertEqual(KeyboardLayerModifiers.hyper.symbols, "⌃⌥⇧⌘")
     }

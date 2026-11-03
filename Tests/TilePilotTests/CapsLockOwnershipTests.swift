@@ -9,10 +9,10 @@ final class CapsLockOwnershipTests: XCTestCase {
     private let rightOption: UInt64 = 0x7_0000_00E6
     private let leftControl: UInt64 = 0x7_0000_00E0
 
-    func testRaycastHyperKeyOnCapsLockOwnsIt() {
-        XCTAssertEqual(owner(raycast: ["enabled": 1, "keyCode": 57, "capsLockAction": "toggleCapsLock"]), .raycastHyperKey)
-        XCTAssertNil(owner(raycast: ["enabled": 0, "keyCode": 57]))
-        XCTAssertNil(owner(raycast: ["enabled": 1, "keyCode": 61]))
+    func testRaycastHyperKeyIsItsLiveCapsLockMapping() {
+        XCTAssertEqual(owner(mappings: [[entry(capsLock, f20)]], raycastRunning: true), .raycastHyperKey)
+        // Turning the Hyper Key off empties the mapping, whatever Raycast's saved preference says.
+        XCTAssertNil(owner(mappings: [[]], raycastRunning: true))
     }
 
     func testKarabinerEngineOwnsIt() {
@@ -25,6 +25,7 @@ final class CapsLockOwnershipTests: XCTestCase {
 
     func testAnyOtherCapsLockRemapOwnsIt() {
         XCTAssertEqual(owner(mappings: [[entry(capsLock, f20)]]), .otherRemap)
+        XCTAssertEqual(owner(mappings: [[entry(capsLock, leftControl)]], raycastRunning: true), .otherRemap)
         XCTAssertNil(owner(mappings: [[entry(rightOption, leftControl)], []]))
     }
 
@@ -54,13 +55,13 @@ final class CapsLockOwnershipTests: XCTestCase {
     private func owner(
         mappings: [[[String: Any]]] = [],
         applied: Bool = false,
-        raycast: [String: Any]? = nil,
+        raycastRunning: Bool = false,
         karabinerRunning: Bool = false
     ) -> CapsLockOwner? {
         CapsLockOwnership.owner(
             keyboardMappings: mappings,
             tilePilotApplied: applied,
-            raycastHyperKeyState: raycast,
+            raycastRunning: raycastRunning,
             karabinerRunning: karabinerRunning
         )
     }

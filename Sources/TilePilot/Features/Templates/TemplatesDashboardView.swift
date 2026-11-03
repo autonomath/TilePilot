@@ -1404,7 +1404,7 @@ private enum TemplateAppDragDrop {
         NSItemProvider(object: appName as NSString)
     }
 
-    static func loadAppName(from providers: [NSItemProvider], perform: @escaping (String) -> Void) -> Bool {
+    static func loadAppName(from providers: [NSItemProvider], perform: @escaping @MainActor (String) -> Void) -> Bool {
         guard let provider = providers.first(where: { itemProvider in
             dropTypeIdentifiers.contains { itemProvider.hasItemConformingToTypeIdentifier($0) }
         }) else {
