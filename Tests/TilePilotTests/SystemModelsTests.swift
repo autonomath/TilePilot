@@ -39,6 +39,24 @@ final class SystemModelsTests: XCTestCase {
         XCTAssertEqual(items[1].actualValue, "On")
     }
 
+    func testUnsetMissionControlDefaultReadsAsMacOSDefault() {
+        func result(exit: Int32?, _ error: CommandErrorType, stdout: String = "") -> CommandResult {
+            CommandResult(command: "/usr/bin/defaults read com.apple.dock mru-spaces", startedAt: .now, endedAt: .now,
+                          exitStatus: exit, stdout: stdout, stderr: "Error: Could not find key", errorType: error)
+        }
+
+        let unset = DoctorService.usingMacOSDefaultIfUnset(result(exit: 1, .nonZeroExit), defaultValue: "1")
+        XCTAssertTrue(unset.isSuccess)
+        XCTAssertEqual(unset.stdout, "1")
+        XCTAssertEqual(unset.stderr, "")
+
+        let set = DoctorService.usingMacOSDefaultIfUnset(result(exit: 0, .none, stdout: "0"), defaultValue: "1")
+        XCTAssertEqual(set.stdout, "0")
+
+        let timedOut = DoctorService.usingMacOSDefaultIfUnset(result(exit: 15, .timeout), defaultValue: "1")
+        XCTAssertFalse(timedOut.isSuccess)
+    }
+
     func testSetupGuideStepDoesNotRepeatPrimaryActionAsSecondary() {
         let step = SetupGuideStep(
             kind: .startHelperServices,

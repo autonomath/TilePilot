@@ -187,8 +187,9 @@ final class DoctorService: @unchecked Sendable {
         let skhdVersionResult = await skhdVersionTask
         let yabaiDaemonResult = await yabaiDaemonTask
         let skhdDaemonResult = await skhdDaemonTask
-        let mruSpacesResult = await mruSpacesTask
-        let spansDisplaysResult = await spansDisplaysTask
+        // macOS defaults: Spaces rearrange automatically; displays have separate Spaces.
+        let mruSpacesResult = Self.usingMacOSDefaultIfUnset(await mruSpacesTask, defaultValue: "1")
+        let spansDisplaysResult = Self.usingMacOSDefaultIfUnset(await spansDisplaysTask, defaultValue: "0")
         let yabaiQueryResult = await yabaiQueryTask
         let commandResultsForLogs = [
             buildResult,
@@ -496,6 +497,21 @@ final class DoctorService: @unchecked Sendable {
     private func cleanedLine(from string: String) -> String? {
         let value = string.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value
+    }
+
+    /// `defaults read` exits 1 when a key (or its domain) was never written, which is normal
+    /// until the user changes the setting; macOS then uses its default value.
+    static func usingMacOSDefaultIfUnset(_ result: CommandResult, defaultValue: String) -> CommandResult {
+        guard result.errorType == .nonZeroExit, result.exitStatus == 1 else { return result }
+        return CommandResult(
+            command: result.command,
+            startedAt: result.startedAt,
+            endedAt: result.endedAt,
+            exitStatus: 0,
+            stdout: defaultValue,
+            stderr: "",
+            errorType: .none
+        )
     }
 
     private func currentArchitecture() -> String {
