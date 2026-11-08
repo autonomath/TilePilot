@@ -59,6 +59,7 @@ extension AppModel {
         ], defaultStatus: .notice)
 
         let startAtLogonStatus = mappedGuideStatus(from: startAtLogonSetup?.state) ?? .notice
+        let screenRecordingOn = megamapScreenRecordingAuthorized
 
         let missionControlStatus: SystemCheckStatus
         if missionControlChecks.contains(where: { $0.status == .warning }) {
@@ -164,6 +165,23 @@ extension AppModel {
                 secondaryActions: [.openLoginItemsSettings, .recheck]
             ),
             SetupGuideStep(
+                kind: .screenRecording,
+                category: .featureOptional,
+                title: "Screen Recording for MegaMap",
+                summary: screenRecordingOn
+                    ? "Screen Recording is on. MegaMap shows real screenshots of your desktops."
+                    : "Turn this on only if you want MegaMap to show real screenshots of your desktops. Without it, MegaMap draws each desktop as a wireframe with app icons.",
+                whyItMatters: "MegaMap is the full-screen map of every desktop (Open MegaMap in the menu bar). Screen Recording lets it show what each desktop really looks like, and lets the System Bar show the real menu bar icons. Screenshots stay in memory and are never saved to disk.",
+                whatToDo: "Click Enable Screen Recording. If macOS asks, choose Open System Settings, then turn on TilePilot under Screen Recording. If macOS offers Quit & Reopen, accept it.",
+                detail: screenRecordingOn ? nil : "Not using MegaMap? Skip this. You can turn it on later from MegaMap or the System tab.",
+                verificationText: "TilePilot rechecks when you come back from System Settings.",
+                status: screenRecordingOn ? .good : .notice,
+                isBlocking: false,
+                isSkippable: true,
+                primaryAction: screenRecordingOn ? nil : .requestScreenRecordingAccess,
+                secondaryActions: screenRecordingOn ? [] : [.openScreenRecordingSettings, .recheck]
+            ),
+            SetupGuideStep(
                 kind: .missionControl,
                 category: .featureOptional,
                 title: "Review Mission Control Settings",
@@ -195,6 +213,12 @@ extension AppModel {
 
     var hasIncompleteEssentialSetupGuideSteps: Bool {
         !incompleteEssentialSetupGuideSteps.isEmpty
+    }
+
+    /// Continue also walks through later optional steps, so the guide reaches Screen Recording before offering Done.
+    func setupGuideCanContinue(from kind: SetupGuideStepKind) -> Bool {
+        !incompleteSetupGuideSteps.isEmpty
+            || setupGuideSteps.drop(while: { $0.kind != kind }).dropFirst().contains { !$0.isSatisfied }
     }
 
     var currentSetupGuideStep: SetupGuideStep? {

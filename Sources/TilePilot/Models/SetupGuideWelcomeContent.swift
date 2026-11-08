@@ -77,12 +77,12 @@ enum SetupGuideWelcomeContent {
             subtitle: "A live overview of your desktops. Click a window to jump to it, even when it is buried behind everything else.",
             highlights: [
                 .init(id: "minimap", symbolName: "map", title: "Mini-map", detail: "The Overview tab shows each desktop as a wireframe with app icons."),
-                .init(id: "megamap", symbolName: "photo", title: "MegaMap", detail: "A full-screen map with real screenshots of every desktop."),
+                .init(id: "megamap", symbolName: "photo", title: "MegaMap", detail: "A full-screen map of every desktop, with real screenshots when Screen Recording is on."),
                 .init(id: "find", symbolName: "eye", title: "Find hidden windows", detail: "Spot a window under a pile and bring it to the front with one click."),
                 .init(id: "on-demand", symbolName: "camera", title: "Captures on demand", detail: "Screenshots happen only when you refresh MegaMap or switch desktops with TilePilot."),
             ],
             permission: .optional(name: "Screen Recording for MegaMap screenshots"),
-            permissionExplanation: "Only needed if you want real screenshot thumbnails in MegaMap. Skip it and MegaMap shows wireframes instead. macOS asks the first time you use MegaMap capture, and screenshots never leave memory."
+            permissionExplanation: "Only needed if you want real screenshots in MegaMap; without it, MegaMap shows wireframes. The setup checklist offers it as an optional step, and macOS asks only when you click Enable Screen Recording. Screenshots stay in memory and are never saved."
         ),
         SetupGuideWelcomePage(
             id: "finish",
@@ -91,6 +91,7 @@ enum SetupGuideWelcomeContent {
             subtitle: "Next is a short checklist that starts window control and confirms this Mac is ready. The required part takes under a minute.",
             highlights: [
                 .init(id: "login", symbolName: "power", title: "Start at login", detail: "Recommended so tiling is ready right after you sign in."),
+                .init(id: "screen-recording", symbolName: "photo", title: "MegaMap screenshots", detail: "Optional Screen Recording so MegaMap shows real screenshots of your desktops."),
                 .init(id: "mission-control", symbolName: "rectangle.on.rectangle", title: "Mission Control review", detail: "Optional settings check that makes desktop switching more predictable."),
                 .init(id: "return", symbolName: "questionmark.circle", title: "Come back anytime", detail: "Reopen Guided Setup from the menu bar or the System tab whenever you like."),
             ],

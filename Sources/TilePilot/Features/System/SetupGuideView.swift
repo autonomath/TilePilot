@@ -412,8 +412,10 @@ struct SetupGuideView: View {
     }
 
     private func actionBar(for step: SetupGuideStep) -> some View {
-        HStack(spacing: 10) {
-            if let primaryAction = step.primaryAction, !step.isSatisfied {
+        let canContinue = model.setupGuideCanContinue(from: step.kind)
+        let showsStepAction = step.primaryAction != nil && !step.isSatisfied
+        return HStack(spacing: 10) {
+            if let primaryAction = step.primaryAction, showsStepAction {
                 Button(primaryButtonLabel(for: step, action: primaryAction)) {
                     if step.kind == .startHelperServices, primaryAction == .startYabai || primaryAction == .startSkhd {
                         model.startWindowControlBestEffort()
@@ -424,8 +426,8 @@ struct SetupGuideView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(primaryActionInFlight(for: step))
             } else {
-                Button(hasRemainingIncompleteSteps ? "Continue" : "Done") {
-                    if hasRemainingIncompleteSteps {
+                Button(canContinue ? "Continue" : "Done") {
+                    if canContinue {
                         model.continueSetupGuide()
                     } else {
                         model.dismissSetupGuide()
@@ -446,6 +448,12 @@ struct SetupGuideView: View {
 
             if hasRemainingIncompleteSteps, step.isSkippable || step.isBlocking {
                 Button("Skip for Now") {
+                    model.dismissSetupGuide()
+                }
+                .buttonStyle(.bordered)
+            } else if showsStepAction || canContinue {
+                // A sheet has no close button, so every step needs a way out.
+                Button("Done") {
                     model.dismissSetupGuide()
                 }
                 .buttonStyle(.bordered)
