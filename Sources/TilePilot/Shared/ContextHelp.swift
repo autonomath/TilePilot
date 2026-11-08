@@ -61,7 +61,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
         case .rightClickMenu:
             return "Pinned actions appear when you right-click the TilePilot icon in the menu bar, in the order shown here. Right-clicking a window badge shows them too."
         case .keyboardLayers:
-            return "Hold a trigger key, such as Tab, and press another key to run its action. Each trigger has its own keys, so Tab + C and Caps Lock + C can do different things. Tapping the trigger alone still types it. Layer keys are separate from the shortcuts in Actions & Shortcuts."
+            return "Hold a trigger, such as Tab or the right mouse button, and press another key to run its action. Each trigger has its own keys, so Tab + C and Caps Lock + C can do different things. On its own, the trigger still works as usual. Layer keys are separate from the shortcuts in Actions & Shortcuts."
         case .layoutOutcomes:
             return "Each layout action's name says how it ends. Some arrange windows and leave them floating; others end with the desktop tiled."
         case .templates:
@@ -131,7 +131,10 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
         case .keyboardLayers:
             return [
                 .init("A key you've listed acts as soon as you press it while holding the trigger, however fast", systemImage: "keyboard"),
-                .init("Held for a second or more and released alone, the trigger types nothing", systemImage: "timer"),
+                .init("Held for a second or more and released alone, the trigger does nothing", systemImage: "timer"),
+                .init("With Right Click as the trigger, a key acts on the window under the pointer. A click alone still opens the menu, and dragging with the right button works as usual", systemImage: "computermouse"),
+                .init("The first time you press a key with the right button held, a window opens to set up that key. Close it without an action, and the right button works as usual with that key from then on, as games need", systemImage: "slider.horizontal.3"),
+                .init("Type Text pastes the text, then puts your clipboard back a second later", systemImage: "text.cursor"),
                 .init("With ⇧, ⌃, ⌥, ⌘, or another app's Hyper Key held, the trigger keeps its usual job: Shift+Tab and ⌘Tab work as always", systemImage: "command"),
                 .init("Keys you haven't listed type as usual. Turn on Hyper and they send ⌃⌥⇧⌘ + key instead, so the trigger works as a Hyper Key, even with no keys listed", systemImage: "rectangle.3.group"),
                 .init("Caps Lock works only while no other app remaps it, such as Raycast's Hyper Key or Karabiner-Elements. A tap still toggles Caps Lock", systemImage: "capslock"),

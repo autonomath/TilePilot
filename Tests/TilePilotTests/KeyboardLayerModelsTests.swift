@@ -118,6 +118,56 @@ final class KeyboardLayerModelsTests: XCTestCase {
         XCTAssertEqual(KeyboardLayerModifiers.hyper.symbols, "⌃⌥⇧⌘")
     }
 
+    func testNewActionsRoundTripThroughJSON() throws {
+        let actions: [KeyboardLayerAction] = [
+            .builtIn(id: "window.snap.left-half", title: "Snap Left Half"),
+            .typeText("Hello\nWorld"),
+            .openURL("example.com"),
+            .openPath("~/Documents"),
+            .runAppleShortcut(name: "Take a Break"),
+            .runCommand(command: "yabai -m space --balance", title: "Balance"),
+            .runCommand(command: "echo hi", title: nil),
+        ]
+        let layer = KeyboardLayer(
+            isEnabled: true,
+            trigger: .rightClick,
+            bindings: actions.enumerated().map { binding(keyCode: UInt16($0.offset), label: "\($0.offset)", $0.element) }
+        )
+
+        XCTAssertEqual(try JSONDecoder().decode([KeyboardLayer].self, from: JSONEncoder().encode([layer])), [layer])
+    }
+
+    func testAnActionFromANewerVersionReadsAsNoActionAndTheLayersSurvive() throws {
+        let saved = #"[{"id":"6F1C2A10-0000-4000-8000-000000000001","isEnabled":true,"trigger":"tab","unboundKeys":"typeNormally","bindings":[{"id":"6F1C2A10-0000-4000-8000-000000000002","key":{"keyCode":8,"modifiers":0,"keyLabel":"C"},"action":{"teleport":{"to":"moon"}},"note":"Later"},{"id":"6F1C2A10-0000-4000-8000-000000000003","key":{"keyCode":4,"modifiers":0,"keyLabel":"H"},"action":{"typeText":{"_0":"Hi"}}}]}]"#
+
+        let bindings = try JSONDecoder().decode([KeyboardLayer].self, from: Data(saved.utf8)).first?.bindings
+
+        XCTAssertEqual(bindings?.count, 2)
+        XCTAssertNil(bindings?.first?.action)
+        XCTAssertEqual(bindings?.first?.note, "Later")
+        XCTAssertEqual(bindings?.last?.action, .typeText("Hi"))
+    }
+
+    func testAnEnabledRightClickLayerRunsWithNoKeysSoTheGestureCanAddOne() {
+        let rightClick = KeyboardLayer(isEnabled: true, trigger: .rightClick)
+
+        XCTAssertEqual(KeyboardLayerPlanner.activeLayers([rightClick], capsLockAvailable: true).map(\.id), [rightClick.id])
+        XCTAssertTrue(KeyboardLayerPlanner.activeLayers([KeyboardLayer(trigger: .rightClick)], capsLockAvailable: true).isEmpty)
+    }
+
+    func testKeysWithoutAnActionAreLeftAlone() {
+        let rightClick = KeyboardLayer(isEnabled: true, trigger: .rightClick, bindings: [
+            KeyboardLayerBinding(key: key(13, "W")),
+            binding(keyCode: 4, label: "H", chrome),
+            KeyboardLayerBinding(),
+        ])
+
+        let active = KeyboardLayerPlanner.activeLayers([rightClick], capsLockAvailable: true).first
+
+        XCTAssertEqual(active?.keysLeftAlone, [KeyboardLayerChord(keyCode: 13)])
+        XCTAssertEqual(active?.bindings, [KeyboardLayerChord(keyCode: 4): chrome])
+    }
+
     private func key(_ keyCode: UInt16, _ label: String) -> KeyboardLayerKey {
         KeyboardLayerKey(keyCode: keyCode, modifiers: [], keyLabel: label)
     }

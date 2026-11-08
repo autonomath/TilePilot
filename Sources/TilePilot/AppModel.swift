@@ -458,6 +458,9 @@ final class AppModel: ObservableObject {
     @Published var keyboardLayerRecordingTarget: KeyboardLayerRecordingTarget?
     @Published var keyboardLayerStatus = KeyboardLayerRuntimeStatus()
     @Published var keyboardLayerMessage: String?
+    /// The key the key window is editing; nil while it's closed.
+    @Published var keyboardLayerEditorTarget: KeyboardLayerEditorTarget?
+    @Published var keyboardLayerEditorDraft: KeyboardLayerEditorDraft?
 
     let doctorService = DoctorService()
     let bootstrapService = BootstrapService()
@@ -474,6 +477,11 @@ final class AppModel: ObservableObject {
     let capsLockRemapper = CapsLockRemapper()
     var keyboardLayerObservers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     var keyboardLayerReapplyTask: Task<Void, Never>?
+    var keyboardLayerActionTask: Task<Void, Never>?
+    lazy var keyboardLayerTextPaster = KeyboardLayerTextPaster { [weak self] in
+        // shortcut: kVK_ANSI_V assumes V sits on the U.S. key, use UCKeyTranslate if Dvorak support is needed
+        self?.keyboardLayerEventTap.send(KeyboardLayerChord(keyCode: 9, modifiers: .command))
+    }
     private let keepOnTopCoordinator = KeepOnTopCoordinator()
     let workAreaContainmentCoordinator = WorkAreaContainmentCoordinator()
     let systemBarController = SystemBarController()

@@ -14,17 +14,12 @@ struct KeyboardLayersCard: View {
     @State private var layerPendingRemoval: KeyboardLayer?
 
     var body: some View {
-        let featureMenu = model.keyboardLayerFeatureMenu
-        let featureTitles = Dictionary(
-            featureMenu.flatMap(\.features).map { ($0.id.rawValue, $0.title) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        let runningApps = model.keyboardLayerRunningApps
+        let featureTitles = model.keyboardLayerFeatureTitles
 
         VStack(alignment: .leading, spacing: 8) {
             header
 
-            Text("Hold a trigger key, such as Tab, then press a second key to run its action. Tapping the trigger alone still types it. These keys are separate from your shortcuts in Actions & Shortcuts.")
+            Text("Hold a trigger, such as Tab or the right mouse button, then press a second key to run its action. On its own, the trigger still works as usual. These keys are separate from your shortcuts in Actions & Shortcuts.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -34,9 +29,7 @@ struct KeyboardLayersCard: View {
             ForEach(model.keyboardLayers) { layer in
                 KeyboardLayerEditor(
                     layer: layer,
-                    featureMenu: featureMenu,
                     featureTitles: featureTitles,
-                    runningApps: runningApps,
                     onRemove: { layerPendingRemoval = layer }
                 )
             }
@@ -110,9 +103,7 @@ struct KeyboardLayersCard: View {
 private struct KeyboardLayerEditor: View {
     @EnvironmentObject private var model: AppModel
     let layer: KeyboardLayer
-    let featureMenu: [(group: UnifiedControlGroup, features: [AppModel.FeatureDefinition])]
     let featureTitles: [String: String]
-    let runningApps: [KeyboardLayerApp]
     let onRemove: () -> Void
 
     var body: some View {
@@ -170,15 +161,14 @@ private struct KeyboardLayerEditor: View {
                     KeyboardLayerBindingRow(
                         layer: layer,
                         binding: binding,
-                        featureMenu: featureMenu,
-                        featureTitles: featureTitles,
-                        runningApps: runningApps
+                        featureTitles: featureTitles
                     )
                 }
             }
 
             Button {
-                model.addKeyboardLayerBinding(layer.id)
+                let bindingID = model.addKeyboardLayerBinding(layer.id)
+                model.openKeyboardLayerEditor(layerID: layer.id, bindingID: bindingID, recordsKey: true)
             } label: {
                 Label("Add Key", systemImage: "plus")
             }
@@ -201,27 +191,16 @@ private struct KeyboardLayerBindingRow: View {
     @EnvironmentObject private var model: AppModel
     let layer: KeyboardLayer
     let binding: KeyboardLayerBinding
-    let featureMenu: [(group: UnifiedControlGroup, features: [AppModel.FeatureDefinition])]
     let featureTitles: [String: String]
-    let runningApps: [KeyboardLayerApp]
 
     private var keyTarget: KeyboardLayerRecordingTarget {
         .key(layerID: layer.id, bindingID: binding.id)
     }
 
-    private var outputTarget: KeyboardLayerRecordingTarget {
-        .output(layerID: layer.id, bindingID: binding.id)
-    }
-
-    private var outputKey: KeyboardLayerKey? {
-        if case .sendShortcut(let key)? = binding.action { return key }
-        return nil
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
-                Text("Hold \(layer.trigger.symbol) +")
+                Text("Hold \(layer.trigger == .rightClick ? Text(Image(systemName: "computermouse")) : Text(layer.trigger.symbol)) +")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
                     .frame(width: 56, alignment: .trailing)
@@ -241,18 +220,18 @@ private struct KeyboardLayerBindingRow: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
 
-                actionMenu
-
-                if outputKey != nil || model.keyboardLayerRecordingTarget == outputTarget {
-                    ShortcutRecorderField(
-                        symbols: outputKey?.symbols ?? "",
-                        spelledOut: outputKey?.spelledOut,
-                        isRecording: model.keyboardLayerRecordingTarget == outputTarget,
-                        onRecord: { model.beginKeyboardLayerRecording(outputTarget) },
-                        onCancelRecording: { model.stopShortcutRecording() },
-                        width: 120
-                    )
+                Button {
+                    model.openKeyboardLayerEditor(layerID: layer.id, bindingID: binding.id)
+                } label: {
+                    HStack(spacing: 5) {
+                        KeyboardLayerActionIcon(icon: model.keyboardLayerActionIcon(binding.action))
+                            .frame(width: 14, height: 14)
+                        Text(actionTitle)
+                            .lineLimit(1)
+                    }
                 }
+                .fixedSize()
+                .help("Choose what this key does")
 
                 TextField("Description", text: Binding(
                     get: { binding.note ?? "" },
@@ -280,46 +259,8 @@ private struct KeyboardLayerBindingRow: View {
         }
     }
 
-    private var actionMenu: some View {
-        Menu {
-            ForEach(featureMenu, id: \.group) { section in
-                Menu(section.group.title) {
-                    ForEach(section.features, id: \.id) { feature in
-                        Button(feature.title) {
-                            model.setKeyboardLayerAction(
-                                .feature(id: feature.id.rawValue, title: feature.title),
-                                layerID: layer.id,
-                                bindingID: binding.id
-                            )
-                        }
-                    }
-                }
-            }
-            Divider()
-            Menu("Open App") {
-                ForEach(runningApps, id: \.path) { app in
-                    Button(app.name) {
-                        model.setKeyboardLayerAction(.openApp(app), layerID: layer.id, bindingID: binding.id)
-                    }
-                }
-                if !runningApps.isEmpty { Divider() }
-                Button("Choose App…") {
-                    model.chooseKeyboardLayerApp(layerID: layer.id, bindingID: binding.id)
-                }
-            }
-            Button("Send Shortcut…") {
-                model.beginKeyboardLayerRecording(outputTarget)
-            }
-        } label: {
-            Text(actionTitle)
-                .lineLimit(1)
-        }
-        .fixedSize()
-        .help("What this key does")
-    }
-
     private var actionTitle: String {
-        if outputKey != nil || model.keyboardLayerRecordingTarget == outputTarget { return "Send Shortcut" }
+        if binding.action == nil, binding.key != nil, layer.trigger == .rightClick { return "Clicks as Usual" }
         let title = model.keyboardLayerActionTitle(binding.action, featureTitles: featureTitles)
         return title.count > 44 ? String(title.prefix(43)) + "…" : title
     }

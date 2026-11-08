@@ -11,6 +11,7 @@ final class KeyboardLayerEngineTests: XCTestCase {
     private let k: UInt16 = 40
     private let x: UInt16 = 7
     private let one: UInt16 = 18
+    private let rightButton = KeyboardLayerEngine.rightMouseButton
 
     private let chrome = KeyboardLayerAction.openApp(
         KeyboardLayerApp(bundleID: "com.google.Chrome", name: "Google Chrome", path: "/Applications/Google Chrome.app")
@@ -276,7 +277,125 @@ final class KeyboardLayerEngineTests: XCTestCase {
         XCTAssertEqual(engine.keyUp(grave, at: 0.4), .pass)
     }
 
+    // MARK: Right mouse button
+
+    func testRightClickAloneStillClicks() {
+        var engine = makeEngine(layer(trigger: rightButton, [chord(h): megamap]))
+
+        XCTAssertEqual(engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0), .consume)
+        XCTAssertEqual(engine.triggerDragged(distance: 3), .consume)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.15), output(consuming: true, [replay(rightButton)]))
+        XCTAssertFalse(engine.isTrackingKeys)
+    }
+
+    func testKeyWithTheRightButtonDownActsAndNoClickFollows() {
+        var engine = makeEngine(layer(trigger: rightButton, [chord(h): megamap]))
+
+        _ = engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(engine.keyDown(h, modifiers: [], isRepeat: false, at: 0.2), output(consuming: true, [.run(megamap)]))
+        // After an action, moving only points at the next window.
+        XCTAssertEqual(engine.triggerDragged(distance: 300), .consume)
+        XCTAssertEqual(engine.keyUp(h, at: 0.3), .consume)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.5), .consume)
+        XCTAssertFalse(engine.isTrackingKeys)
+    }
+
+    func testRightDragBeforeAnyActionPressesTheButtonForReal() {
+        var engine = makeEngine(layer(trigger: rightButton, [chord(h): megamap]))
+
+        _ = engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(engine.triggerDragged(distance: KeyboardLayerEngine.dragSlop), output(consuming: false, [.press(chord(rightButton))]))
+        XCTAssertEqual(engine.triggerDragged(distance: 40), .pass)
+        XCTAssertEqual(engine.keyDown(h, modifiers: [], isRepeat: false, at: 0.3), .pass)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.5), .pass)
+    }
+
+    func testKeyLeftAloneWithTheRightButtonDownPressesItForRealEvenAfterALongHold() {
+        var engine = makeEngine(layer(trigger: rightButton, leftAlone: [chord(x)], [chord(h): megamap]))
+
+        _ = engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(engine.keyDown(x, modifiers: [], isRepeat: false, at: 1.5), output(consuming: false, [.press(chord(rightButton))]))
+        XCTAssertEqual(engine.keyUp(x, at: 1.6), .pass)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 1.7), .pass)
+    }
+
+    func testModifiedRightClickAndARightClickDuringAKeyLayerPassThrough() {
+        var engine = makeEngine(tabLayer([chord(c): chrome]), layer(trigger: rightButton, [chord(h): megamap]))
+
+        // ⌥ + right-drag is yabai's resize.
+        XCTAssertEqual(engine.keyDown(rightButton, modifiers: .option, isRepeat: false, at: 0), .pass)
+        XCTAssertEqual(engine.triggerDragged(distance: 50), .pass)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.2), .pass)
+
+        _ = engine.keyDown(tab, modifiers: [], isRepeat: false, at: 1)
+        XCTAssertEqual(engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 1.1), .pass)
+        XCTAssertEqual(engine.triggerDragged(distance: 50), .pass)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 1.2), .pass)
+        XCTAssertEqual(engine.keyDown(c, modifiers: [], isRepeat: false, at: 1.3), output(consuming: true, [.run(chrome)]))
+    }
+
     // MARK: Recovery
+
+    // MARK: Setting up keys from the right button
+
+    func testFirstPressOfAnUnlistedKeyWithTheRightButtonOpensItsSettings() {
+        let rightClick = layer(trigger: rightButton, [chord(h): megamap])
+        var engine = makeEngine(rightClick)
+
+        XCTAssertEqual(engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0), .consume)
+        XCTAssertEqual(
+            engine.keyDown(k, modifiers: [], isRepeat: false, at: 0.2),
+            output(consuming: true, [.configure(layerID: rightClick.id, chord(k))])
+        )
+        XCTAssertEqual(engine.keyUp(k, at: 0.3), .consume)
+        // A listed key still runs in the same hold, and no click follows.
+        XCTAssertEqual(engine.keyDown(h, modifiers: [], isRepeat: false, at: 0.4), output(consuming: true, [.run(megamap)]))
+        XCTAssertEqual(engine.keyUp(h, at: 0.5), .consume)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.6), .consume)
+        XCTAssertFalse(engine.isTrackingKeys)
+    }
+
+    func testAddingTheKeyMidHoldKeepsSwallowingItsReleaseAndTheButtons() {
+        let rightClick = layer(trigger: rightButton, [:])
+        var engine = makeEngine(rightClick)
+
+        _ = engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0)
+        _ = engine.keyDown(k, modifiers: [], isRepeat: false, at: 0.2)
+        let updated = KeyboardLayerEngine.Layer(
+            id: rightClick.id, triggerKeyCode: rightButton, tapsCapsLock: false,
+            sendsHyperForUnboundKeys: false, bindings: [:], keysLeftAlone: [chord(k)]
+        )
+        engine.configure([updated])
+        XCTAssertEqual(engine.keyUp(k, at: 0.3), .consume)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.4), .consume)
+        XCTAssertFalse(engine.isTrackingKeys)
+    }
+
+    func testModifiersStayPartOfTheKeyBeingSetUp() {
+        let rightClick = layer(trigger: rightButton, [:])
+        var engine = makeEngine(rightClick)
+
+        _ = engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(
+            engine.keyDown(x, modifiers: .shift, isRepeat: false, at: 0.2),
+            output(consuming: true, [.configure(layerID: rightClick.id, chord(x, .shift))])
+        )
+    }
+
+    func testCommandRightClickPassesThroughUntouched() {
+        var engine = makeEngine(layer(trigger: rightButton, [chord(h): megamap]))
+
+        XCTAssertEqual(engine.keyDown(rightButton, modifiers: .command, isRepeat: false, at: 0), .pass)
+        XCTAssertEqual(engine.keyDown(13, modifiers: .command, isRepeat: false, at: 0.1), .pass)
+        XCTAssertEqual(engine.keyUp(rightButton, at: 0.2), .pass)
+    }
+
+    func testAHyperRightClickLayerSendsHyperInsteadOfAskingForSettings() {
+        var engine = makeEngine(layer(trigger: rightButton, sendsHyper: true, [:]))
+
+        _ = engine.keyDown(rightButton, modifiers: [], isRepeat: false, at: 0)
+        XCTAssertEqual(engine.keyDown(k, modifiers: [], isRepeat: false, at: 0.2), output(consuming: true, [.send(chord(k, .hyper))]))
+    }
 
     func testResetMidHoldLetsEveryKeyThrough() {
         var engine = makeEngine(tabLayer([chord(c): chrome]))
@@ -347,6 +466,7 @@ final class KeyboardLayerEngineTests: XCTestCase {
         trigger: UInt16,
         tapsCapsLock: Bool = false,
         sendsHyper: Bool = false,
+        leftAlone: Set<KeyboardLayerChord> = [],
         _ bindings: [KeyboardLayerChord: KeyboardLayerAction]
     ) -> KeyboardLayerEngine.Layer {
         KeyboardLayerEngine.Layer(
@@ -354,7 +474,8 @@ final class KeyboardLayerEngineTests: XCTestCase {
             triggerKeyCode: trigger,
             tapsCapsLock: tapsCapsLock,
             sendsHyperForUnboundKeys: sendsHyper,
-            bindings: bindings
+            bindings: bindings,
+            keysLeftAlone: leftAlone
         )
     }
 

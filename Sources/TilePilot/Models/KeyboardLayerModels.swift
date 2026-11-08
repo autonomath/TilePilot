@@ -109,6 +109,18 @@ enum KeyboardLayerAction: Codable, Hashable, Sendable {
     case feature(id: String, title: String)
     case openApp(KeyboardLayerApp)
     case sendShortcut(KeyboardLayerKey)
+    /// An entry in `KeyboardLayerActionCatalog`, such as Snap Left Half or Volume Up. The title is
+    /// kept for display if a later version drops the entry.
+    case builtIn(id: String, title: String)
+    /// A block of text, pasted into the front app.
+    case typeText(String)
+    case openURL(String)
+    /// A file or folder.
+    case openPath(String)
+    /// A shortcut from Apple's Shortcuts app, by name.
+    case runAppleShortcut(name: String)
+    /// A shell command, typed in or taken from skhdrc (which supplies the title).
+    case runCommand(command: String, title: String?)
 }
 
 struct KeyboardLayerBinding: Codable, Hashable, Identifiable, Sendable {
@@ -117,6 +129,24 @@ struct KeyboardLayerBinding: Codable, Hashable, Identifiable, Sendable {
     var action: KeyboardLayerAction?
     /// What the key is for, in the user's words. Optional so older saved layers still decode.
     var note: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, key, action, note
+    }
+}
+
+extension KeyboardLayerBinding {
+    /// An action this build doesn't know, saved by a newer one, reads as no action instead of
+    /// failing every saved layer.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID(),
+            key: try container.decodeIfPresent(KeyboardLayerKey.self, forKey: .key),
+            action: try? container.decodeIfPresent(KeyboardLayerAction.self, forKey: .action),
+            note: try container.decodeIfPresent(String.self, forKey: .note)
+        )
+    }
 }
 
 enum KeyboardLayerTrigger: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -124,6 +154,7 @@ enum KeyboardLayerTrigger: String, Codable, CaseIterable, Identifiable, Sendable
     case capsLock
     case grave
     case backslash
+    case rightClick
 
     var id: String { rawValue }
 
@@ -133,6 +164,7 @@ enum KeyboardLayerTrigger: String, Codable, CaseIterable, Identifiable, Sendable
         case .capsLock: return "Caps Lock"
         case .grave: return "` Backtick"
         case .backslash: return "\\ Backslash"
+        case .rightClick: return "Right Click"
         }
     }
 
@@ -142,30 +174,35 @@ enum KeyboardLayerTrigger: String, Codable, CaseIterable, Identifiable, Sendable
         case .capsLock: return "⇪"
         case .grave: return "`"
         case .backslash: return "\\"
+        case .rightClick: return "🖱"
         }
     }
 
     /// The key code the event tap sees. TilePilot remaps Caps Lock to F18 while a Caps Lock
-    /// layer is on, because macOS never reports Caps Lock as a normal key press.
+    /// layer is on, because macOS never reports Caps Lock as a normal key press. The right mouse
+    /// button has no key code, so the tap reports it as a stand-in.
     var eventKeyCode: UInt16 {
         switch self {
         case .tab: return 48
         case .capsLock: return 79
         case .grave: return 50
         case .backslash: return 42
+        case .rightClick: return KeyboardLayerEngine.rightMouseButton
         }
     }
 
     /// Tapping Caps Lock toggles Caps Lock; the other triggers type themselves.
     var tapsCapsLock: Bool { self == .capsLock }
 
-    /// The same key alone in skhd syntax, for spotting skhd bindings that compete for it.
-    var skhdCombo: String {
+    /// The same key alone in skhd syntax, for spotting skhd bindings that compete for it. skhd
+    /// can't bind mouse buttons.
+    var skhdCombo: String? {
         switch self {
         case .tab: return "tab"
         case .capsLock: return "f18"
         case .grave: return "0x32"
         case .backslash: return "0x2A"
+        case .rightClick: return nil
         }
     }
 }
@@ -189,10 +226,11 @@ struct KeyboardLayer: Codable, Hashable, Identifiable, Sendable {
 
     var sendsHyperForUnboundKeys: Bool { unboundKeys == .sendHyper }
 
-    /// A Hyper layer works with no keys listed; otherwise at least one binding needs a key
-    /// (other than the trigger) and an action.
+    /// A Hyper layer works with no keys listed, and so does a Right Click layer, whose unlisted
+    /// keys open their settings; otherwise at least one binding needs a key (other than the
+    /// trigger) and an action.
     var isUsable: Bool {
-        sendsHyperForUnboundKeys || bindings.contains { binding in
+        trigger == .rightClick || sendsHyperForUnboundKeys || bindings.contains { binding in
             guard let key = binding.key, binding.action != nil else { return false }
             return key.keyCode != trigger.eventKeyCode
         }
@@ -209,18 +247,19 @@ enum KeyboardLayerPlanner {
             guard usedTriggers.insert(layer.trigger).inserted else { continue }
             if layer.trigger == .capsLock && !capsLockAvailable { continue }
             var bindings: [KeyboardLayerChord: KeyboardLayerAction] = [:]
+            var keysLeftAlone: Set<KeyboardLayerChord> = []
             for binding in layer.bindings {
-                guard let key = binding.key, let action = binding.action,
-                      key.keyCode != layer.trigger.eventKeyCode,
+                guard let key = binding.key, key.keyCode != layer.trigger.eventKeyCode,
                       bindings[key.chord] == nil else { continue }
-                bindings[key.chord] = action
+                if let action = binding.action { bindings[key.chord] = action } else { keysLeftAlone.insert(key.chord) }
             }
             result.append(KeyboardLayerEngine.Layer(
                 id: layer.id,
                 triggerKeyCode: layer.trigger.eventKeyCode,
                 tapsCapsLock: layer.trigger.tapsCapsLock,
                 sendsHyperForUnboundKeys: layer.sendsHyperForUnboundKeys,
-                bindings: bindings
+                bindings: bindings,
+                keysLeftAlone: keysLeftAlone
             ))
         }
         return result

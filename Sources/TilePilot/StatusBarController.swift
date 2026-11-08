@@ -809,6 +809,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowBadgeOverlayController: WindowBadgeOverlayController?
     private var workSetBackdropController: WorkSetBackdropController?
     private var recentWindowTilerWindowController: RecentWindowTilerWindowController?
+    private var keyboardLayerEditorWindowController: KeyboardLayerEditorWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if shouldTerminateAsDuplicateInstance() {
@@ -835,6 +836,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowBadgeOverlayController = WindowBadgeOverlayController(model: model)
         workSetBackdropController = WorkSetBackdropController(model: model)
         recentWindowTilerWindowController = RecentWindowTilerWindowController(model: model)
+        keyboardLayerEditorWindowController = KeyboardLayerEditorWindowController(model: model)
         model.systemBarController.quickMenuPresenter = { [weak self] view, point in
             self?.statusBarController?.presentQuickMenu(in: view, at: point)
         }
@@ -1011,10 +1013,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         tilePilotWindowController?.persistCurrentWindowSize()
         megamapWindowController?.persistCurrentWindowSize()
+        model.closeKeyboardLayerEditor()
         model.stop()
         windowBadgeOverlayController = nil
         NotificationCenter.default.removeObserver(self, name: .tilePilotOpenMegamap, object: nil)
         NotificationCenter.default.removeObserver(self, name: .tilePilotHideMegamap, object: nil)
         recentWindowTilerWindowController = nil
+        keyboardLayerEditorWindowController = nil
     }
 }

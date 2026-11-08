@@ -183,6 +183,18 @@ enum WorkAreaGeometry {
         workArea
     }
 
+    /// Where a snapped window goes: `slot` is a part of `area` (normalized, top-left origin).
+    /// A nil slot centers the window at its current size, shrunk to fit.
+    static func snapFrame(slot: CGRect?, windowSize: CGSize, area: CGRect) -> CGRect {
+        guard let slot else {
+            let width = min(windowSize.width, area.width)
+            let height = min(windowSize.height, area.height)
+            return CGRect(x: (area.midX - width / 2).rounded(), y: (area.midY - height / 2).rounded(), width: width.rounded(.down), height: height.rounded(.down))
+        }
+        let frame = absoluteRect(normalized: slot, displayFrame: area)
+        return CGRect(x: frame.minX.rounded(), y: frame.minY.rounded(), width: frame.width.rounded(.down), height: frame.height.rounded(.down))
+    }
+
     /// Mission Control, App Exposé, and Show Desktop move and scale what the window server reports
     /// for every window, while Accessibility keeps each window's real frame. A size change or a jump
     /// of more than 120 pt counts. One window that disagrees could be an app quirk, so when several

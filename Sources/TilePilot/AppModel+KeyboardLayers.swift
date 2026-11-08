@@ -85,7 +85,7 @@ extension AppModel {
 
     func addKeyboardLayer() {
         let taken = Set(keyboardLayers.map(\.trigger))
-        let trigger = [KeyboardLayerTrigger.tab, .grave, .backslash, .capsLock].first { !taken.contains($0) } ?? .tab
+        let trigger = [KeyboardLayerTrigger.tab, .grave, .backslash, .capsLock, .rightClick].first { !taken.contains($0) } ?? .tab
         let layer = KeyboardLayer(trigger: trigger, bindings: [KeyboardLayerBinding()])
         keyboardLayerMessage = nil
         updateKeyboardLayers { $0.append(layer) }
@@ -131,8 +131,11 @@ extension AppModel {
         updateKeyboardLayer(id) { $0.unboundKeys = unboundKeys }
     }
 
-    func addKeyboardLayerBinding(_ layerID: UUID) {
-        updateKeyboardLayer(layerID) { $0.bindings.append(KeyboardLayerBinding()) }
+    @discardableResult
+    func addKeyboardLayerBinding(_ layerID: UUID) -> UUID {
+        let binding = KeyboardLayerBinding()
+        updateKeyboardLayer(layerID) { $0.bindings.append(binding) }
+        return binding.id
     }
 
     func removeKeyboardLayerBinding(_ layerID: UUID, _ bindingID: UUID) {
@@ -142,6 +145,8 @@ extension AppModel {
 
     func setKeyboardLayerAction(_ action: KeyboardLayerAction, layerID: UUID, bindingID: UUID) {
         keyboardLayerMessage = nil
+        if keyboardLayerRecordingTarget == .output(layerID: layerID, bindingID: bindingID) { stopShortcutRecording() }
+        if keyboardLayerEditorTarget?.bindingID == bindingID { keyboardLayerEditorDraft = nil }
         updateKeyboardLayerBinding(layerID, bindingID) { $0.action = action }
     }
 
@@ -169,10 +174,15 @@ extension AppModel {
         } else if let data = try? JSONEncoder().encode(layers) {
             defaults.set(data, forKey: Self.keyboardLayersDefaultsKey)
         }
+        if let target = keyboardLayerEditorTarget,
+           !layers.contains(where: { $0.id == target.layerID && $0.bindings.contains { $0.id == target.bindingID } }) {
+            // The key window's key or layer is gone.
+            endKeyboardLayerEditor(target)
+        }
         if applyingRuntime { applyKeyboardLayerRuntime() }
     }
 
-    private func updateKeyboardLayer(_ id: UUID, applyingRuntime: Bool = true, _ change: (inout KeyboardLayer) -> Void) {
+    func updateKeyboardLayer(_ id: UUID, applyingRuntime: Bool = true, _ change: (inout KeyboardLayer) -> Void) {
         updateKeyboardLayers(applyingRuntime: applyingRuntime) { layers in
             guard let index = layers.firstIndex(where: { $0.id == id }) else { return }
             change(&layers[index])
@@ -184,7 +194,7 @@ extension AppModel {
         updateKeyboardLayerBinding(layerID, bindingID, applyingRuntime: false) { $0.note = note.isEmpty ? nil : note }
     }
 
-    private func updateKeyboardLayerBinding(
+    func updateKeyboardLayerBinding(
         _ layerID: UUID,
         _ bindingID: UUID,
         applyingRuntime: Bool = true,
@@ -243,8 +253,11 @@ extension AppModel {
     // MARK: - Runtime
 
     func startKeyboardLayers() {
-        keyboardLayerEventTap.setActionHandler { [weak self] action in
-            MainActor.assumeIsolated { self?.runKeyboardLayerAction(action) }
+        keyboardLayerEventTap.setActionHandler { [weak self] action, aimsAtPointer in
+            MainActor.assumeIsolated { self?.runKeyboardLayerAction(action, aimsAtPointer: aimsAtPointer) }
+        }
+        keyboardLayerEventTap.setConfigureHandler { [weak self] layerID, chord, press in
+            MainActor.assumeIsolated { self?.configureKeyboardLayerKey(layerID: layerID, chord: chord, event: press.event) }
         }
         installKeyboardLayerObservers()
         // Also clears a Caps Lock remap left behind by a crash when no layer needs it.
@@ -342,7 +355,19 @@ extension AppModel {
         )
     }
 
-    func runKeyboardLayerAction(_ action: KeyboardLayerAction) {
+    /// Runs layer actions in the order their keys were pressed. A right-click layer first focuses
+    /// the window under the pointer, so the action lands on the window you point at.
+    func runKeyboardLayerAction(_ action: KeyboardLayerAction, aimsAtPointer: Bool) {
+        let previous = keyboardLayerActionTask
+        keyboardLayerActionTask = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            if aimsAtPointer { await self.focusWindowUnderPointer() }
+            await self.performKeyboardLayerAction(action)
+        }
+    }
+
+    private func performKeyboardLayerAction(_ action: KeyboardLayerAction) async {
         switch action {
         case .feature(let id, let title):
             let featureID = FeatureControlID(rawValue: id)
@@ -363,10 +388,79 @@ extension AppModel {
                 let message = "Couldn't open \(app.name): \(error.localizedDescription)"
                 Task { @MainActor in self?.keyboardLayerMessage = message }
             }
-        case .sendShortcut:
-            // The event tap presses the shortcut itself.
-            break
+        case .sendShortcut(let key):
+            // Key layers press their shortcuts in the event tap; a right-click layer's come here.
+            keyboardLayerEventTap.send(key.chord)
+        case .builtIn(let id, let title):
+            await runKeyboardLayerBuiltIn(id: id, title: title)
+        case .typeText(let text):
+            keyboardLayerTextPaster.paste(text)
+        case .openURL(let address):
+            guard let url = URL(string: KeyboardLayerActionCatalog.normalizedURL(address)), NSWorkspace.shared.open(url) else {
+                reportKeyboardLayerFailure("Couldn’t open \(address).")
+                return
+            }
+        case .openPath(let path):
+            let expanded = (path as NSString).expandingTildeInPath
+            guard FileManager.default.fileExists(atPath: expanded) else {
+                keyboardLayerMessage = "\(path) can’t be found. Choose it again for that key."
+                return
+            }
+            NSWorkspace.shared.open(URL(fileURLWithPath: expanded))
+        case .runAppleShortcut(let name):
+            // A shortcut can run for a while, so later keys don't wait for it.
+            Task { [weak self] in
+                guard let self else { return }
+                let result = await self.doctorService.runSupportCommand(ShellCommand("/usr/bin/shortcuts", ["run", name], timeout: 60))
+                self.appendCommandLog(from: result)
+                if !result.isSuccess { self.reportKeyboardLayerFailure("Run “\(name)”", result) }
+            }
+        case .runCommand(let command, let title):
+            runShortcutCommand(command, shortcutLabel: title ?? KeyboardLayerActionCatalog.preview(command))
         }
+    }
+
+    /// Focuses the window under the pointer. Over the desktop, over TilePilot, or without yabai,
+    /// the action stays with the focused window.
+    private func focusWindowUnderPointer() async {
+        guard canRunYabaiRuntimeCommands, let window = Self.windowUnderPointer(),
+              !window.isFocused, window.pid != getpid() else { return }
+        // A key press is user-initiated: keep App Nap from slowing the yabai call several-fold.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep, reason: "Keyboard layer")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
+        let focus = await doctorService.runSupportCommand(
+            yabaiCommand(["-m", "window", "--focus", String(window.id)], timeout: 1.0)
+        )
+        appendCommandLog(from: focus)
+        guard focus.isSuccess else { return }
+        // The window comes forward a moment after yabai returns; wait so the action lands on it.
+        for _ in 0..<15 {
+            if let now = Self.windowUnderPointer(), now.id == window.id, now.isFocused { return }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    /// The window under the pointer and whether it's the focused one, from the window server, so
+    /// pointing at the focused window costs no yabai call. Only ordinary windows count: the Dock
+    /// and some apps cover whole displays with clear windows on higher layers.
+    private static func windowUnderPointer() -> (id: Int, pid: pid_t, isFocused: Bool)? {
+        guard let point = CGEvent(source: nil)?.location,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        let windows: [(id: Int, pid: pid_t, frame: CGRect)] = list.compactMap { info in
+            guard info[kCGWindowLayer as String] as? Int == 0,
+                  (info[kCGWindowAlpha as String] as? Double ?? 1) > 0.01,
+                  let id = info[kCGWindowNumber as String] as? Int,
+                  let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                  let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
+            return (id, pid, frame)
+        }
+        guard let hit = windows.first(where: { $0.frame.contains(point) }) else { return nil }
+        let isFocused = NSWorkspace.shared.frontmostApplication?.processIdentifier == hit.pid
+            && windows.first(where: { $0.pid == hit.pid })?.id == hit.id
+        return (hit.id, hit.pid, isFocused)
     }
 
     private func refreshCapsLockOwner() {
@@ -441,14 +535,9 @@ extension AppModel {
         return nil
     }
 
-    /// TilePilot features a key can run, grouped like the Actions & Shortcuts list.
-    var keyboardLayerFeatureMenu: [(group: UnifiedControlGroup, features: [FeatureDefinition])] {
-        let definitions = featureDefinitions.filter { !$0.isExperimental && $0.group != .experimental }
-        return Dictionary(grouping: definitions, by: \.group)
-            .map { group, features in
-                (group: group, features: features.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending })
-            }
-            .sorted { $0.group.sortRank < $1.group.sortRank }
+    /// Feature titles by ID, for showing what a key runs.
+    var keyboardLayerFeatureTitles: [String: String] {
+        Dictionary(featureDefinitions.map { ($0.id.rawValue, $0.title) }, uniquingKeysWith: { first, _ in first })
     }
 
     var keyboardLayerRunningApps: [KeyboardLayerApp] {
@@ -474,6 +563,32 @@ extension AppModel {
             return "Open \(app.name)"
         case .sendShortcut(let key)?:
             return "Send \(key.symbols)"
+        case .builtIn(let id, let title)?:
+            return KeyboardLayerActionCatalog.builtIn(id: id)?.title ?? title
+        case .typeText(let text)?:
+            return "Type “\(KeyboardLayerActionCatalog.preview(text))”"
+        case .openURL(let address)?:
+            return "Open \(URL(string: KeyboardLayerActionCatalog.normalizedURL(address))?.host ?? address)"
+        case .openPath(let path)?:
+            return "Open \((path as NSString).lastPathComponent)"
+        case .runAppleShortcut(let name)?:
+            return "Run “\(name)”"
+        case .runCommand(let command, let title)?:
+            return title ?? KeyboardLayerActionCatalog.preview(command)
+        }
+    }
+
+    /// The icon shown with a key's action.
+    func keyboardLayerActionIcon(_ action: KeyboardLayerAction?) -> KeyboardLayerPickerItem.Icon {
+        switch action {
+        case .none: return .symbol("plus.circle")
+        case .feature(let id, _)?:
+            return .symbol(featureDefinitions.first { $0.id.rawValue == id }?.group.systemImage ?? "gearshape")
+        case .builtIn(let id, _)?: return .symbol(KeyboardLayerActionCatalog.builtIn(id: id)?.systemImage ?? "questionmark.circle")
+        case .openApp(let app)?: return .app(path: app.resolvedURL?.path ?? app.path)
+        case .runAppleShortcut?: return .symbol("bolt.circle")
+        case .runCommand(_, _?)?: return .symbol("keyboard")
+        case let action?: return .symbol(KeyboardLayerActionSetting(action)?.systemImage ?? "questionmark.circle")
         }
     }
 
@@ -492,8 +607,8 @@ extension AppModel {
         } else if let reason = keyboardLayerEnableBlockReason(layer) {
             issues.append(reason)
         }
-        let triggerCombo = ShortcutComboIdentity.normalized(layer.trigger.skhdCombo)
-        if let entry = shortcutEntries.first(where: { ShortcutComboIdentity.normalized($0.combo) == triggerCombo }) {
+        if let triggerCombo = layer.trigger.skhdCombo.map(ShortcutComboIdentity.normalized),
+           let entry = shortcutEntries.first(where: { ShortcutComboIdentity.normalized($0.combo) == triggerCombo }) {
             issues.append("Your skhd config also uses \(layer.trigger.title) by itself (line \(entry.sourceLine)), so one of them may not work.")
         }
         return issues
@@ -508,6 +623,13 @@ extension AppModel {
             if featureTitles[id] == nil { return "“\(title)” no longer exists. Choose another action." }
         case .openApp(let app)?:
             if app.resolvedURL == nil { return "\(app.name) can't be found. Choose the app again." }
+        case .builtIn(let id, let title)?:
+            guard let builtIn = KeyboardLayerActionCatalog.builtIn(id: id) else { return "“\(title)” no longer exists. Choose another action." }
+            if let note = keyboardLayerUnmetNote(builtIn.requirement) { return note + "." }
+        case .openPath(let path)?:
+            if !FileManager.default.fileExists(atPath: (path as NSString).expandingTildeInPath) {
+                return "\(path) can’t be found. Choose it again."
+            }
         default:
             break
         }

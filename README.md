@@ -65,8 +65,9 @@ If you want to use TilePilot the way it is intended, the path looks like this:
   - the action catalog and shortcut learning surface
   - record shortcuts, edit them, pin frequent ones to the right-click menu, and run the recent-window picker
 - `Keyboard Layers`
-  - hold a trigger key such as Tab and press a second key to run an action
+  - hold a trigger such as Tab or the right mouse button and press a second key to run an action
   - each trigger has its own keys, kept apart from the shortcuts in `Actions & Shortcuts`
+  - each key opens a searchable action picker: windows, desktops, layouts, apps, macOS controls, URLs and files, typed text, Apple Shortcuts, and shell commands
 - `Appearance`
   - controls visual feedback and tiling spacing
   - badges, outlines, outline width and colors, screen edge padding, and gap between tiled windows, with a live preview
@@ -164,8 +165,11 @@ You can enable it and change the trigger keys in `Behaviors`.
 A layer turns a key you already have into a second set of shortcuts, without giving up what that key normally does:
 
 - tap Tab and it types a Tab; hold Tab and press C, and TilePilot opens Chrome instead
-- each trigger (Tab, Caps Lock, backtick, or backslash) has its own keys, so Tab + C and Caps Lock + C can do different things
-- a key can run any TilePilot action, open an app, or press another shortcut, and can carry a short description of what it's for
+- each trigger (Tab, Caps Lock, backtick, backslash, or the right mouse button) has its own keys, so Tab + C and Caps Lock + C can do different things
+- a key can snap or arrange windows, switch desktops, run any TilePilot action, open an app, URL, file, or folder, press another shortcut, type a block of text, run an Apple Shortcut or a shell command, or control media, volume, and brightness; it can also carry a short description of what it's for
+- with the right mouse button as the trigger, keys act on the window under the pointer, so one hand points while the other picks the action; a click alone still opens the context menu, and right-drags still work
+- the first time you press a new key with the right button held, a window opens to choose what it does; close it without an action and that key works as usual with the right button from then on, which keeps games and 3D apps working
+- Type Text pastes the text, then puts your clipboard back
 - turn on Hyper and keys you haven't listed send ⌃⌥⇧⌘ + key, so the trigger also works as a Hyper Key
 - a key you've listed acts the moment you press it while holding the trigger, however fast; other keys, Shift+Tab, and ⌘Tab type as usual
 - a Caps Lock layer works only while no other app remaps Caps Lock, such as Raycast's Hyper Key or Karabiner-Elements; a tap still toggles Caps Lock

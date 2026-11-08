@@ -6,7 +6,7 @@ import os
 
 /// Runs the keyboard-layer event tap on its own thread, so typing never waits on TilePilot's
 /// main thread. KeyboardLayerEngine decides what each key means; this class feeds it key
-/// events and carries out the effects.
+/// and right-button events and carries out the effects.
 final class KeyboardLayerEventTap: @unchecked Sendable {
     enum State: Equatable, Sendable {
         case off
@@ -29,26 +29,44 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
     private var engine = KeyboardLayerEngine()
     private var suspended = false
     private var lastKeyEventTime: TimeInterval = 0
-    /// The held trigger's own press, so a tap types it exactly as pressed.
+    /// The held trigger's own press, so a tap types it exactly as pressed, and a right click
+    /// lands where the button went down.
     private var triggerKeyDown: CGEvent?
+    /// How far the mouse has moved since the held right button went down.
+    private var triggerTravel: Double = 0
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var tapRunLoop: CFRunLoop?
-    private var actionHandler: (@Sendable (KeyboardLayerAction) -> Void)?
+    private var actionHandler: (@Sendable (KeyboardLayerAction, _ aimsAtPointer: Bool) -> Void)?
+    private var configureHandler: (@Sendable (UUID, KeyboardLayerChord, KeyPress) -> Void)?
     // Used only on the tap thread.
     private let eventSource: CGEventSource?
     private let capsLockState = CapsLockLockState()
     // Main thread only.
     private(set) var state: State = .off
+    private var watchesMouse = false
 
     init() {
         eventSource = CGEventSource(stateID: .privateState)
         eventSource?.localEventsSuppressionInterval = 0
     }
 
-    /// Called on the main thread for each TilePilot feature or app a layer key runs.
-    func setActionHandler(_ handler: @escaping @Sendable (KeyboardLayerAction) -> Void) {
+    /// Called on the main thread for each TilePilot feature or app a layer key runs, and for a
+    /// right-click layer's shortcuts. `aimsAtPointer` asks to focus the window under the pointer
+    /// first.
+    func setActionHandler(_ handler: @escaping @Sendable (KeyboardLayerAction, _ aimsAtPointer: Bool) -> Void) {
         lock.withLock { actionHandler = handler }
+    }
+
+    /// A copy of a key press, handed to the main thread and read only there.
+    struct KeyPress: @unchecked Sendable {
+        let event: CGEvent
+    }
+
+    /// Called on the main thread with the layer, the key, and a copy of the key's press when the
+    /// right button meets a key its layer doesn't list yet.
+    func setConfigureHandler(_ handler: @escaping @Sendable (UUID, KeyboardLayerChord, KeyPress) -> Void) {
+        lock.withLock { configureHandler = handler }
     }
 
     /// Starts, updates, or stops the tap. With no layers it stops completely.
@@ -58,13 +76,16 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             stop()
             return state
         }
+        // The tap watches the right mouse button only while a layer uses it.
+        let wantsMouse = layers.contains(where: \.triggerIsMouseButton)
+        if hasTap, wantsMouse != watchesMouse { stop() }
         lock.withLock {
             guard engine.layers != layers else { return }
             engine.configure(layers)
-            triggerKeyDown = nil
+            if engine.heldTriggerKeyCode == nil { triggerKeyDown = nil }
         }
         if hasTap { return ensureRunning() }
-        state = start()
+        state = start(watchingMouse: wantsMouse)
         return state
     }
 
@@ -122,17 +143,33 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             if let source { CFRunLoopRemoveSource(runLoop, source, .commonModes) }
             CFRunLoopStop(runLoop)
         }
+        watchesMouse = false
         state = .off
+    }
+
+    /// Presses a right-click layer's shortcut once the window under the pointer has focus. Runs on
+    /// the tap thread, which owns the event source.
+    func send(_ chord: KeyboardLayerChord) {
+        guard let runLoop = lock.withLock({ tapRunLoop }) else { return }
+        CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue) { [self] in
+            for event in shortcutEvents(for: chord) { event.post(tap: .cghidEventTap) }
+        }
+        CFRunLoopWakeUp(runLoop)
     }
 
     private var hasTap: Bool {
         lock.withLock { tap != nil }
     }
 
-    private func start() -> State {
+    private func start(watchingMouse: Bool) -> State {
         // Never prompt here: an active keyboard tap needs Accessibility the user already granted.
         guard AXIsProcessTrusted() else { return .needsAccessibility }
-        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
+        var mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
+        if watchingMouse {
+            for type in [CGEventType.rightMouseDown, .rightMouseUp, .rightMouseDragged] {
+                mask |= CGEventMask(1 << type.rawValue)
+            }
+        }
         let callback: CGEventTapCallBack = { proxy, type, event, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(event) }
             let owner = Unmanaged<KeyboardLayerEventTap>.fromOpaque(userInfo).takeUnretainedValue()
@@ -157,6 +194,7 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             self.tap = tap
             runLoopSource = source
         }
+        watchesMouse = watchingMouse
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [self] in
             let runLoop = CFRunLoopGetCurrent()
@@ -191,13 +229,23 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             }
             return passThrough
         }
-        guard type == .keyDown || type == .keyUp,
-              event.getIntegerValueField(.eventSourceUserData) != Self.syntheticEventMarker else {
+        // TilePilot's own output goes straight through, marked or not, such as System Bar clicks.
+        guard event.getIntegerValueField(.eventSourceUserData) != Self.syntheticEventMarker,
+              event.getIntegerValueField(.eventSourceUnixProcessID) != Int64(getpid()) else {
             return passThrough
         }
-        let rawKeyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        guard rawKeyCode >= 0, rawKeyCode <= Int64(UInt16.max) else { return passThrough }
-        let keyCode = UInt16(rawKeyCode)
+        let keyCode: UInt16
+        switch type {
+        case .keyDown, .keyUp:
+            let rawKeyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            guard rawKeyCode >= 0, rawKeyCode <= Int64(UInt16.max) else { return passThrough }
+            keyCode = UInt16(rawKeyCode)
+        case .rightMouseDown, .rightMouseUp, .rightMouseDragged:
+            keyCode = KeyboardLayerEngine.rightMouseButton
+        default:
+            return passThrough
+        }
+        let isRepeat = type == .keyDown && event.getIntegerValueField(.keyboardEventAutorepeat) != 0
         let now = ProcessInfo.processInfo.systemUptime
 
         lock.lock()
@@ -205,13 +253,16 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
         guard !suspended, !engine.layers.isEmpty else { return passThrough }
 
         let output: KeyboardLayerEngine.Output
-        if type == .keyDown {
+        switch type {
+        case .keyDown, .rightMouseDown:
             if engine.isTrackingKeys, now - lastKeyEventTime >= Self.staleKeyCheckDelay {
                 engine.forgetReleasedKeys(isDown: Self.isKeyDown)
             }
-            let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             var modifiers = KeyboardLayerModifiers(event.flags)
-            if !isRepeat, modifiers.isEmpty, engine.startsLayer(keyCode), otherHyperKeyIsHeld() {
+            if type == .rightMouseDown, event.flags.contains(.maskSecondaryFn) {
+                // Fn + right button is left alone, with any modifier; it's yabai's default resize drag.
+                modifiers = .hyper
+            } else if !isRepeat, modifiers.isEmpty, engine.startsLayer(keyCode), otherHyperKeyIsHeld() {
                 // Another tool's Hyper Key is down and adds ⌃⌥⇧⌘ after this tap, so the trigger
                 // is part of a Hyper shortcut, like Shift+Tab is a Shift shortcut.
                 modifiers = .hyper
@@ -219,33 +270,69 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
             output = engine.keyDown(keyCode, modifiers: modifiers, isRepeat: isRepeat, at: now)
             if output.consumesEvent, !isRepeat, engine.heldTriggerKeyCode == keyCode {
                 triggerKeyDown = event.copy()
+                triggerTravel = 0
             }
-        } else {
+            lastKeyEventTime = now
+        case .rightMouseDragged:
+            let start = triggerKeyDown?.location ?? event.location
+            // Games and 3D views that lock the pointer still report movement as deltas.
+            triggerTravel += hypot(event.getDoubleValueField(.mouseEventDeltaX), event.getDoubleValueField(.mouseEventDeltaY))
+            output = engine.triggerDragged(distance: max(triggerTravel, hypot(event.location.x - start.x, event.location.y - start.y)))
+        default:
             output = engine.keyUp(keyCode, at: now)
+            lastKeyEventTime = now
         }
-        lastKeyEventTime = now
-        perform(output.effects, proxy: proxy)
+        perform(output.effects, proxy: proxy, event: event, isRepeat: isRepeat)
         if engine.heldTriggerKeyCode == nil { triggerKeyDown = nil }
         return output.consumesEvent ? nil : passThrough
     }
 
     /// Runs on the tap thread with the lock held.
-    private func perform(_ effects: [KeyboardLayerEngine.Effect], proxy: CGEventTapProxy) {
+    private func perform(_ effects: [KeyboardLayerEngine.Effect], proxy: CGEventTapProxy, event: CGEvent, isRepeat: Bool) {
+        // A right-click layer acts on the window under the pointer, so its shortcuts wait on the
+        // main thread until that window has focus. A held key's repeats follow its first press.
+        let aimsAtPointer = engine.heldTriggerKeyCode == KeyboardLayerEngine.rightMouseButton
         for effect in effects {
             switch effect {
+            case .replay(let chord) where chord.keyCode == KeyboardLayerEngine.rightMouseButton:
+                // A right click on its own: press and release where the button went down.
+                guard let down = rightButtonDown(), let up = down.copy() else { continue }
+                up.type = .rightMouseUp
+                down.tapPostEvent(proxy)
+                up.tapPostEvent(proxy)
             case .replay(let chord):
                 // Posted from the tap, typed keys land in order, ahead of the current event.
                 for event in replayEvents(for: chord) { event.tapPostEvent(proxy) }
+            case .press:
+                rightButtonDown()?.tapPostEvent(proxy)
             case .toggleCapsLock:
                 capsLockState.toggle()
+            case .send(let chord) where aimsAtPointer:
+                let key = KeyboardLayerKey(keyCode: chord.keyCode, modifiers: chord.modifiers, keyLabel: "")
+                runOnMain(.sendShortcut(key), aimsAtPointer: !isRepeat)
             case .send(let chord):
                 // Posted at the HID level, shortcuts reach skhd, Raycast, and every other tap.
                 for event in shortcutEvents(for: chord) { event.post(tap: .cghidEventTap) }
             case .run(let action):
-                guard let handler = actionHandler else { continue }
-                DispatchQueue.main.async { handler(action) }
+                runOnMain(action, aimsAtPointer: aimsAtPointer)
+            case .configure(let layerID, let chord):
+                guard let handler = configureHandler, let copy = event.copy() else { continue }
+                let press = KeyPress(event: copy)
+                DispatchQueue.main.async { handler(layerID, chord, press) }
             }
         }
+    }
+
+    private func runOnMain(_ action: KeyboardLayerAction, aimsAtPointer: Bool) {
+        guard let handler = actionHandler else { return }
+        DispatchQueue.main.async { handler(action, aimsAtPointer) }
+    }
+
+    /// The held right button's own press, sent on once it turns out to be a click or a drag.
+    private func rightButtonDown() -> CGEvent? {
+        guard let down = triggerKeyDown?.copy() else { return nil }
+        down.setIntegerValueField(.eventSourceUserData, value: Self.syntheticEventMarker)
+        return down
     }
 
     private func replayEvents(for chord: KeyboardLayerChord) -> [CGEvent] {
@@ -291,7 +378,11 @@ final class KeyboardLayerEventTap: @unchecked Sendable {
     ]
 
     private static func isKeyDown(_ keyCode: UInt16) -> Bool {
-        CGEventSource.keyState(.hidSystemState, key: keyCode)
+        if keyCode == KeyboardLayerEngine.rightMouseButton {
+            return CGEventSource.buttonState(.hidSystemState, button: .right)
+                || CGEventSource.buttonState(.combinedSessionState, button: .right)
+        }
+        return CGEventSource.keyState(.hidSystemState, key: keyCode)
             || CGEventSource.keyState(.combinedSessionState, key: keyCode)
     }
 
