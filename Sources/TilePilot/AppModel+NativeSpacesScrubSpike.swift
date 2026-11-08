@@ -4,8 +4,6 @@ import Foundation
 @MainActor
 extension AppModel {
     static let experimentalNativeSpacesScrubSpikeDeepLink = "tilepilot://internal/native-spaces-scrub-spike"
-    static let experimentalNativeSpacesScrubEnableDeepLink = "tilepilot://internal/enable-native-spaces-scrub"
-    static let experimentalNativeSpacesScrubDisableDeepLink = "tilepilot://internal/disable-native-spaces-scrub"
 
     var experimentalNativeSpacesScrubSpikeEnabled: Bool {
         true
@@ -15,28 +13,12 @@ extension AppModel {
         DesktopScrubModifier.flags(for: desktopScrubTriggerModifiers)
     }
 
-    var desktopScrubTriggerSymbolsText: String {
-        DesktopScrubModifier.symbolsText(for: desktopScrubTriggerModifiers)
-    }
-
-    var desktopScrubTriggerWordsText: String {
-        let modifierText = DesktopScrubModifier.wordsText(for: desktopScrubTriggerModifiers)
-        if desktopScrubTriggerCharacter == .none {
-            return modifierText
-        }
-        return "\(modifierText) + \(desktopScrubTriggerCharacter.keyDisplayText)"
-    }
-
     var desktopScrubTriggerSummaryText: String {
         let modifierSymbols = DesktopScrubModifier.symbolsText(for: desktopScrubTriggerModifiers)
         if desktopScrubTriggerCharacter == .none {
             return modifierSymbols
         }
         return "\(modifierSymbols) + \(desktopScrubTriggerCharacter.keyDisplayText)"
-    }
-
-    var desktopScrubSensitivityDisplayText: String {
-        String(format: "%.1f", desktopScrubSensitivity)
     }
 
     func setDesktopScrubInvertDirection(_ enabled: Bool) {

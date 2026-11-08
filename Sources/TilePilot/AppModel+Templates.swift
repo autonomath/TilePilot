@@ -142,11 +142,6 @@ extension AppModel {
         return currentTemplateTargetDisplayOption()
     }
 
-    func templateMatchesCurrentDisplay(_ template: WindowLayoutTemplate) -> Bool {
-        guard let option = templateTargetDisplayOption(for: template) else { return false }
-        return template.displayShapeKey.matches(width: option.frameWidth, height: option.frameHeight)
-    }
-
     func templateApplyDisabledReason(_ template: WindowLayoutTemplate) -> String? {
         if let runtimeReason = yabaiRuntimeControlDisabledReason, !canRunYabaiRuntimeCommands {
             return runtimeReason

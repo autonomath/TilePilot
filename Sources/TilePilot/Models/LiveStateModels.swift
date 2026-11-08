@@ -74,7 +74,6 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
         !isRuntimeManageable
     }
 
-
     private enum CodingKeys: String, CodingKey {
         case id
         case pid
@@ -185,12 +184,6 @@ struct WindowState: Identifiable, Codable, Sendable, Equatable {
         lastUpdatedAt = try container.decode(Date.self, forKey: .lastUpdatedAt)
         isNativeFullscreen = try container.decodeIfPresent(Bool.self, forKey: .isNativeFullscreen) ?? false
     }
-}
-
-enum WindowBadgeVisibilityMode: String, Codable, CaseIterable, Sendable {
-    case focusedAndHovered
-    case alwaysOn
-    case focusedOnly
 }
 
 struct WindowBadgeState: Identifiable, Sendable, Equatable {

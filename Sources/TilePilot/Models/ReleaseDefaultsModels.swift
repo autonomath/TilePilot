@@ -137,17 +137,6 @@ enum ReleaseDefaultsStatus: Sendable, Equatable {
     case updateAvailable(currentVersion: String, lastAppliedVersion: String)
     case neverApplied(currentVersion: String)
 
-    var summaryText: String {
-        switch self {
-        case .upToDate(let version):
-            return "Release defaults \(version) are applied."
-        case .updateAvailable(let currentVersion, let lastAppliedVersion):
-            return "New release defaults available (\(lastAppliedVersion) -> \(currentVersion))."
-        case .neverApplied(let currentVersion):
-            return "Release defaults \(currentVersion) have not been applied yet."
-        }
-    }
-
     var currentVersion: String {
         switch self {
         case .upToDate(let version):

@@ -30,17 +30,6 @@ extension AppModel {
         }
     }
 
-    var healthBadgeSymbol: String {
-        doctorSnapshot?.healthBadge.symbolName ?? "questionmark.circle"
-    }
-
-    var menuBarHealthBadgeSymbol: String {
-        if shouldUseNeutralSetupMenuBar {
-            return "circle.dashed"
-        }
-        return menuBarVisualBadgeLevel?.symbolName ?? "questionmark.circle"
-    }
-
     var healthBadgeTitle: String {
         doctorSnapshot?.healthBadge.title ?? "Unknown"
     }
@@ -64,17 +53,6 @@ extension AppModel {
         guard let snapshot = doctorSnapshot else { return "Starting..." }
         let summary = primaryMenuBarSummary() ?? snapshot.healthBadge.title
         return "\(summary) · \(snapshot.generatedAt.formatted(date: .omitted, time: .standard))"
-    }
-
-    var statusLine: String {
-        guard let snapshot = doctorSnapshot else { return "Setup check has not run yet" }
-        return "\(snapshot.healthBadge.title) · \(snapshot.generatedAt.formatted(date: .omitted, time: .standard))"
-    }
-
-    var nowStatusLine: String {
-        guard let snapshot = liveStateSnapshot else { return "No live state yet" }
-        let source = snapshot.source.rawValue.capitalized
-        return "\(source) · \(snapshot.lastUpdatedAt.formatted(date: .omitted, time: .standard))"
     }
 
     var runtimeActivityMode: RuntimeActivityMode {
@@ -119,20 +97,6 @@ extension AppModel {
             // Work Area containment also catches windows moved by keyboard or newly opened.
             return hasActiveWorkAreaContainment ? 3.0 : max(10.0, performanceBackgroundPollingSeconds)
         }
-    }
-
-    var menuBarVisualBadgeLevel: HealthBadgeLevel? {
-        guard let snapshot = doctorSnapshot else { return nil }
-        if shouldUseNeutralSetupMenuBar {
-            return nil
-        }
-        if shouldSoftenInitialBlockedStatus {
-            return .warning
-        }
-        if shouldDowngradeBlockedToSetupNeededInMenuBar {
-            return .warning
-        }
-        return snapshot.healthBadge
     }
 
     private var shouldSoftenInitialBlockedStatus: Bool {

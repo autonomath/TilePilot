@@ -82,19 +82,6 @@ extension AppModel {
         }
     }
 
-    func requestMegamapScreenRecordingAccess() {
-        requestScreenRecordingAccessPrompt()
-        megamapScreenRecordingAuthorized = megamapCaptureService.screenRecordingAuthorized()
-        if megamapScreenRecordingAuthorized {
-            megamapLastActionMessage = "Screen Recording access confirmed."
-            megamapLastErrorMessage = nil
-        } else {
-            megamapLastActionMessage = "Opened Screen Recording settings."
-            megamapLastErrorMessage = "If TilePilot is not listed yet, macOS has not registered the capture request. Reopen TilePilot and try Enable Screen Recording again."
-        }
-        rebuildMegamapSections()
-    }
-
     func setMegamapCacheArmed(_ armed: Bool) {
         guard megamapCacheArmed != armed else { return }
         megamapCacheArmed = armed

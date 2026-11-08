@@ -107,19 +107,6 @@ func buildUnifiedControlRows() -> [UnifiedControlRow] {
     }
 }
 
-func filteredUnifiedControlRows(query: String) -> [UnifiedControlRow] {
-    let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    guard !q.isEmpty else { return unifiedControlRows }
-    return unifiedControlRows.filter { row in
-        row.title.lowercased().contains(q) ||
-            row.description.lowercased().contains(q) ||
-            row.shortcutEntry?.combo.lowercased().contains(q) == true ||
-            row.shortcutEntry?.command.lowercased().contains(q) == true ||
-            row.group.title.lowercased().contains(q)
-    }
-}
-
-
 var featureControlRows: [FeatureControlRow] {
     cachedFeatureControlRows
 }
@@ -250,18 +237,6 @@ func featureControlRowSortPriority(_ row: FeatureControlRow) -> Int {
     return 500
 }
 
-func filteredFeatureControlRows(query: String) -> [FeatureControlRow] {
-    let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    guard !q.isEmpty else { return featureControlRows }
-    return featureControlRows.filter { row in
-        row.title.lowercased().contains(q) ||
-            row.description.lowercased().contains(q) ||
-            row.assignedCombo?.lowercased().contains(q) == true ||
-            row.shortcutEntry?.command.lowercased().contains(q) == true ||
-            row.group.title.lowercased().contains(q)
-    }
-}
-
 func shortcutsCatalogGroup(for item: ShortcutsDisplayItem) -> UnifiedControlGroup {
     switch item {
     case .featureRow(let row):
@@ -346,50 +321,6 @@ func flatShortcutsItems(query: String) -> [ShortcutsDisplayItem] {
             }
         }
     }
-}
-
-func moveFlatShortcutsItems(fromOffsets: IndexSet, toOffset: Int) {
-    let orderedIDs = flatShortcutsItems(query: "").map(\.id)
-    guard !orderedIDs.isEmpty else { return }
-    var mutableIDs = orderedIDs
-    mutableIDs.move(fromOffsets: fromOffsets, toOffset: toOffset)
-    guard mutableIDs != shortcutsCustomOrderIDs else { return }
-    var transaction = Transaction()
-    transaction.disablesAnimations = true
-    withTransaction(transaction) {
-        shortcutsCustomOrderIDs = mutableIDs
-    }
-    persistShortcutsCustomOrderIDs()
-    rebuildShortcutPresentationCaches()
-}
-
-func moveFlatShortcutsItem(draggedID: String, before targetID: String) {
-    guard draggedID != targetID else { return }
-    var orderedIDs = flatShortcutsItems(query: "").map(\.id)
-    guard
-        let sourceIndex = orderedIDs.firstIndex(of: draggedID),
-        let targetIndex = orderedIDs.firstIndex(of: targetID)
-    else { return }
-
-    let movingID = orderedIDs.remove(at: sourceIndex)
-    let destinationIndex = sourceIndex < targetIndex ? max(0, targetIndex - 1) : targetIndex
-    orderedIDs.insert(movingID, at: destinationIndex)
-
-    guard orderedIDs != shortcutsCustomOrderIDs else { return }
-    var transaction = Transaction()
-    transaction.disablesAnimations = true
-    withTransaction(transaction) {
-        shortcutsCustomOrderIDs = orderedIDs
-    }
-    persistShortcutsCustomOrderIDs()
-    rebuildShortcutPresentationCaches()
-}
-
-func resetShortcutsCustomOrderToDefault() {
-    shortcutsCustomOrderIDs = []
-    persistShortcutsCustomOrderIDs()
-    reconcileShortcutsCustomOrderIDsToCurrentItems()
-    rebuildShortcutPresentationCaches()
 }
 
 func applyShortcutsCustomOrderIDs(_ ids: [String]) {
@@ -683,5 +614,4 @@ func toggleFeaturePinned(_ featureID: FeatureControlID) {
     rebuildShortcutPresentationCaches()
     lastErrorMessage = nil
 }
-
 }

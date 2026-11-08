@@ -49,10 +49,6 @@ final class NativeSpacesScrubSpikeCoordinator {
         return "Hold \(triggerWords) + \(scrubTriggerCharacter.keyDisplayText), move the mouse horizontally, then let go and macOS settles on that desktop."
     }
 
-    var interactiveScrubEnabled: Bool {
-        isInteractiveScrubArmed
-    }
-
     func configureInteractiveScrub(
         enabled: Bool,
         triggerModifiers: NSEvent.ModifierFlags,
@@ -373,7 +369,6 @@ final class NativeSpacesScrubSpikeCoordinator {
                 endInteractiveScrub(commit: false)
             }
         }
-
     }
 
     private func endInteractiveScrub(commit: Bool) {

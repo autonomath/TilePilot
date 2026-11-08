@@ -318,10 +318,6 @@ final class ManagedHelperService: @unchecked Sendable {
         return String(decoding: data, as: UTF8.self)
     }
 
-    func hasOperationalHelpers() -> Bool {
-        resolvedHelperURL(for: .yabai) != nil && resolvedHelperURL(for: .skhd) != nil
-    }
-
     func managedHelpersNeedUpgrade(bundle: Bundle = .main, currentState: ManagedHelperInstallState? = nil) -> Bool {
         guard let manifest = bundledManifest(bundle: bundle) else { return false }
         let state = currentState ?? loadInstallState()

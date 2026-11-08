@@ -107,16 +107,6 @@ extension AppModel {
         }
     }
 
-    func resetWindowBehaviorDraft() {
-        windowBehaviorAutoSaveTask?.cancel()
-        windowBehaviorAutoSaveTask = nil
-        windowBehaviorPolicyDraft = originalWindowBehaviorPolicy
-        syncStagedAppRuleListsFromDraft(preservePendingChanges: false)
-        recomputeYabaiConfigDiffPreview()
-        lastActionMessage = "Reverted Window Behavior draft."
-        lastErrorMessage = nil
-    }
-
     func saveWindowBehaviorPolicy() {
         saveWindowBehaviorPolicy(reason: .manual())
     }
@@ -209,44 +199,6 @@ extension AppModel {
         windowBehaviorPolicyDraft.mouseFollowsFocusEnabled = false
         recomputeYabaiConfigDiffPreview()
         saveWindowBehaviorPolicy()
-    }
-
-    func addStagedNeverTileApp(_ name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        stagedAlwaysTileApps = removeAppName(trimmed, from: stagedAlwaysTileApps)
-        stagedNeverTileApps = addingAppName(trimmed, to: stagedNeverTileApps)
-    }
-
-    func removeStagedNeverTileApp(_ name: String) {
-        stagedNeverTileApps = removeAppName(name, from: stagedNeverTileApps)
-    }
-
-    func addStagedAlwaysTileApp(_ name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        stagedNeverTileApps = removeAppName(trimmed, from: stagedNeverTileApps)
-        stagedAlwaysTileApps = addingAppName(trimmed, to: stagedAlwaysTileApps)
-    }
-
-    func removeStagedAlwaysTileApp(_ name: String) {
-        stagedAlwaysTileApps = removeAppName(name, from: stagedAlwaysTileApps)
-    }
-
-    func discardStagedAppRuleListChanges() {
-        syncStagedAppRuleListsFromDraft(preservePendingChanges: false)
-        lastActionMessage = "Discarded app rule list edits."
-        lastErrorMessage = nil
-    }
-
-    func applyStagedAppRuleListChanges() {
-        guard isAppRuleListApplyRequired else { return }
-        guard !isSavingYabaiConfig else { return }
-        isApplyingStagedAppRules = true
-        windowBehaviorPolicyDraft.neverTileApps = canonicalizeAppRuleList(stagedNeverTileApps)
-        windowBehaviorPolicyDraft.alwaysTileApps = canonicalizeAppRuleList(stagedAlwaysTileApps)
-        recomputeYabaiConfigDiffPreview()
-        saveWindowBehaviorPolicy(reason: .manual())
     }
 
     func appTilingBehavior(for appName: String) -> AppTilingBehavior {
@@ -345,24 +297,6 @@ extension AppModel {
         }
     }
 
-    func toggleAppDefaultTilingBehavior(for appName: String) {
-        let trimmed = appName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        let currentDefault = appTilingBehavior(for: trimmed)
-        let next: AppTilingBehavior
-        switch currentDefault {
-        case .neverTile:
-            next = .alwaysTile
-        case .alwaysTile:
-            next = .neverTile
-        case .useDefault:
-            next = windowBehaviorPolicyDraft.manualTilingModeEnabled ? .alwaysTile : .neverTile
-        }
-        setAppTilingBehavior(next, for: trimmed, autosave: false)
-        saveWindowBehaviorPolicy()
-    }
-
     func alwaysTileConflictDesktopIndex(for appName: String) -> Int? {
         guard appTilingBehavior(for: appName) == .alwaysTile else { return nil }
         guard let snapshot = liveStateSnapshot, snapshot.source == .yabai, !snapshot.degraded else { return nil }
@@ -440,30 +374,6 @@ extension AppModel {
                     if wasApplyingStagedRules {
                         self.isApplyingStagedAppRules = false
                     }
-                }
-            }
-        }
-    }
-
-    func restoreYabaiConfigBackup(_ backup: ConfigBackupInfo) {
-        guard !isRestoringYabaiConfig else { return }
-        isRestoringYabaiConfig = true
-        Task { [weak self] in
-            guard let self else { return }
-            defer { Task { @MainActor in self.isRestoringYabaiConfig = false } }
-            do {
-                _ = try await self.yabaiRulesConfigService.restoreBackup(path: backup.path)
-                let reloaded = try await self.yabaiRulesConfigService.loadConfigDocument()
-                await MainActor.run {
-                    self.applyYabaiConfigDocumentState(reloaded, preserveDraftIfDirty: false)
-                    self.lastActionMessage = "Restored yabairc backup: \(URL(fileURLWithPath: backup.path).lastPathComponent)"
-                    self.lastErrorMessage = nil
-                }
-                await self.applyWindowBehaviorRuntime(previous: self.originalWindowBehaviorPolicy, current: reloaded.policy)
-            } catch {
-                await MainActor.run {
-                    self.lastErrorMessage = "Restore yabairc backup failed: \(error.localizedDescription)"
-                    self.lastActionMessage = nil
                 }
             }
         }

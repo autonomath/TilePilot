@@ -290,7 +290,7 @@ private func shortcutCommandSegment(from line: String, fallback: String) -> Stri
 }
 
 private func upsertManagedFeatureShortcut(featureID: FeatureControlID, combo: String, command: String) {
-    let marker = managedFeatureMarkerPrefix + featureID.rawValue
+    let marker = ShortcutEntry.managedFeatureMarkerPrefix + featureID.rawValue
     let shortcutLine = "\(combo) : \(command)"
     var lines = managedConfigDraft.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
 
@@ -312,7 +312,7 @@ private func upsertManagedFeatureShortcut(featureID: FeatureControlID, combo: St
 }
 
 private func removeManagedFeatureShortcut(featureID: FeatureControlID) {
-    let marker = managedFeatureMarkerPrefix + featureID.rawValue
+    let marker = ShortcutEntry.managedFeatureMarkerPrefix + featureID.rawValue
     var lines = managedConfigDraft.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
     var index = 0
     while index < lines.count {
@@ -331,5 +331,4 @@ private func removeManagedFeatureShortcut(featureID: FeatureControlID) {
     managedConfigDraft = lines.joined(separator: "\n")
     recomputeConfigDiffPreview()
 }
-
 }

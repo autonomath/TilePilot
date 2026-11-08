@@ -158,24 +158,6 @@ extension AppModel {
         }
     }
 
-    func tileFocusedWindowNow() {
-        guard let focused = focusedWindowState else {
-            lastErrorMessage = "No focused window detected."
-            lastActionMessage = nil
-            return
-        }
-        setWindowFloating(windowID: focused.id, shouldFloat: false, bringToFrontOnFloat: true)
-    }
-
-    func floatFocusedWindowNow() {
-        guard let focused = focusedWindowState else {
-            lastErrorMessage = "No focused window detected."
-            lastActionMessage = nil
-            return
-        }
-        setWindowFloating(windowID: focused.id, shouldFloat: true, bringToFrontOnFloat: true)
-    }
-
     func toggleFocusedWindowTiling() {
         guard let focused = focusedWindowState else {
             lastErrorMessage = "No focused window detected."
@@ -2657,60 +2639,6 @@ extension AppModel {
             savedWindowFramesBeforeTiledWorkSetByScope.removeValue(forKey: scopeKey)
         }
         return restored
-    }
-
-    private func restoreSavedWindowFramesAfterTiledWorkSetIfNeeded(
-        scopeKey: WorkSetScopeKey,
-        windows: [WindowState]? = nil,
-        refreshAfterRestore: Bool = true
-    ) async -> (updated: Int, failed: Int) {
-        guard let savedFrames = savedWindowFramesBeforeTiledWorkSetByScope.removeValue(forKey: scopeKey),
-              !savedFrames.isEmpty else {
-            return (0, 0)
-        }
-
-        let targetWindows = (windows ?? visibleWindowsForWorkSetScope(scopeKey, in: latestLiveStateSnapshot ?? liveStateSnapshot))
-            .filter(\.isRuntimeManageable)
-        var updated = 0
-        var failed = 0
-
-        for window in targetWindows {
-            guard !Task.isCancelled else { break }
-            guard let savedFrame = savedFrames[window.id] else { continue }
-
-            let resizeResult = await doctorService.runSupportCommand(
-                yabaiCommand(
-                    ["-m", "window", String(window.id), "--resize", "abs:\(Int(savedFrame.width)):\(Int(savedFrame.height))"],
-                    timeout: 1.5
-                )
-            )
-            await MainActor.run {
-                appendCommandLog(from: resizeResult)
-            }
-
-            let moveResult = await doctorService.runSupportCommand(
-                yabaiCommand(
-                    ["-m", "window", String(window.id), "--move", "abs:\(Int(savedFrame.x)):\(Int(savedFrame.y))"],
-                    timeout: 1.5
-                )
-            )
-            await MainActor.run {
-                appendCommandLog(from: moveResult)
-            }
-
-            if resizeResult.isSuccess && moveResult.isSuccess {
-                updated += 1
-            } else {
-                failed += 1
-            }
-        }
-
-        if refreshAfterRestore, updated > 0 {
-            try? await Task.sleep(for: .milliseconds(60))
-            await refreshLiveState()
-        }
-
-        return (updated, failed)
     }
 
     private func normalizeWorkSetScopeToFloatingIfNeeded(

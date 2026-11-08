@@ -158,12 +158,6 @@ final class YabaiRulesConfigService: @unchecked Sendable {
         return commands
     }
 
-    func parsePolicy(fromManagedBody body: String) -> ManagedWindowBehaviorPolicy {
-        let managed = parseManagedPolicyComponents(from: body)
-        let runtimeFallback = runtimeConfigAssignments(missingKeys: managed.missingRuntimeKeys)
-        return resolvePolicy(managed: managed, fileFallback: .empty, runtimeFallback: runtimeFallback)
-    }
-
     private func loadConfigDocumentSync() throws -> YabaiConfigDocumentState {
         let path = yabaircPath()
         let fileExists = FileManager.default.fileExists(atPath: path)

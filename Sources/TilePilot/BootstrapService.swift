@@ -10,7 +10,6 @@ struct BootstrapRunResult: Sendable {
 final class BootstrapService: @unchecked Sendable {
     static let startAtLogonLaunchAgentLabel = "com.klode.tilepilot.launcher"
     static let startAtLogonLaunchAgentFileName = "com.klode.tilepilot.launcher.plist"
-    static let setupDirectoryRelativePath = "Library/Application Support/TilePilot/Setup"
     private let runner = CommandRunner()
     private let helperService = ManagedHelperService.shared
 
@@ -39,29 +38,6 @@ final class BootstrapService: @unchecked Sendable {
             managedHelperInstallState: helperService.loadInstallState(),
             commandLogs: []
         )
-    }
-
-    func prepareScriptingAdditionRepairScript() throws -> URL {
-        let fm = FileManager.default
-        let supportDirectory = try Self.setupSupportDirectory(fileManager: fm)
-
-        let scriptURL = supportDirectory.appendingPathComponent("repair_yabai_scripting_addition.command")
-        let script = scriptingAdditionRepairScriptContents()
-        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
-
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var mutableURL = scriptURL
-        try? mutableURL.setResourceValues(values)
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
-        return scriptURL
-    }
-
-    private static func setupSupportDirectory(fileManager: FileManager) throws -> URL {
-        let supportDirectory = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(setupDirectoryRelativePath, isDirectory: true)
-        try fileManager.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
-        return supportDirectory
     }
 
     private func bundledHelpersItem() -> SetupCheckItem {
@@ -111,25 +87,5 @@ final class BootstrapService: @unchecked Sendable {
             state: .warning,
             detail: "Not enabled. Recommended for menu bar availability after sign-in."
         )
-    }
-
-    private func scriptingAdditionRepairScriptContents() -> String {
-        """
-        #!/bin/zsh
-        set -u
-
-        clear
-        echo "=============================================="
-        echo " TilePilot: Unsupported Desktop Control"
-        echo "=============================================="
-        echo
-        echo "TilePilot does not support this desktop-control repair flow."
-        echo
-        echo "If you need unsupported yabai desktop-control features,"
-        echo "handle that setup manually outside TilePilot."
-        echo
-        read -k 1 '?Press any key to close...'
-        echo
-        """
     }
 }

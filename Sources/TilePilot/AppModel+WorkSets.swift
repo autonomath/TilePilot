@@ -112,11 +112,6 @@ extension AppModel {
         return workSets(for: scopeKey)
     }
 
-    var currentDesktopPaletteWindows: [WindowState] {
-        guard let scopeKey = currentDesktopWorkSetScopeKey else { return [] }
-        return paletteWindows(for: scopeKey)
-    }
-
     var visibleWorkSetContexts: [WorkSetDesktopContext] {
         rebuildWorkSetRuntimeCachesIfNeeded()
         return cachedWorkSetVisibleContexts
@@ -171,11 +166,6 @@ extension AppModel {
         )
     }
 
-    func workSetLinkedTemplate(_ workSet: WorkSet) -> WindowLayoutTemplate? {
-        guard let linkedTemplateID = workSet.linkedTemplateID else { return nil }
-        return windowLayoutTemplate(withID: linkedTemplateID)
-    }
-
     func workSetTemplateWarning(_ workSet: WorkSet) -> String? {
         guard workSet.layoutMode == .template else { return nil }
         guard let linkedTemplateID = workSet.linkedTemplateID else {
@@ -224,16 +214,6 @@ extension AppModel {
     }
 
     @discardableResult
-    func createEmptyWorkSetForCurrentDesktop(announce: Bool = true) -> UUID? {
-        guard let scopeKey = currentDesktopWorkSetScopeKey else {
-            lastErrorMessage = "Current desktop data is unavailable right now."
-            lastActionMessage = nil
-            return nil
-        }
-        return createEmptyWorkSet(for: scopeKey, announce: announce)
-    }
-
-    @discardableResult
     func createEmptyWorkSet(for scopeKey: WorkSetScopeKey, announce: Bool = true) -> UUID? {
         guard let context = workSetContext(for: scopeKey) else {
             lastErrorMessage = "Desktop data is unavailable right now."
@@ -249,17 +229,6 @@ extension AppModel {
             announce: announce,
             actionMessage: "Created"
         )
-    }
-
-    @discardableResult
-    func importCurrentDesktopWorkSet() async -> UUID? {
-        await refreshLiveState()
-        guard let scopeKey = currentDesktopWorkSetScopeKey else {
-            lastErrorMessage = "Current desktop data is unavailable right now."
-            lastActionMessage = nil
-            return nil
-        }
-        return importWorkSet(for: scopeKey)
     }
 
     @discardableResult
@@ -394,10 +363,6 @@ extension AppModel {
         guard workSets[index].launchMissingApps != enabled else { return }
         workSets[index] = workSets[index].with(launchMissingApps: enabled)
         persistWorkSets()
-    }
-
-    func addWindowToWorkSet(workSetID: UUID, window: WindowState, at insertionIndex: Int? = nil) {
-        addMemberToWorkSet(workSetID: workSetID, member: WorkSetMember(window: window), at: insertionIndex)
     }
 
     func addMemberToWorkSet(workSetID: UUID, member: WorkSetMember, at insertionIndex: Int? = nil) {
@@ -537,57 +502,6 @@ extension AppModel {
         lastActionMessage = "Added \(sourceMember.appName) to \(destinationWorkSet.name)."
         lastErrorMessage = nil
         return true
-    }
-
-    @discardableResult
-    func createWorkSetWithCopiedMember(_ member: WorkSetMember) -> UUID? {
-        guard let context = currentDesktopWorkSetContext else {
-            lastErrorMessage = "Current desktop data is unavailable right now."
-            lastActionMessage = nil
-            return nil
-        }
-
-        let workSetID = createWorkSet(
-            name: nextAvailableWorkSetName(base: "Work Set"),
-            sourceDisplay: context.display,
-            scopeKey: context.scopeKey,
-            members: [duplicatedMembershipCopy(of: member)],
-            announce: false,
-            actionMessage: "Created"
-        )
-        if let workSet = workSet(withID: workSetID) {
-            lastActionMessage = "Created \(workSet.name) with \(member.appName)."
-            lastErrorMessage = nil
-        }
-        return workSetID
-    }
-
-    @discardableResult
-    func createWorkSetFromDrop(
-        payload: WorkSetDropPayload,
-        before targetMemberID: UUID? = nil
-    ) -> UUID? {
-        guard let newWorkSetID = createEmptyWorkSetForCurrentDesktop(announce: false) else {
-            return nil
-        }
-
-        switch payload {
-        case .member(let sourceWorkSetID, let memberID):
-            moveWorkSetMember(
-                from: sourceWorkSetID,
-                memberID: memberID,
-                to: newWorkSetID,
-                before: targetMemberID
-            )
-        case .window(let member):
-            addMemberToWorkSet(workSetID: newWorkSetID, member: member, at: targetMemberID == nil ? nil : 0)
-        }
-
-        if let workSet = workSet(withID: newWorkSetID) {
-            lastActionMessage = "Created \(workSet.name)."
-            lastErrorMessage = nil
-        }
-        return newWorkSetID
     }
 
     func persistWorkSets() {

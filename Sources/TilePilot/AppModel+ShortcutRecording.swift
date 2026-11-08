@@ -33,10 +33,6 @@ extension AppModel {
     func stopShortcutRecording() {
         shortcutRecordingSession?.stop()
         shortcutRecordingSession = nil
-        if let monitor = shortcutRecordMonitor { NSEvent.removeMonitor(monitor) }
-        if let monitor = shortcutGlobalRecordMonitor { NSEvent.removeMonitor(monitor) }
-        shortcutRecordMonitor = nil
-        shortcutGlobalRecordMonitor = nil
         recordingFeatureID = nil
         recordingShortcutStableKey = nil
         keyboardLayerRecordingTarget = nil

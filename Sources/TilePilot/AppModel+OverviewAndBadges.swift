@@ -192,10 +192,6 @@ extension AppModel {
         }
     }
 
-    var canControlFocusedWindow: Bool {
-        focusedWindowState != nil && doctorSnapshot != nil
-    }
-
     func refreshWindowBadges(forceRepair: Bool = false, contentSignature: String? = nil) {
         guard showWindowBadgeOverlay || showWindowOutlineOverlay else {
             lastWindowBadgeRefreshSignature = nil
@@ -310,62 +306,10 @@ extension AppModel {
         return window.floating
     }
 
-    func updateHoveredWindowForBadges(candidates: [WindowState]? = nil) {
-        guard let snapshot = currentSnapshotForRuntimeConsumers, snapshot.source == .yabai, !snapshot.degraded else {
-            applyWindowBadgeState(windowBadges, hoveredWindowID: nil)
-            return
-        }
-        let windows = (candidates ?? snapshot.windows).filter { window in
-            guard window.isVisible && !window.isMinimized && !window.isHidden else { return false }
-            let normalizedTitle = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let normalizedRole = window.role.trimmingCharacters(in: .whitespacesAndNewlines)
-            let normalizedSubrole = window.subrole.trimmingCharacters(in: .whitespacesAndNewlines)
-            return !isBackdropSurfaceWindow(
-                window,
-                normalizedTitle: normalizedTitle,
-                normalizedRole: normalizedRole,
-                normalizedSubrole: normalizedSubrole,
-                in: snapshot
-            ) && !isTransientDialogSiblingWindow(
-                window,
-                normalizedTitle: normalizedTitle,
-                normalizedRole: normalizedRole,
-                normalizedSubrole: normalizedSubrole,
-                in: snapshot
-            )
-        }
-        guard !windows.isEmpty else {
-            applyWindowBadgeState(windowBadges, hoveredWindowID: nil)
-            return
-        }
-
-        let mouse = NSEvent.mouseLocation
-        let screens = NSScreen.screens
-
-        let hovered = windows
-            .filter { containsMouse(mouse, in: $0, screens: screens) }
-            .sorted { lhs, rhs in
-                if lhs.focused != rhs.focused { return lhs.focused && !rhs.focused }
-                let lhsArea = lhs.frameW * lhs.frameH
-                let rhsArea = rhs.frameW * rhs.frameH
-                if lhsArea != rhsArea { return lhsArea < rhsArea }
-                return lhs.id < rhs.id
-            }
-            .first?
-            .id
-
-        applyWindowBadgeState(windowBadges, hoveredWindowID: hovered)
-    }
-
     var shouldShowWindowBehaviorRecommendation: Bool {
         guard let snapshot = doctorSnapshot else { return false }
         let capabilityByKey = Dictionary(uniqueKeysWithValues: snapshot.capabilities.map { ($0.key, $0.status) })
         return capabilityByKey["yabai-binary"] == .available && !yabaiConfigHasManagedSection
-    }
-
-    private func containsMouse(_ mouse: NSPoint, in window: WindowState, screens: [NSScreen]) -> Bool {
-        let rect = convertTopOriginRectToAppKit(CGRect(x: window.frameX, y: window.frameY, width: window.frameW, height: window.frameH), screens: screens)
-        return rect.contains(mouse)
     }
 
     private func convertTopOriginRectToAppKit(_ rect: CGRect, screens: [NSScreen]) -> CGRect {

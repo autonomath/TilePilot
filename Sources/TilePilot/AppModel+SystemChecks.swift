@@ -2,31 +2,8 @@ import Foundation
 
 @MainActor
 extension AppModel {
-    var coreChecklistItems: [DoctorChecklistItem] {
-        checklistItems.filter(\.isCore)
-    }
-
     var setupChecklistItems: [SetupCheckItem] {
         bootstrapSnapshot?.items ?? []
-    }
-
-    var setupCoreItems: [SetupCheckItem] {
-        setupChecklistItems.filter { ["bundled-helpers", "yabai-binary", "skhd-binary"].contains($0.id) }
-    }
-
-    var setupServiceItems: [SetupCheckItem] {
-        setupChecklistItems.filter {
-            [
-                "helper-service-yabai",
-                "helper-service-skhd",
-                "start-at-logon",
-                "accessibility-permission",
-            ].contains($0.id)
-        }
-    }
-
-    var setupSummaryLine: String {
-        primarySetupSummaryLine
     }
 
     var systemCheckRows: [SystemCheckRow] {
@@ -275,39 +252,6 @@ extension AppModel {
         }
     }
 
-    var advancedChecklistItems: [DoctorChecklistItem] {
-        checklistItems.filter { !$0.isCore }
-    }
-
-    private var checklistItems: [DoctorChecklistItem] {
-        var items: [DoctorChecklistItem] = []
-        for item in doctorSnapshot?.capabilities ?? [] {
-            switch item.key {
-            case "yabai-binary":
-                items.append(checklist(from: item, title: "yabai installed", isCore: true))
-            case "skhd-binary":
-                items.append(checklist(from: item, title: "skhd installed", isCore: true))
-            case "yabai-daemon":
-                items.append(checklist(from: item, title: "yabai daemon running", isCore: true))
-            case "skhd-daemon":
-                items.append(checklist(from: item, title: "skhd daemon running", isCore: true))
-            case "accessibility":
-                items.append(checklist(from: item, title: "Accessibility permission", isCore: false))
-            case "yabai-query":
-                items.append(checklist(from: item, title: "Live yabai query", isCore: true))
-            default:
-                continue
-            }
-        }
-        return items.sorted { lhs, rhs in
-            if lhs.isCore != rhs.isCore { return lhs.isCore && !rhs.isCore }
-            if lhs.status.severityRank != rhs.status.severityRank {
-                return lhs.status.severityRank > rhs.status.severityRank
-            }
-            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
-        }
-    }
-
     private func checklist(from capability: CapabilityState, title: String, isCore: Bool) -> DoctorChecklistItem {
         DoctorChecklistItem(
             title: title,
@@ -357,5 +301,4 @@ extension AppModel {
         }
         return fallback
     }
-
 }

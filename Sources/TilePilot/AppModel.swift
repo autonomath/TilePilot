@@ -302,7 +302,6 @@ final class AppModel: ObservableObject {
     @Published var isLaunchingSetupInstaller = false
     /// Why yabai/skhd quit after the latest start attempt, read from their error logs.
     @Published var windowControlStartFailures: [HelperStartFailure] = []
-    @Published var isLaunchingScriptingAdditionFix = false
     @Published private(set) var hasAcknowledgedInitialStatus = false
     @Published var actionsLastErrorMessage: String?
     @Published var actionsLastActionMessage: String?
@@ -311,8 +310,6 @@ final class AppModel: ObservableObject {
     @Published var nativeSpacesScrubFeasibilityReport: NativeSpacesScrubFeasibilityReport?
     @Published var nativeSpacesScrubFeasibilityReportURL: URL?
     @Published var lastExportURL: URL?
-    @Published var lastSetupInstallerURL: URL?
-    @Published var lastScriptingAdditionRepairURL: URL?
     @Published private(set) var shortcutFilePath: String?
     @Published private(set) var shortcutParseIssues: [String] = []
     @Published var configFilePath: String?
@@ -528,8 +525,6 @@ final class AppModel: ObservableObject {
     private var managedHelperAutoUpgradeTask: Task<Void, Never>?
     var hasAttemptedAutomaticManagedHelperInstall = false
     var hasAttemptedAutomaticManagedHelperServiceStart = false
-    var shortcutRecordMonitor: Any?
-    var shortcutGlobalRecordMonitor: Any?
     var shortcutRecordingSession: ShortcutRecordingSession?
     var hasDismissedAutomaticSetupGuideThisSession = false
     var automaticSetupGuideStartupGraceElapsed = false
@@ -576,7 +571,6 @@ final class AppModel: ObservableObject {
     let isInitialSetupLaunchSession = SetupGuideAutomaticPresentationPolicy.shouldPresentImmediatelyOnFirstLaunch(
         initialSetupLandingShown: UserDefaults.standard.bool(forKey: AppModel.initialSetupLandingShownDefaultsKey)
     )
-    let managedFeatureMarkerPrefix = ShortcutEntry.managedFeatureMarkerPrefix
     var hasAttemptedReleaseDefaultsInitialization = false
     var windowBehaviorAutoSaveTask: Task<Void, Never>?
     let windowBehaviorAutoSaveDelayNanoseconds: UInt64 = 400_000_000
@@ -912,10 +906,6 @@ final class AppModel: ObservableObject {
         return explanation
     }
 
-    func actionButtonLabel(for actionID: TilePilotActionID) -> String {
-        TilePilotActionCatalog.meta(for: actionID).buttonLabel
-    }
-
     func updateManagedConfigDraft(_ newValue: String) {
         managedConfigDraft = newValue
         recomputeConfigDiffPreview()
@@ -1042,22 +1032,6 @@ final class AppModel: ObservableObject {
         let savedNeverKeys = Set(windowBehaviorPolicyDraft.neverTileApps.map(normalizedAppRuleKey))
         let savedAlwaysKeys = Set(windowBehaviorPolicyDraft.alwaysTileApps.map(normalizedAppRuleKey))
         return stagedNeverKeys != savedNeverKeys || stagedAlwaysKeys != savedAlwaysKeys
-    }
-
-    func addNeverTileApp(_ name: String) {
-        addStagedNeverTileApp(name)
-    }
-
-    func removeNeverTileApp(_ name: String) {
-        removeStagedNeverTileApp(name)
-    }
-
-    func addAlwaysTileApp(_ name: String) {
-        addStagedAlwaysTileApp(name)
-    }
-
-    func removeAlwaysTileApp(_ name: String) {
-        removeStagedAlwaysTileApp(name)
     }
 
     func featureDefinition(forActionID actionID: TilePilotActionID) -> FeatureDefinition? {
@@ -1549,10 +1523,6 @@ final class AppModel: ObservableObject {
 
     func invalidateOverviewCaches() {
         overviewCachesDirty = true
-    }
-
-    func invalidateShortcutPresentationCaches() {
-        shortcutPresentationCachesDirty = true
     }
 
     private func updateOverviewCachesForCurrentVisibility(with snapshot: LiveStateSnapshot) {

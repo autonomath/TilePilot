@@ -131,10 +131,6 @@ extension AppModel {
             }
     }
 
-    var quickActionCards: [TilePilotActionCard] {
-        actionCards.filter { ["Layouts", "Window"].contains($0.category) && $0.id != .browserReliefPlaceholder }
-    }
-
     func runBestEffortSkhdRestart(afterConfigChange: Bool) async {
         let failure = await requestRunningSkhdReload()
         // Doctor refresh clears generic action feedback. Publish the save and

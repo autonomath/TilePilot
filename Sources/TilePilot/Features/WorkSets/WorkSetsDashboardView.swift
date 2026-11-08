@@ -702,17 +702,6 @@ struct WorkSetsDashboardView: View {
             .padding(.vertical, 5)
             .background(tint.opacity(0.14), in: Capsule())
     }
-
-    private func workSetLayoutModeSystemImage(_ layoutMode: WorkSetLayoutMode) -> String {
-        switch layoutMode {
-        case .stackOnly:
-            return "square.stack.3d.up"
-        case .tiled:
-            return "rectangle.split.3x1"
-        case .template:
-            return "rectangle.3.offgrid"
-        }
-    }
 }
 
 private struct WorkSetMemberRow: View {

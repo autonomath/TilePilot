@@ -147,13 +147,6 @@ extension AppModel {
         }
     }
 
-    func disablePerformanceOverlays() {
-        setWindowBadgeOverlayEnabled(false)
-        setWindowOutlineOverlayEnabled(false)
-        lastActionMessage = "Overlays disabled."
-        lastErrorMessage = nil
-    }
-
     func setWindowBadgeOverlayEnabled(_ enabled: Bool) {
         guard showWindowBadgeOverlay != enabled else { return }
         showWindowBadgeOverlay = enabled

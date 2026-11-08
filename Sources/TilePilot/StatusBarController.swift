@@ -259,16 +259,6 @@ final class StatusBarController: NSObject {
         return image
     }
 
-    private func tintColor(for badge: HealthBadgeLevel?) -> NSColor {
-        switch badge {
-        case .healthy: return .systemGreen
-        case .warning: return .systemYellow
-        case .degraded: return .systemOrange
-        case .blocked: return .systemRed
-        case .none: return .labelColor
-        }
-    }
-
     @objc
     private func handleStatusItemClick(_ sender: Any?) {
         let event = NSApp.currentEvent
@@ -694,16 +684,6 @@ final class StatusBarController: NSObject {
         onOpenTilePilot()
     }
 
-    @objc private func tileFocusedWindow() {
-        model.acknowledgeInitialStatusIfNeeded()
-        model.tileFocusedWindowNow()
-    }
-
-    @objc private func floatFocusedWindow() {
-        model.acknowledgeInitialStatusIfNeeded()
-        model.floatFocusedWindowNow()
-    }
-
     @objc private func toggleFocusedWindowTiling() {
         model.acknowledgeInitialStatusIfNeeded()
         model.toggleFocusedWindowTiling()
@@ -733,11 +713,6 @@ final class StatusBarController: NSObject {
         model.openLatestReleasePage()
     }
 
-    @objc private func runSetupInstaller() {
-        model.acknowledgeInitialStatusIfNeeded()
-        model.performPrimarySetupAction()
-    }
-
     @objc private func runPinnedShortcut(_ sender: NSMenuItem) {
         guard let stableKey = sender.representedObject as? String else { return }
         model.acknowledgeInitialStatusIfNeeded()
@@ -748,11 +723,6 @@ final class StatusBarController: NSObject {
         guard let raw = sender.representedObject as? String else { return }
         model.acknowledgeInitialStatusIfNeeded()
         model.runFeatureControl(FeatureControlID(rawValue: raw), source: .statusMenu)
-    }
-
-    @objc private func copyIssueSummary() {
-        model.acknowledgeInitialStatusIfNeeded()
-        model.copyIssueReadySummary()
     }
 
     @objc private func exportDiagnostics() {
@@ -792,10 +762,6 @@ final class StatusBarController: NSObject {
 
     @objc private func quitApp() {
         onQuit()
-    }
-
-    private func menuBarBadgeLevel() -> HealthBadgeLevel? {
-        model.menuBarVisualBadgeLevel
     }
 }
 

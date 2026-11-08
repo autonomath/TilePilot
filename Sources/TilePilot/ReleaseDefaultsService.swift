@@ -75,13 +75,6 @@ final class ReleaseDefaultsService: @unchecked Sendable {
         try data.write(to: currentAlias, options: .atomic)
     }
 
-    func loadLastSnapshotIfPresent() -> ReleaseDefaultsProfile? {
-        let currentAlias = defaultsDirectoryURL().appendingPathComponent("release-defaults-current.json")
-        guard fileManager.fileExists(atPath: currentAlias.path) else { return nil }
-        guard let data = try? Data(contentsOf: currentAlias) else { return nil }
-        return try? JSONDecoder().decode(ReleaseDefaultsProfile.self, from: data)
-    }
-
     func hasLegacyUserDefaultsFootprint(_ defaults: UserDefaults = .standard) -> Bool {
         let keys = [
             "TilePilot.windowLayoutTemplates",

@@ -2,14 +2,6 @@ import Foundation
 
 @MainActor
 extension AppModel {
-func displayShortcutCombo(_ entry: ShortcutEntry) -> String {
-    let display = parseShortcutComboDisplay(entry.combo)
-    if display.symbols == display.words || display.symbols.isEmpty {
-        return display.words
-    }
-    return "\(display.symbols)  \(display.words)"
-}
-
 func displayShortcutComboWords(_ entry: ShortcutEntry) -> String {
     cachedShortcutComboWordsByStableKey[entry.stableKey] ?? parseShortcutComboDisplay(entry.combo).words
 }
@@ -28,19 +20,6 @@ func displayShortcutComboSymbols(from combo: String) -> String {
 
 func displayShortcutComboWords(from combo: String) -> String {
     parseShortcutComboDisplay(combo).words
-}
-
-func displayShortcutPrimaryKey(_ entry: ShortcutEntry) -> String {
-    let trimmed = entry.combo.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return "?" }
-    let separatorIndex = trimmed.lastIndex(of: "-")
-    let keyPartRaw = separatorIndex.map { String(trimmed[trimmed.index(after: $0)...]) } ?? trimmed
-    let keyTokens = keyPartRaw
-        .split(whereSeparator: \.isWhitespace)
-        .map(String.init)
-        .filter { !$0.isEmpty }
-    let firstToken = (keyTokens.isEmpty ? [keyPartRaw.trimmingCharacters(in: .whitespacesAndNewlines)] : keyTokens).first?.lowercased() ?? ""
-    return displayPrimaryKeyToken(lower: firstToken)
 }
 
 var pinnedShortcutEntries: [ShortcutEntry] {
@@ -302,25 +281,6 @@ private func displayKeySymbol(lower: String, original: String) -> String {
     default:
         if original.count == 1 { return original.uppercased() }
         return original
-    }
-}
-
-private func displayPrimaryKeyToken(lower: String) -> String {
-    switch lower {
-    case "0x32", "grave", "backtick":
-        return "~"
-    case "left":
-        return "←"
-    case "right":
-        return "→"
-    case "up":
-        return "↑"
-    case "down":
-        return "↓"
-    case "space":
-        return "Space"
-    default:
-        return lower.isEmpty ? "?" : lower.uppercased()
     }
 }
 }

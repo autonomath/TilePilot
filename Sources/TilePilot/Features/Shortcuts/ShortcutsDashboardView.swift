@@ -876,17 +876,6 @@ struct ShortcutsDashboardView: View {
         )
     }
 
-    private struct DesktopShortcutFamilySummary: Identifiable {
-        enum Kind: String {
-            case goToDesktop
-            case moveWindowToDesktopAndFollow
-        }
-
-        let kind: Kind
-        let entries: [(entry: ShortcutEntry, desktop: Int)]
-        var id: String { kind.rawValue }
-    }
-
     private struct DirectionalShortcutFamilySummary: Identifiable {
         enum Kind: String, CaseIterable {
             case focusWindow
@@ -916,45 +905,6 @@ struct ShortcutsDashboardView: View {
         var id: String { kind.rawValue }
     }
 
-    @ViewBuilder
-    private func desktopShortcutsSection(_ entries: [ShortcutEntry]) -> some View {
-        let summaries = desktopShortcutFamilies(from: entries)
-        let covered = Set(summaries.flatMap { $0.entries.map { $0.entry.id } })
-        let leftovers = entries.filter { !covered.contains($0.id) }
-
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(summaries) { summary in
-                desktopShortcutFamilyCard(summary)
-            }
-            if !leftovers.isEmpty {
-                ForEach(leftovers) { entry in
-                    shortcutRow(entry)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func directionalShortcutsSection(
-        _ entries: [ShortcutEntry],
-        kinds: Set<DirectionalShortcutFamilySummary.Kind>
-    ) -> some View {
-        let summaries = directionalShortcutFamilies(from: entries).filter { kinds.contains($0.kind) }
-        let covered = Set(summaries.flatMap { $0.entries.map { $0.entry.id } })
-        let leftovers = entries.filter { !covered.contains($0.id) }
-
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(summaries) { summary in
-                directionalShortcutFamilyCard(summary)
-            }
-            if !leftovers.isEmpty {
-                ForEach(leftovers) { entry in
-                    shortcutRow(entry)
-                }
-            }
-        }
-    }
-
     private func directionalSummary(
         group: DirectionalShortcutGroup,
         bindings: [DirectionalShortcutBinding]
@@ -966,19 +916,6 @@ struct ShortcutsDashboardView: View {
         }
         guard !mappedEntries.isEmpty else { return nil }
         return DirectionalShortcutFamilySummary(kind: kind, entries: mappedEntries)
-    }
-
-    private func directionalKinds(for group: UnifiedControlGroup) -> Set<DirectionalShortcutFamilySummary.Kind> {
-        switch group {
-        case .windowPlacement:
-            return [.moveWindow, .swapWindow]
-        case .windowSize:
-            return [.resizeWindow]
-        case .focus:
-            return [.focusWindow]
-        default:
-            return []
-        }
     }
 
     private func directionalShortcutFamilyCard(_ summary: DirectionalShortcutFamilySummary) -> some View {
@@ -1082,148 +1019,6 @@ struct ShortcutsDashboardView: View {
         }
     }
 
-    private func desktopShortcutFamilyCard(_ summary: DesktopShortcutFamilySummary) -> some View {
-        let exampleLimit = summary.entries.count <= 4 ? 4 : 3
-        let examples = Array(summary.entries.prefix(exampleLimit))
-        let moreCount = max(0, summary.entries.count - examples.count)
-
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(desktopFamilyTitle(summary.kind))
-                        .font(.subheadline.weight(.semibold))
-                    Text(desktopFamilyDescription(summary.kind))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                Spacer()
-                if summary.kind == .goToDesktop {
-                    Button("Use macOS Shortcut") {
-                        model.openMissionControlKeyboardShortcuts()
-                    }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .environment(\.controlActiveState, .key)
-                } else {
-                    Text("Requires SA")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.orange.opacity(0.1), in: Capsule())
-                }
-            }
-
-            HStack(spacing: 6) {
-                ForEach(examples, id: \.entry.id) { sample in
-                    Button {
-                        model.selectShortcut(sample.entry)
-                    } label: {
-                        HStack(alignment: .center, spacing: 6) {
-                            Text(model.displayShortcutComboWords(sample.entry))
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(model.displayShortcutComboSymbolsSpaced(sample.entry))
-                                .font(.system(size: 14, weight: .semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    .help(desktopExampleHelp(sample.entry, desktop: sample.desktop, kind: summary.kind))
-                }
-                if moreCount > 0 {
-                    Text("+\(moreCount) more")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-        }
-        .padding(8)
-        .background(Color.secondary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func desktopShortcutFamilies(from entries: [ShortcutEntry]) -> [DesktopShortcutFamilySummary] {
-        var goTo: [(ShortcutEntry, Int)] = []
-
-        for entry in entries {
-            if let desktop = desktopGoToTarget(from: entry.command), !entry.command.lowercased().contains("window --space") {
-                goTo.append((entry, desktop))
-                continue
-            }
-        }
-
-        let sortedGoTo = goTo.sorted { lhs, rhs in lhs.1 == rhs.1 ? lhs.0.sourceLine < rhs.0.sourceLine : lhs.1 < rhs.1 }
-
-        var output: [DesktopShortcutFamilySummary] = []
-        if !sortedGoTo.isEmpty {
-            output.append(.init(kind: .goToDesktop, entries: sortedGoTo.map { ($0.0, $0.1) }))
-        }
-        return output
-    }
-
-    private func directionalShortcutFamilies(from entries: [ShortcutEntry]) -> [DirectionalShortcutFamilySummary] {
-        var buckets: [DirectionalShortcutFamilySummary.Kind: [(ShortcutEntry, DirectionalShortcutFamilySummary.Direction)]] = [:]
-
-        for entry in entries {
-            guard let (kind, direction) = directionalShortcutKindAndDirection(from: entry.command) else { continue }
-            buckets[kind, default: []].append((entry, direction))
-        }
-
-        var output: [DirectionalShortcutFamilySummary] = []
-        for kind in DirectionalShortcutFamilySummary.Kind.allCases {
-            guard let rawEntries = buckets[kind], !rawEntries.isEmpty else { continue }
-            let sorted = rawEntries.sorted { lhs, rhs in
-                if lhs.1.sortRank != rhs.1.sortRank { return lhs.1.sortRank < rhs.1.sortRank }
-                return lhs.0.sourceLine < rhs.0.sourceLine
-            }
-            output.append(.init(kind: kind, entries: sorted.map { ($0.0, $0.1) }))
-        }
-        return output
-    }
-
-    private func directionalShortcutKindAndDirection(from command: String) -> (DirectionalShortcutFamilySummary.Kind, DirectionalShortcutFamilySummary.Direction)? {
-        let c = command.lowercased()
-
-        if let direction = cardinalDirection(from: c, west: "yabai -m window --focus west", east: "yabai -m window --focus east", north: "yabai -m window --focus north", south: "yabai -m window --focus south") {
-            return (.focusWindow, direction)
-        }
-        if let direction = cardinalDirection(from: c, west: "yabai -m window --warp west", east: "yabai -m window --warp east", north: "yabai -m window --warp north", south: "yabai -m window --warp south") {
-            return (.moveWindow, direction)
-        }
-        if let direction = cardinalDirection(from: c, west: "yabai -m window --swap west", east: "yabai -m window --swap east", north: "yabai -m window --swap north", south: "yabai -m window --swap south") {
-            return (.swapWindow, direction)
-        }
-
-        if c.contains("yabai -m window --resize left:") { return (.resizeWindow, .left) }
-        if c.contains("yabai -m window --resize right:") { return (.resizeWindow, .right) }
-        if c.contains("yabai -m window --resize top:") { return (.resizeWindow, .up) }
-        if c.contains("yabai -m window --resize bottom:") { return (.resizeWindow, .down) }
-
-        return nil
-    }
-
-    private func cardinalDirection(
-        from command: String,
-        west: String,
-        east: String,
-        north: String,
-        south: String
-    ) -> DirectionalShortcutFamilySummary.Direction? {
-        if command.contains(north) { return .up }
-        if command.contains(west) { return .left }
-        if command.contains(south) { return .down }
-        if command.contains(east) { return .right }
-        return nil
-    }
-
     private func directionalFamilyTitle(_ kind: DirectionalShortcutFamilySummary.Kind) -> String {
         switch kind {
         case .focusWindow:
@@ -1314,31 +1109,6 @@ struct ShortcutsDashboardView: View {
         .lineLimit(1)
     }
 
-    private func desktopFamilyTitle(_ kind: DesktopShortcutFamilySummary.Kind) -> String {
-        switch kind {
-        case .goToDesktop: return "Go to Desktop"
-        case .moveWindowToDesktopAndFollow: return "Move Window to Desktop"
-        }
-    }
-
-    private func desktopFamilyDescription(_ kind: DesktopShortcutFamilySummary.Kind) -> String {
-        switch kind {
-        case .goToDesktop:
-            return "Switch to desktop number N using your configured desktop shortcut."
-        case .moveWindowToDesktopAndFollow:
-            return "This shortcut family is not supported by TilePilot."
-        }
-    }
-
-    private func desktopExampleHelp(_ entry: ShortcutEntry, desktop: Int, kind: DesktopShortcutFamilySummary.Kind) -> String {
-        switch kind {
-        case .goToDesktop:
-            return "\(model.displayShortcutComboWords(entry)) switches to Desktop \(desktop)."
-        case .moveWindowToDesktopAndFollow:
-            return "\(model.displayShortcutComboWords(entry)) moves the focused window to Desktop \(desktop), then switches there."
-        }
-    }
-
     private func desktopGoToTarget(from command: String) -> Int? {
         let c = command.lowercased()
         guard !c.contains("window --space") else { return nil }
@@ -1355,85 +1125,5 @@ struct ShortcutsDashboardView: View {
         let suffix = c[range.upperBound...]
         let digits = suffix.prefix { $0.isNumber }
         return Int(digits)
-    }
-
-    private func shortcutIntentGroup(_ entry: ShortcutEntry) -> String {
-        let c = entry.command.lowercased()
-
-        if c.contains("yabai -m window --space") {
-            return "Experimental Desktop Move"
-        }
-        if c.contains("yabai -m space --focus") {
-            return "Desktops"
-        }
-        if c.contains("yabai -m window --warp") {
-            return "Window Placement"
-        }
-        if c.contains("yabai -m window --resize") {
-            return "Window Size"
-        }
-        if c.contains("yabai -m window --toggle float") ||
-            c.contains("yabai -m space --balance") ||
-            c.contains("yabai -m space --layout") ||
-            c.contains("yabai -m space --rotate") {
-            return "Tiling & Layout"
-        }
-        if c.contains("yabai -m window --focus") {
-            return "Focus"
-        }
-        if c.contains("yabai -m display") {
-            return "Displays"
-        }
-        if c.contains("osascript") || c.contains("skhd -k") {
-            return "Automation"
-        }
-
-        if c.hasPrefix("open ") || c.contains(" open ") {
-            return "Apps"
-        }
-        if let first = c.split(whereSeparator: \.isWhitespace).first {
-            let token = String(first)
-            if token.hasPrefix("/") || token.hasPrefix("~/") || token.hasPrefix("./") {
-                return "Helpers & Scripts"
-            }
-        }
-
-        if entry.category == "Spaces" { return "Desktops" }
-        if entry.category == "Windows" { return "Tiling & Layout" }
-        return entry.category == "Other" ? "Other" : entry.category
-    }
-
-    private func shortcutGroupRank(_ group: String) -> Int {
-        switch group {
-        case "Desktops": return 0
-        case "Window Placement": return 1
-        case "Tiling & Layout": return 2
-        case "Window Size": return 3
-        case "Helpers & Scripts": return 4
-        case "Apps": return 5
-        case "Focus": return 6
-        case "Displays": return 7
-        case "Automation": return 8
-        case "Other": return 98
-        case "Experimental Desktop Move": return 99
-        default: return 50
-        }
-    }
-
-    private func shortcutGroupTitle(_ group: String) -> String {
-        switch group {
-        case "Experimental Desktop Move":
-            return "Desktop Move (Experimental)"
-        default:
-            return group
-        }
-    }
-}
-
-private struct ShortcutsRowFramePreferenceKey: PreferenceKey {
-    static let defaultValue: [String: CGRect] = [:]
-
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
     }
 }

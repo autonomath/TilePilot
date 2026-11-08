@@ -43,43 +43,6 @@ extension AppModel {
         }
     }
 
-    func copyIssueReadySummary() {
-        guard let snapshot = doctorSnapshot else {
-            lastErrorMessage = "Run System Recheck before copying a status summary."
-            return
-        }
-
-        let failing = snapshot.capabilities
-            .filter { $0.status != .available }
-            .sorted { $0.status.severityRank > $1.status.severityRank }
-
-        var lines: [String] = []
-        lines.append("TilePilot Status Summary")
-        lines.append("Generated: \(snapshot.generatedAt.formatted(date: .abbreviated, time: .standard))")
-        lines.append("macOS: \(snapshot.systemProfile.macOSVersion)")
-        lines.append("Build: \(snapshot.systemProfile.macOSBuild ?? "unknown")")
-        lines.append("Arch: \(snapshot.systemProfile.arch)")
-        lines.append("yabai: \(snapshot.systemProfile.yabaiVersion ?? "not detected")")
-        lines.append("skhd: \(snapshot.systemProfile.skhdVersion ?? "not detected")")
-        lines.append("Health: \(snapshot.healthBadge.title)")
-        lines.append("")
-        lines.append("Capabilities:")
-        for item in failing.prefix(8) {
-            lines.append("- \(item.key): \(item.status.rawValue) (\(item.reasonCode ?? "no-reason"))")
-            lines.append("  \(item.message)")
-        }
-        if !snapshot.compatibilityWarnings.isEmpty {
-            lines.append("")
-            lines.append("Warnings:")
-            snapshot.compatibilityWarnings.forEach { lines.append("- \($0)") }
-        }
-
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
-        lastErrorMessage = nil
-        lastActionMessage = "Issue-ready summary copied to clipboard."
-    }
-
     func installManagedHelpers() {
         Task { [weak self] in
             guard let self else { return }
@@ -239,10 +202,6 @@ extension AppModel {
         guard helperService.hasManagedHelperInstall() else { return false }
         guard bootstrapManagedHelperBinariesInstalled(in: result.snapshot) else { return false }
         return !bootstrapWindowControlServicesRunning(in: result.snapshot)
-    }
-
-    func runSetupInstallerInTerminal() {
-        installManagedHelpers()
     }
 
     func runScriptingAdditionRepairInTerminal() {
@@ -449,14 +408,6 @@ extension AppModel {
             await self.refreshBootstrapSetup()
             await self.refreshDoctor()
         }
-    }
-
-    func startBrewServiceYabai() {
-        startYabaiBestEffort()
-    }
-
-    func startBrewServiceSkhd() {
-        startSkhdBestEffort()
     }
 
     func startWindowControlBestEffort() {
