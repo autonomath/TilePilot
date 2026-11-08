@@ -40,16 +40,23 @@ final class SkhdShortcutService: @unchecked Sendable {
 
         let lines = raw.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
         var entries: [ShortcutEntry] = []
+        var managedFeatureID: String?
 
         for (index, lineSubseq) in lines.enumerated() {
             let lineNumber = index + 1
             let line = String(lineSubseq)
 
-            if let entry = parseLine(line, lineNumber: lineNumber, filePath: path) {
+            if var entry = parseLine(line, lineNumber: lineNumber, filePath: path) {
+                entry.managedFeatureID = managedFeatureID
                 entries.append(entry)
             } else if shouldCountAsMalformed(line) {
                 issues.append("Line \(lineNumber): could not parse shortcut entry")
             }
+            // A feature marker labels only the line right below it.
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            managedFeatureID = trimmed.hasPrefix(ShortcutEntry.managedFeatureMarkerPrefix)
+                ? String(trimmed.dropFirst(ShortcutEntry.managedFeatureMarkerPrefix.count))
+                : nil
         }
 
         return ShortcutLoadResult(entries: entries, filePath: path, issues: Array(issues.prefix(50)))

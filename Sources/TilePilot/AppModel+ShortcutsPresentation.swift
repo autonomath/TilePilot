@@ -13,6 +13,8 @@ func buildUnifiedControlRows() -> [UnifiedControlRow] {
 
     for entry in shortcutEntries {
         let intent = shortcutIntentKey(for: entry)
+        // Keep the line TilePilot manages when another line does the same thing.
+        if entry.managedFeatureID == nil, byIntent[intent]?.shortcutEntry?.managedFeatureID != nil { continue }
         let group = unifiedGroup(for: entry)
         let matchingAction = matchingActionID(forShortcutIntentKey: intent)
         if let matchingAction {
@@ -609,6 +611,12 @@ func buildFlatShortcutsOrderRankByID() -> [String: Int] {
 }
 
 private func preferredFeatureRow(existing: FeatureControlRow, candidate: FeatureControlRow) -> FeatureControlRow {
+    // Recording rewrites the line under this feature's marker, so show that line.
+    if let featureID = candidate.featureID?.rawValue {
+        let existingIsManaged = existing.shortcutEntry?.managedFeatureID == featureID
+        let candidateIsManaged = candidate.shortcutEntry?.managedFeatureID == featureID
+        if existingIsManaged != candidateIsManaged { return candidateIsManaged ? candidate : existing }
+    }
     if existing.shortcutEntry == nil, candidate.shortcutEntry != nil { return candidate }
     if existing.shortcutEntry != nil, candidate.shortcutEntry == nil { return existing }
     if existing.disabledReason != nil, candidate.disabledReason == nil { return candidate }

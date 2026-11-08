@@ -495,14 +495,20 @@ extension AppModel {
     }
 
     func featureDefinition(for entry: ShortcutEntry) -> FeatureDefinition? {
+        let definitions = featureDefinitions
+        if let id = entry.managedFeatureID, let definition = definitions.first(where: { $0.id.rawValue == id }) {
+            return definition
+        }
         let command = normalizedFeatureMatchCommand(entry.command.lowercased())
-        return featureDefinitions.first { definition in
+        let matches = { (definition: FeatureDefinition) -> Bool in
             guard !definition.commandMatchers.isEmpty else { return false }
             if definition.matchAllCommandMatchers {
                 return definition.commandMatchers.allSatisfy { command.contains($0) }
             }
             return definition.commandMatchers.contains(where: { command.contains($0) })
         }
+        // Needing every matcher is more specific: "layout bsp; balance" is not plain "layout bsp".
+        return definitions.first { $0.matchAllCommandMatchers && matches($0) } ?? definitions.first(where: matches)
     }
 
     func normalizedFeatureMatchCommand(_ raw: String) -> String {

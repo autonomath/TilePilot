@@ -1,6 +1,8 @@
 import Foundation
 
 struct ShortcutEntry: Identifiable, Codable, Sendable {
+    static let managedFeatureMarkerPrefix = "# TILEPILOT_FEATURE "
+
     let id: UUID
     let combo: String
     let command: String
@@ -8,6 +10,8 @@ struct ShortcutEntry: Identifiable, Codable, Sendable {
     let sourceLine: Int
     let sourceFile: String
     let warning: String?
+    /// Feature named by the marker on the line above; recording that feature rewrites this line.
+    var managedFeatureID: String? = nil
 
     var stableKey: String {
         "\(combo)\n\(command)"

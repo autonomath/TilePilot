@@ -576,7 +576,7 @@ final class AppModel: ObservableObject {
     let isInitialSetupLaunchSession = SetupGuideAutomaticPresentationPolicy.shouldPresentImmediatelyOnFirstLaunch(
         initialSetupLandingShown: UserDefaults.standard.bool(forKey: AppModel.initialSetupLandingShownDefaultsKey)
     )
-    let managedFeatureMarkerPrefix = "# TILEPILOT_FEATURE "
+    let managedFeatureMarkerPrefix = ShortcutEntry.managedFeatureMarkerPrefix
     var hasAttemptedReleaseDefaultsInitialization = false
     var windowBehaviorAutoSaveTask: Task<Void, Never>?
     let windowBehaviorAutoSaveDelayNanoseconds: UInt64 = 400_000_000
