@@ -113,6 +113,12 @@ final class ConfigService: @unchecked Sendable {
         DefaultShortcutProfile.managedSkhdSectionBody()
     }
 
+    /// skhd reads `~` as syntax, so one `… - ~ :` line makes it load no shortcuts at all.
+    /// Older release defaults wrote that for the backtick key; 0x32 is the same key.
+    static func repairedManagedSectionBody(_ body: String) -> String {
+        body.replacingOccurrences(of: #"(?m)^([^#:\n]*)-[ \t]*~([ \t]*:)"#, with: "$1- 0x32$2", options: .regularExpression)
+    }
+
     private func loadConfigDocumentSync() throws -> ConfigDocumentState {
         let path = skhdrcPath()
         let fileExists = FileManager.default.fileExists(atPath: path)

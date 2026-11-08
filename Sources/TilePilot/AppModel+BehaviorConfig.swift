@@ -11,6 +11,11 @@ extension AppModel {
             let state = try await configService.loadConfigDocument()
             applyConfigDocumentState(state, preserveUserDraftIfDirty: false)
             lastErrorMessage = nil
+            let repaired = ConfigService.repairedManagedSectionBody(state.managedSectionBody)
+            if state.hasManagedSection, repaired != state.managedSectionBody {
+                managedConfigDraft = repaired
+                saveManagedConfigSection()
+            }
         } catch {
             lastErrorMessage = "Failed to load config: \(error.localizedDescription)"
             lastActionMessage = nil

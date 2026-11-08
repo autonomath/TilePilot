@@ -22,6 +22,27 @@ final class ReleaseDefaultsTests: XCTestCase {
         )
     }
 
+    func testDefaultsUseAKeySkhdCanParse() {
+        let body = ReleaseDefaultsService().currentProfile().configState.managedSkhdSectionBody
+        XCTAssertTrue(body.contains("ctrl + shift + alt - 0x32 : yabai -m window --toggle float"))
+        XCTAssertEqual(ConfigService.repairedManagedSectionBody(body), body)
+    }
+
+    func testRepairReplacesTildeKeyOnly() {
+        let body = """
+        # ctrl - ~ : comment stays
+        ctrl + shift + alt - ~ : yabai -m window --toggle float
+        ctrl - d : ~/.config/yabai/scripts/a-b.sh ~ :x
+        alt + cmd - a : /usr/bin/open -g "tilepilot://feature/app.open-megamap"
+        """
+        XCTAssertEqual(ConfigService.repairedManagedSectionBody(body), """
+        # ctrl - ~ : comment stays
+        ctrl + shift + alt - 0x32 : yabai -m window --toggle float
+        ctrl - d : ~/.config/yabai/scripts/a-b.sh ~ :x
+        alt + cmd - a : /usr/bin/open -g "tilepilot://feature/app.open-megamap"
+        """)
+    }
+
     func testReleaseDefaultsResetClearsWorkAreas() {
         XCTAssertEqual(ReleaseDefaultsService().currentProfile().userState.workAreas, [])
     }

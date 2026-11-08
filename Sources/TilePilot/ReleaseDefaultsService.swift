@@ -1,7 +1,7 @@
 import Foundation
 
 final class ReleaseDefaultsService: @unchecked Sendable {
-    static let currentProfileVersion = "v0.4.9-defaults.1"
+    static let currentProfileVersion = "v0.4.9-defaults.2"
 
     private let fileManager = FileManager.default
 
@@ -173,7 +173,7 @@ enum DefaultShortcutProfile {
         # TILEPILOT_FEATURE screen.balance-current-desktop
         alt - 0 : yabai -m space --balance
         # TILEPILOT_FEATURE action.toggle-float
-        ctrl + shift + alt - ~ : yabai -m window --toggle float
+        ctrl + shift + alt - 0x32 : yabai -m window --toggle float
 
         # Desktop Move (Experimental)
         shift + alt - 1 : yabai -m window --space 1; yabai -m space --focus 1

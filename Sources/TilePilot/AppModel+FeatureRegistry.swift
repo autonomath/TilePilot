@@ -229,7 +229,7 @@ extension AppModel {
                 description: "Toggles the focused window between floating and tiled.",
                 backend: .tilePilotAction,
                 capabilityGate: .yabaiRuntime,
-                defaultCombo: "ctrl + shift + alt - ~",
+                defaultCombo: "ctrl + shift + alt - 0x32",
                 commandMatchers: ["yabai -m window --toggle float"],
                 matchAllCommandMatchers: false,
                 preferredCommand: "yabai -m window --toggle float",
