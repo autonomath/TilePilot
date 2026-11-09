@@ -5,7 +5,7 @@ Native macOS window-workflow app that makes yabai/skhd tiling, floating layouts,
 - Swift tools 6.2; verified with Apple Swift 6.2.3.
 - SwiftUI application with AppKit, ApplicationServices/Accessibility, CoreGraphics, and Combine.
 - macOS 13+; Swift Package Manager; no third-party Swift package dependencies or lockfile.
-- Packaged helpers: yabai 7.1.17 and skhd 0.3.9, fetched from pinned checksummed sources.
+- Packaged helpers: yabai 7.1.25 and skhd 0.3.9, fetched from pinned checksummed sources. yabai before 7.1.19 can't switch desktops with SIP on, and before 7.1.25 can't move windows between desktops, so older Homebrew yabai leaves the default ⌥1–9 and ⇧⌥1–9 keys dead.
 
 ## Setup
 ```bash

@@ -2,7 +2,7 @@
 import XCTest
 @testable import TilePilot
 
-/// Abort lines below are copied from the bundled yabai 7.1.17 binary and skhd 0.3.9 source.
+/// Abort lines below are copied from the bundled yabai 7.1.25 binary and skhd 0.3.9 source.
 final class HelperStartFailureDiagnosisTests: XCTestCase {
     func testRecognizesYabaiAccessibilityAbort() {
         let failure = HelperStartFailureDiagnosis.failure(
