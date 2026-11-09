@@ -497,6 +497,7 @@ final class AppModel: ObservableObject {
     private(set) var cachedFeatureControlRows: [FeatureControlRow] = []
     private(set) var cachedFeatureControlRowByShortcutStableKey: [String: FeatureControlRow] = [:]
     private(set) var cachedFeatureControlRowByFeatureID: [String: FeatureControlRow] = [:]
+    private(set) var cachedOtherShortcutEntriesByFeatureID: [String: [ShortcutEntry]] = [:]
     private(set) var cachedShortcutTitleByStableKey: [String: String] = [:]
     private(set) var cachedShortcutSecondaryByStableKey: [String: String?] = [:]
     private(set) var cachedShortcutComboWordsByStableKey: [String: String] = [:]
@@ -1471,6 +1472,12 @@ final class AppModel: ObservableObject {
             },
             uniquingKeysWith: { first, _ in first }
         )
+        // Lines outside the one a row shows still run the action; the row lists them.
+        cachedOtherShortcutEntriesByFeatureID = Dictionary(grouping: shortcutEntries.sorted { $0.sourceLine < $1.sourceLine }.compactMap { entry in
+            featureDefinition(for: entry).map { ($0.id.rawValue, entry) }
+        }.filter { id, entry in
+            cachedFeatureControlRowByFeatureID[id]?.shortcutEntry?.stableKey != entry.stableKey
+        }, by: \.0).mapValues { $0.map(\.1) }
         cachedShortcutTitleByStableKey = Dictionary(
             shortcutEntries.map { ($0.stableKey, shortcutTitle(for: $0)) },
             uniquingKeysWith: { first, _ in first }

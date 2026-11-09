@@ -595,6 +595,10 @@ func featureControlRow(forID featureID: FeatureControlID) -> FeatureControlRow? 
     cachedFeatureControlRowByFeatureID[featureID.rawValue]
 }
 
+func otherShortcutEntries(for featureID: FeatureControlID) -> [ShortcutEntry] {
+    cachedOtherShortcutEntriesByFeatureID[featureID.rawValue] ?? []
+}
+
 func isFeaturePinned(_ featureID: FeatureControlID) -> Bool {
     pinnedFeatureControlIDs.contains(featureID.rawValue)
 }

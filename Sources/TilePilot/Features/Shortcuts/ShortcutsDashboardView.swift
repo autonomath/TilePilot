@@ -707,6 +707,10 @@ struct ShortcutsDashboardView: View {
                         .foregroundStyle(.orange)
                         .lineLimit(1)
                 }
+
+                if let featureID {
+                    otherBindingsLine(model.otherShortcutEntries(for: featureID))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -812,6 +816,22 @@ struct ShortcutsDashboardView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.secondary.opacity(0.04))
         )
+    }
+
+    @ViewBuilder
+    private func otherBindingsLine(_ entries: [ShortcutEntry]) -> some View {
+        if !entries.isEmpty {
+            HStack(spacing: 6) {
+                Text("Also:")
+                ForEach(entries, id: \.stableKey) { entry in
+                    Button(model.displayShortcutComboSymbols(entry)) { model.openShortcutSource(entry) }
+                        .buttonStyle(.link)
+                        .help("Line \(entry.sourceLine) of skhdrc also runs this. Click to open it.")
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
     }
 
     private func catalogPinButton(isPinned: Bool, action: @escaping () -> Void) -> some View {
