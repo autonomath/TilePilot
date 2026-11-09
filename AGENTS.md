@@ -78,7 +78,7 @@ graphify update .
 
 ## Known issues
 - The selected Command Line Tools compile XCTest bundles but list/execute zero tests. Run XCTest with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` and check the executed count.
-- UNVERIFIED: no project SwiftFormat/SwiftLint configuration or CI workflow exists. Repo-wide `swift format lint` emits thousands of default-style warnings and is not a usable gate.
+- No project SwiftFormat/SwiftLint configuration exists; repo-wide `swift format lint` emits thousands of default-style warnings and is not a usable gate. Public CI only builds and runs the tests.
 - Bundled skhd 0.3.9 builds with an existing deprecated FSEvents warning and an unused-function warning.
 - One skhd line that fails to parse makes skhd load no hotkeys at all. `~` is skhd syntax, not a key: write the backtick key as `0x32`.
 - Native full screen is unsupported with an active Work Area: containment can pull a window out of full screen. The user chose title-bar double-click (zoom, then fit to the Work Area) instead; do not spend effort on full-screen support unless asked.
