@@ -21,7 +21,7 @@ LOCAL="$(cd "$(dirname "$0")/.." && pwd)"
 STAGING="${TILEPILOT_STAGING:-$HOME/Documents/ChatGPT/DevPloy/migration/staging/TilePilot}"
 NUMBER="${VERSION#v}"
 DMG="dist/TilePilot-$VERSION.dmg"
-APP_PATHS=(Sources Tests Package.swift AGENTS.md scripts/package_dev_app.sh scripts/build_release_dmg.sh scripts/prepare_bundled_helpers.sh)
+SYNCED_PATHS=(Sources Tests Package.swift AGENTS.md README.md .gitignore docs scripts/package_dev_app.sh scripts/build_release_dmg.sh scripts/prepare_bundled_helpers.sh)
 gh_autonomath() { GH_CONFIG_DIR="$HOME/.config/gh-autonomath" gh "$@"; }
 
 # Applies one local commit. Files that drifted on public main take the local copy.
@@ -70,9 +70,9 @@ for c in "${commits[@]}"; do
     git commit -q -m "$(git -C "$LOCAL" log -1 --format=%B "$c")"
 done
 git -C "$LOCAL" fetch -q "$STAGING" +HEAD:refs/tmp/staging-head
-git -C "$LOCAL" diff --quiet refs/tmp/staging-head HEAD -- "${APP_PATHS[@]}" \
-    || { git -C "$LOCAL" diff --stat refs/tmp/staging-head HEAD -- "${APP_PATHS[@]}"; fail "staging app code differs from local HEAD"; }
-echo "Staging app code matches local HEAD."
+git -C "$LOCAL" diff --quiet refs/tmp/staging-head HEAD -- "${SYNCED_PATHS[@]}" \
+    || { git -C "$LOCAL" diff --stat refs/tmp/staging-head HEAD -- "${SYNCED_PATHS[@]}"; fail "staging differs from local HEAD"; }
+echo "Staging matches local HEAD."
 if (( DRY_RUN )); then echo "Dry run: staging reset to origin/main."; exit 0; fi
 
 LOG="/tmp/tilepilot-$VERSION-build.log"
