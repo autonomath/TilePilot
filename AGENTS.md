@@ -5,7 +5,7 @@ Native macOS window-workflow app that makes yabai/skhd tiling, floating layouts,
 - Swift tools 6.2; verified with Apple Swift 6.2.3.
 - SwiftUI application with AppKit, ApplicationServices/Accessibility, CoreGraphics, and Combine.
 - macOS 13+; Swift Package Manager; no third-party Swift package dependencies or lockfile.
-- Packaged helpers: yabai 7.1.25 and skhd 0.3.9, fetched from pinned checksummed sources. yabai before 7.1.19 can't switch desktops with SIP on, and before 7.1.25 can't move windows between desktops, so older Homebrew yabai leaves the default ⌥1–9 and ⇧⌥1–9 keys dead.
+- Packaged helpers: yabai 7.1.25 and skhd 0.3.9, fetched from pinned checksummed sources.
 
 ## Setup
 ```bash
@@ -83,6 +83,7 @@ graphify update .
 - One skhd line that fails to parse makes skhd load no hotkeys at all. `~` is skhd syntax, not a key: write the backtick key as `0x32`.
 - Native full screen is unsupported with an active Work Area: containment can pull a window out of full screen. The user chose title-bar double-click (zoom, then fit to the Work Area) instead; do not spend effort on full-screen support unless asked.
 - Do not restart yabai while the Mac is locked: it comes back without Accessibility references for existing windows (`has-ax-reference` false, empty role, `can-move` false, stale frames). Work Area containment falls back to Accessibility and window-server frames for such windows, but other features degrade until yabai restarts while unlocked.
+- With SIP on, yabai can't switch desktops on macOS 27: 7.1.19–7.1.25 fake a swipe in the pre-27 event format and still report success. Default ⌥1–9 therefore open `tilepilot://desktop/N`, and `focusDesktopInternal` checks the desktop became visible before trusting any attempt. Moving windows between desktops or displays with SIP on needs yabai 7.1.25+; ⇧⌥1–9 use `window --space N --focus` so the desktop follows the window.
 - Menu bar icon (`AXExtrasMenuBar`) frames point at the active display's bar even when the icon is only drawn on another display (most third-party icons live on the main display's bar). Confirm positions by hit test, matching the hit element's `AXIdentifier` or icon container, never just the pid. On an inactive bar an icon answers with its app's own `AXMenuBar`, the same role empty stretches answer with; see `docs/research/SYSTEM_BAR_FEASIBILITY.md`.
 - yabai and skhd quit at launch without Accessibility (yabai also when Displays have separate Spaces is off, skhd when Secure Keyboard Entry is on). Managed LaunchAgents start them once, so a first approval needs a second Start; the reason lands in `~/Library/Application Support/TilePilot/Logs/<helper>.stderr.log` and `HelperStartFailureDiagnosis` reads it.
 - This Mac cannot show a first install: dev and release builds share `com.klode.tilepilot.dev`, TilePilot already holds Accessibility and Screen Recording (system-wide TCC), and yabai/skhd run from Homebrew. Rehearse first installs in a fresh macOS VM.

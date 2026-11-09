@@ -255,6 +255,9 @@ extension AppModel {
     func focusDesktop(index: Int) {
         Task { [weak self] in
             guard let self else { return }
+            // A key press waits on this; App Nap makes each yabai call several times slower.
+            let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep, reason: "Switch desktop")
+            defer { ProcessInfo.processInfo.endActivity(activity) }
             let switched = await self.focusDesktopInternal(
                 index: index,
                 updateMessages: true,
@@ -4358,12 +4361,6 @@ extension AppModel {
         let flags: CGEventFlags
     }
 
-    private func isScriptingAdditionDesktopFocusFailure(_ result: CommandResult) -> Bool {
-        let text = "\(result.stderr)\n\(result.stdout)".lowercased()
-        return (text.contains("cannot focus space") && text.contains("scripting-addition"))
-            || (text.contains("cannot focus space") && text.contains("scripting addition"))
-    }
-
     private func focusDesktopInternal(
         index: Int,
         updateMessages: Bool,
@@ -4376,48 +4373,56 @@ extension AppModel {
             await captureMegamapDesktopIfNeeded(spaceIndex: currentSpace, reason: .beforeTilePilotDesktopSwitch)
         }
 
-        let result = await self.doctorService.runSupportCommand(
-            yabaiCommand(["-m", "space", "--focus", String(index)], timeout: 1.5)
-        )
-        await MainActor.run {
-            self.appendCommandLog(from: result)
+        // yabai 7.1.19+ switches desktops with SIP on by faking a swipe in the pre-macOS 27 format and
+        // reports success even when nothing moved, so skip it there and check every other attempt.
+        var yabaiCanSwitch = true
+        if #available(macOS 27, *) { yabaiCanSwitch = canRunScriptingAdditionDesktopActions }
+        var switched = false
+        if yabaiCanSwitch {
+            let result = await doctorService.runSupportCommand(
+                yabaiCommand(["-m", "space", "--focus", String(index)], timeout: 1.5)
+            )
+            appendCommandLog(from: result)
+            switched = result.isSuccess ? await desktopBecomesVisible(index) : false
         }
-        if result.isSuccess {
-            if updateMessages {
-                await MainActor.run {
-                    self.lastActionMessage = "Switched to Desktop \(index)."
-                    self.lastErrorMessage = nil
-                }
-            }
-            return true
+        var usedShortcut = false
+        // macOS's own Switch to Desktop N shortcut, when it's on, switches the right display natively.
+        if !switched, let binding = missionControlDesktopBinding(for: index), postMissionControlShortcut(binding) {
+            switched = await desktopBecomesVisible(index, attempts: 16)
+            usedShortcut = switched
         }
-
-        if await self.focusAnyWindowOnDesktop(index: index) {
-            if updateMessages {
-                await MainActor.run {
-                    self.lastActionMessage = "Switched to Desktop \(index)."
-                    self.lastErrorMessage = nil
-                }
-            }
-            return true
+        // A window that shows on every desktop "succeeds" here without switching.
+        if !switched, await focusAnyWindowOnDesktop(index: index) {
+            switched = await desktopBecomesVisible(index)
         }
-
-        if self.isScriptingAdditionDesktopFocusFailure(result),
-           self.triggerMissionControlDesktopShortcut(index: index) {
-            if updateMessages {
-                await MainActor.run {
-                    self.lastActionMessage = "Switched to Desktop \(index) using macOS shortcut fallback."
-                    self.lastErrorMessage = nil
-                }
-            }
-            return true
+        // Last resort: the shortcut's macOS default, in case it is on but missing from preferences.
+        if !switched, let binding = missionControlDefaultBinding(for: index), postMissionControlShortcut(binding) {
+            switched = true
+            usedShortcut = true
         }
 
         if updateMessages {
-            await MainActor.run {
-                self.lastErrorMessage = "Could not switch to Desktop \(index)."
-                self.lastActionMessage = nil
+            lastActionMessage = switched
+                ? "Switched to Desktop \(index)\(usedShortcut ? " using macOS shortcut fallback" : "")."
+                : nil
+            lastErrorMessage = switched ? nil : "Could not switch to Desktop \(index)."
+        }
+        return switched
+    }
+
+    /// A desktop on another display becomes visible there without taking focus.
+    private func desktopBecomesVisible(_ index: Int, attempts: Int = 8) async -> Bool {
+        for _ in 0..<attempts {
+            let query = await doctorService.runSupportCommand(
+                yabaiCommand(["-m", "query", "--spaces", "--space", String(index)], timeout: 1.0)
+            )
+            if query.isSuccess,
+               let data = query.stdout.data(using: .utf8),
+               let space = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               boolFromAny(space["is-visible"]) == true {
+                return true
             }
+            try? await Task.sleep(for: .milliseconds(50))
         }
         return false
     }
@@ -4425,15 +4430,8 @@ extension AppModel {
     func focusDesktopForMegamapCapture(index: Int) async -> Bool {
         let issued = await focusDesktopInternal(index: index, updateMessages: false, megamapCapturePolicy: .none)
         guard issued else { return false }
-
-        for _ in 0..<8 {
-            if let focusedSpace = await queryCurrentFocusedSpaceIndex(), focusedSpace == index {
-                return true
-            }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-
-        return false
+        // The macOS shortcut animates, so allow it about a second.
+        return await desktopBecomesVisible(index, attempts: 20)
     }
 
     private func focusAnyWindowOnDesktop(index: Int) async -> Bool {
@@ -4475,10 +4473,7 @@ extension AppModel {
         return focus.isSuccess
     }
 
-    private func triggerMissionControlDesktopShortcut(index: Int) -> Bool {
-        let binding = missionControlDesktopBinding(for: index)
-            ?? missionControlDefaultBinding(for: index)
-        guard let binding else { return false }
+    private func postMissionControlShortcut(_ binding: MissionControlDesktopBinding) -> Bool {
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: binding.keyCode, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: binding.keyCode, keyDown: false) else {

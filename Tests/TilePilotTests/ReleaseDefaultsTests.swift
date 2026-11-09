@@ -6,14 +6,14 @@ final class ReleaseDefaultsTests: XCTestCase {
     func testManagedSkhdDefaultsSeedShortcutFamilies() {
         let body = ReleaseDefaultsService().currentProfile().configState.managedSkhdSectionBody
 
-        XCTAssertTrue(body.contains("alt - 1 : yabai -m space --focus 1"))
-        XCTAssertTrue(body.contains("alt - 9 : yabai -m space --focus 9"))
+        XCTAssertTrue(body.contains("alt - 1 : /usr/bin/open -g \"tilepilot://desktop/1\""))
+        XCTAssertTrue(body.contains("alt - 9 : /usr/bin/open -g \"tilepilot://desktop/9\""))
         XCTAssertTrue(body.contains("alt - j : yabai -m window --focus west"))
         XCTAssertTrue(body.contains("shift + alt - j : yabai -m window --warp west"))
         XCTAssertTrue(body.contains("ctrl + alt - j : yabai -m window --resize left:-80:0"))
         XCTAssertTrue(body.contains("ctrl + shift + alt - j : yabai -m window --swap west"))
         XCTAssertTrue(body.contains("ctrl + shift + alt - s : yabai -m space --layout stack"))
-        XCTAssertTrue(body.contains("shift + alt - 1 : yabai -m window --space 1; yabai -m space --focus 1"))
+        XCTAssertTrue(body.contains("shift + alt - 1 : yabai -m window --space 1 --focus"))
     }
 
     func testDefaultsBindEachKeyOnce() {

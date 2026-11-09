@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 extension AppModel {
     func shortcutExplanation(combo: String, command: String, category: String) -> String {
-        let c = command.lowercased()
+        let c = FeatureCommandNormalizer.desktopEquivalent(command).lowercased()
         let normalized = normalizedFeatureMatchCommand(c)
 
         if let orphan = deletedFeatureTargetCopy(normalizedCommand: normalized) {
@@ -182,7 +182,7 @@ extension AppModel {
         if let feature = featureDefinition(for: entry) {
             return feature.title
         }
-        let c = entry.command.lowercased()
+        let c = FeatureCommandNormalizer.desktopEquivalent(entry.command).lowercased()
         let normalized = normalizedFeatureMatchCommand(c)
 
         if let orphan = deletedFeatureTargetCopy(normalizedCommand: normalized) {

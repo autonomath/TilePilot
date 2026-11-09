@@ -1138,7 +1138,7 @@ final class AppModel: ObservableObject {
     }
 
     func shortcutIntentKey(for entry: ShortcutEntry) -> String {
-        let c = entry.command.lowercased()
+        let c = FeatureCommandNormalizer.desktopEquivalent(entry.command).lowercased()
 
         if c.contains("yabai -m window --space"), c.contains("yabai -m space --focus"),
            let target = firstInteger(after: "--space", in: c) ?? firstInteger(after: "--focus", in: c) {
@@ -1187,7 +1187,7 @@ final class AppModel: ObservableObject {
     }
 
     func unifiedGroup(for entry: ShortcutEntry) -> UnifiedControlGroup {
-        let c = entry.command.lowercased()
+        let c = FeatureCommandNormalizer.desktopEquivalent(entry.command).lowercased()
 
         if c.contains("yabai -m window --space") {
             return .experimental

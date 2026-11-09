@@ -503,7 +503,7 @@ func flatOrderID(for entry: ShortcutEntry) -> String {
 }
 
 private func desktopJumpTarget(from command: String) -> Int? {
-    let c = command.lowercased()
+    let c = FeatureCommandNormalizer.desktopEquivalent(command).lowercased()
     guard !c.contains("yabai -m window --space") else { return nil }
     guard let range = c.range(of: "yabai -m space --focus ") else { return nil }
     let suffix = c[range.upperBound...]
@@ -512,7 +512,7 @@ private func desktopJumpTarget(from command: String) -> Int? {
 }
 
 private func desktopMoveTarget(from command: String) -> Int? {
-    let c = command.lowercased()
+    let c = FeatureCommandNormalizer.desktopEquivalent(command).lowercased()
     guard let range = c.range(of: "yabai -m window --space ") else { return nil }
     let suffix = c[range.upperBound...]
     let digits = suffix.prefix { $0.isNumber }

@@ -875,7 +875,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let routeKind: String
         let routeRaw: String
-        if host == "feature" || host == "internal" {
+        if host == "feature" || host == "internal" || host == "desktop" {
             routeKind = host
             routeRaw = trimmedPath.removingPercentEncoding ?? ""
         } else if host.isEmpty,
@@ -887,6 +887,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         switch routeKind {
+        case "desktop":
+            // skhd's ⌥1–9 come here because yabai alone can't switch desktops with SIP on (macOS 27).
+            guard let index = Int(routeRaw), (1...16).contains(index) else { return }
+            model.focusDesktop(index: index)
         case "feature":
             let featureRaw = routeRaw
             guard !featureRaw.isEmpty else { return }

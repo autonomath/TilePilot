@@ -33,8 +33,8 @@ extension AppModel {
         case .goToDesktop(let index):
             focusDesktop(index: index)
         case .moveToDesktop(let space):
-            // The desktop follows the window.
-            _ = await runKeyboardLayerYabai([["-m", "window", "--space", space], ["-m", "space", "--focus", space]], title: builtIn.title)
+            // --focus follows the window there; `space --focus` can't switch desktops with SIP on (macOS 27).
+            _ = await runKeyboardLayerYabai([["-m", "window", "--space", space, "--focus"]], title: builtIn.title)
         case .keys(let chords):
             for (index, chord) in chords.enumerated() {
                 if index > 0 { try? await Task.sleep(for: .milliseconds(200)) }

@@ -154,15 +154,15 @@ enum DefaultShortcutProfile {
         ctrl + alt - return : \(featureCommand("screen.fill-work-area"))
 
         # Desktops
-        alt - 1 : yabai -m space --focus 1
-        alt - 2 : yabai -m space --focus 2
-        alt - 3 : yabai -m space --focus 3
-        alt - 4 : yabai -m space --focus 4
-        alt - 5 : yabai -m space --focus 5
-        alt - 6 : yabai -m space --focus 6
-        alt - 7 : yabai -m space --focus 7
-        alt - 8 : yabai -m space --focus 8
-        alt - 9 : yabai -m space --focus 9
+        alt - 1 : /usr/bin/open -g "tilepilot://desktop/1"
+        alt - 2 : /usr/bin/open -g "tilepilot://desktop/2"
+        alt - 3 : /usr/bin/open -g "tilepilot://desktop/3"
+        alt - 4 : /usr/bin/open -g "tilepilot://desktop/4"
+        alt - 5 : /usr/bin/open -g "tilepilot://desktop/5"
+        alt - 6 : /usr/bin/open -g "tilepilot://desktop/6"
+        alt - 7 : /usr/bin/open -g "tilepilot://desktop/7"
+        alt - 8 : /usr/bin/open -g "tilepilot://desktop/8"
+        alt - 9 : /usr/bin/open -g "tilepilot://desktop/9"
 
         # Displays (O = other display, wrapping around)
         alt - o : yabai -m display --focus next || yabai -m display --focus first
@@ -203,15 +203,15 @@ enum DefaultShortcutProfile {
         ctrl + shift + alt + cmd - n : \(featureCommand("app.never-auto-tile"))
 
         # Desktop Move (Experimental)
-        shift + alt - 1 : yabai -m window --space 1; yabai -m space --focus 1
-        shift + alt - 2 : yabai -m window --space 2; yabai -m space --focus 2
-        shift + alt - 3 : yabai -m window --space 3; yabai -m space --focus 3
-        shift + alt - 4 : yabai -m window --space 4; yabai -m space --focus 4
-        shift + alt - 5 : yabai -m window --space 5; yabai -m space --focus 5
-        shift + alt - 6 : yabai -m window --space 6; yabai -m space --focus 6
-        shift + alt - 7 : yabai -m window --space 7; yabai -m space --focus 7
-        shift + alt - 8 : yabai -m window --space 8; yabai -m space --focus 8
-        shift + alt - 9 : yabai -m window --space 9; yabai -m space --focus 9
+        shift + alt - 1 : yabai -m window --space 1 --focus
+        shift + alt - 2 : yabai -m window --space 2 --focus
+        shift + alt - 3 : yabai -m window --space 3 --focus
+        shift + alt - 4 : yabai -m window --space 4 --focus
+        shift + alt - 5 : yabai -m window --space 5 --focus
+        shift + alt - 6 : yabai -m window --space 6 --focus
+        shift + alt - 7 : yabai -m window --space 7 --focus
+        shift + alt - 8 : yabai -m window --space 8 --focus
+        shift + alt - 9 : yabai -m window --space 9 --focus
         """
     }
 
