@@ -35,7 +35,7 @@ Important behavior:
 - `Floating Grid` is the default mode
 - spare grid cells are filled with vertical spans where possible
 - AX-only windows can be placed by Floating Grid when Accessibility can move and resize them
-- `Auto-Tiled` remains real yabai tiling and cannot include AX-only windows that yabai cannot manage
+- the picker offers `Floating Grid` and `Template` (`RecentWindowTilerMode.pickerModes`); the `autoTiled` mode is not shown
 
 Run the focused picker/grid tests with:
 

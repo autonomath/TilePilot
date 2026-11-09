@@ -112,6 +112,12 @@ Each section has an ⓘ button beside its title that explains what it does, with
 
 ![Actions & Shortcuts](assets/screenshots/actions-shortcuts.png)
 
+### Pick Windows to Tile
+
+<p align="center">
+  <img src="assets/screenshots/pick-windows-to-tile.png" alt="Pick Windows to Tile" width="58%">
+</p>
+
 ### Behaviors
 
 <p align="center">
