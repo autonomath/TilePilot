@@ -379,6 +379,12 @@ extension AppModel {
         }
     }
 
+    /// Rereads TilePilot's section so a save never brings back lines edited outside TilePilot.
+    func reloadManagedConfigDraft() async {
+        guard let state = try? await configService.loadConfigDocument() else { return }
+        applyConfigDocumentState(state, preserveUserDraftIfDirty: false)
+    }
+
     private func applyConfigDocumentState(_ state: ConfigDocumentState, preserveUserDraftIfDirty: Bool) {
         let wasDirty = isManagedConfigDraftDirty
         configFilePath = state.filePath

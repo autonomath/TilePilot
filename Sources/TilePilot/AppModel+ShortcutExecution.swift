@@ -153,8 +153,11 @@ func assignShortcut(combo: String, to featureID: FeatureControlID) {
         return
     }
 
-    upsertManagedFeatureShortcut(featureID: featureID, combo: combo, command: preferredCommand)
-    saveManagedConfigSection()
+    Task {
+        await reloadManagedConfigDraft()
+        upsertManagedFeatureShortcut(featureID: featureID, combo: combo, command: preferredCommand)
+        saveManagedConfigSection()
+    }
 }
 
 func assignShortcut(combo: String, to entry: ShortcutEntry) {
@@ -214,8 +217,11 @@ func assignShortcut(combo: String, to entry: ShortcutEntry) {
 }
 
 func removeShortcut(for featureID: FeatureControlID) {
-    removeManagedFeatureShortcut(featureID: featureID)
-    saveManagedConfigSection()
+    Task {
+        await reloadManagedConfigDraft()
+        removeManagedFeatureShortcut(featureID: featureID)
+        saveManagedConfigSection()
+    }
 }
 
 func suggestShortcutAlternatives(for combo: String) -> [String] {
