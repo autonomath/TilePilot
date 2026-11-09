@@ -364,7 +364,7 @@ final class StatusBarController: NSObject {
     private func openTilePilotMenuItem() -> NSMenuItem {
         let menuItem = item("Open TilePilot", action: #selector(openTilePilot))
         if let row = model.featureControlRow(forID: FeatureControlID(rawValue: "app.open-tilepilot")) {
-            let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo ?? row.defaultCombo
+            let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo
             applyMenuShortcut(to: menuItem, comboRaw: comboRaw)
         }
         return menuItem
@@ -373,7 +373,7 @@ final class StatusBarController: NSObject {
     private func openMegamapMenuItem() -> NSMenuItem {
         let menuItem = item("Open MegaMap", action: #selector(openMegamap))
         if let row = model.featureControlRow(forID: FeatureControlID(rawValue: "app.open-megamap")) {
-            let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo ?? row.defaultCombo
+            let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo
             applyMenuShortcut(to: menuItem, comboRaw: comboRaw)
         }
         return menuItem
@@ -447,7 +447,7 @@ final class StatusBarController: NSObject {
                 if let appName = focusedAppNameForPinnedAppFeature(), let state = pinnedFeatureState(featureID, appName: appName) {
                     menuItem.state = state
                 }
-                let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo ?? row.defaultCombo
+                let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo
                 applyMenuShortcut(to: menuItem, comboRaw: comboRaw)
                 menuItem.representedObject = featureID.rawValue
                 menu.addItem(menuItem)

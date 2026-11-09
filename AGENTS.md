@@ -45,6 +45,7 @@ graphify update .
 - Mission Control, App Exposé, Show Desktop, and their animations move and scale window-server bounds (`CGWindowListCopyWindowInfo`) while Accessibility frames stay put. Never move or resize a window from window-server bounds alone; containment re-reads the real frame by window ID (`AccessibilityWindowFrames`) first.
 - Keep settings copy short and outcome-based. Say whether windows end tiled or floating; put teaching material in the section's ⓘ help (`ContextHelpTopic` in `Shared/ContextHelp.swift`, shown with `HelpSectionLabel` or `ContextHelpButton`), not in settings cards. There is no separate help tab.
 - Preserve existing user behavior by default. Defaults changes require a release-default profile version bump and reset-flow coverage.
+- Default shortcuts live only in `DefaultShortcutProfile` (`ReleaseDefaultsService.swift`), one modifier per scope: ⌥ goes (focus, desktops), ⇧⌥ moves the focused window, ⌃⌥ sizes it, ⌃⇧⌥ + first letter changes the whole desktop, ⌃⌥⇧⌘ + letter is TilePilot itself. Hyper + digit stays free for templates and Work Sets.
 - Present Guided Setup immediately on a genuine first launch; startup readiness grace applies only to existing installations recovering after launch or login.
 - Add focused XCTest coverage for pure models/planners and regressions when the test runner is available.
 - Use commit subjects such as `feat:`, `fix:`, `perf:`, `build:`, `docs:`, or `release:` followed by a concise imperative summary.

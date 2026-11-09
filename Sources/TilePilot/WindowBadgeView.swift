@@ -193,7 +193,6 @@ struct WindowBadgeView: View {
     private func featureMenuTitle(_ row: FeatureControlRow) -> String {
         let symbols = row.shortcutEntry.map { model.displayShortcutComboSymbols($0) }
             ?? row.assignedCombo.map { model.displayShortcutComboSymbols(from: $0) }
-            ?? row.defaultCombo.map { model.displayShortcutComboSymbols(from: $0) }
         return menuTitle(left: row.title, rightShortcut: spacedSymbols(symbols))
     }
 

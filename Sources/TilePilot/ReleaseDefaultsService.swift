@@ -1,7 +1,7 @@
 import Foundation
 
 final class ReleaseDefaultsService: @unchecked Sendable {
-    static let currentProfileVersion = "v0.4.9-defaults.2"
+    static let currentProfileVersion = "v0.4.24-defaults.3"
 
     private let fileManager = FileManager.default
 
@@ -114,21 +114,14 @@ final class ReleaseDefaultsService: @unchecked Sendable {
 }
 
 enum DefaultShortcutProfile {
+    // One modifier per scope: ⌥ goes, ⇧⌥ moves the window, ⌃⌥ sizes it, ⌃⇧⌥ changes the
+    // whole desktop, ⌃⌥⇧⌘ (Hyper) is TilePilot. Hyper + a digit stays free for templates and Work Sets.
     static func managedSkhdSectionBody() -> String {
         """
         # Managed by TilePilot. Unknown lines outside this block are preserved.
-        # Release default shortcuts:
-
-        # Desktops
-        alt - 1 : yabai -m space --focus 1
-        alt - 2 : yabai -m space --focus 2
-        alt - 3 : yabai -m space --focus 3
-        alt - 4 : yabai -m space --focus 4
-        alt - 5 : yabai -m space --focus 5
-        alt - 6 : yabai -m space --focus 6
-        alt - 7 : yabai -m space --focus 7
-        alt - 8 : yabai -m space --focus 8
-        alt - 9 : yabai -m space --focus 9
+        # Release default shortcuts. J K I L = left, down, up, right.
+        # Option goes, Shift-Option moves the window, Control-Option sizes it,
+        # Control-Shift-Option changes the whole desktop, Hyper opens TilePilot.
 
         # Focus
         alt - j : yabai -m window --focus west
@@ -148,25 +141,66 @@ enum DefaultShortcutProfile {
         ctrl + alt - i : yabai -m window --resize top:0:-80
         ctrl + alt - k : yabai -m window --resize bottom:0:80
 
-        # Tiling & Layout
-        # TILEPILOT_FEATURE screen.set-floating-all-visible
-        ctrl + shift + alt - d : \(featureCommand("screen.set-floating-all-visible"))
+        # Swap
+        ctrl + shift + alt - j : yabai -m window --swap west
+        ctrl + shift + alt - l : yabai -m window --swap east
+        ctrl + shift + alt - i : yabai -m window --swap north
+        ctrl + shift + alt - k : yabai -m window --swap south
+
+        # Window
+        # TILEPILOT_FEATURE action.toggle-float
+        shift + alt - space : yabai -m window --toggle float
+        # TILEPILOT_FEATURE screen.fill-work-area
+        ctrl + alt - return : \(featureCommand("screen.fill-work-area"))
+
+        # Desktops
+        alt - 1 : yabai -m space --focus 1
+        alt - 2 : yabai -m space --focus 2
+        alt - 3 : yabai -m space --focus 3
+        alt - 4 : yabai -m space --focus 4
+        alt - 5 : yabai -m space --focus 5
+        alt - 6 : yabai -m space --focus 6
+        alt - 7 : yabai -m space --focus 7
+        alt - 8 : yabai -m space --focus 8
+        alt - 9 : yabai -m space --focus 9
+
+        # Displays (O = other display, wrapping around)
+        alt - o : yabai -m display --focus next || yabai -m display --focus first
+        shift + alt - o : yabai -m window --display next || yabai -m window --display first
+
+        # Whole Desktop
         # TILEPILOT_FEATURE screen.set-tiled-all-visible
-        ctrl + shift + alt - e : \(featureCommand("screen.set-tiled-all-visible"))
-        # TILEPILOT_FEATURE screen.grid-floating
-        ctrl + shift + alt - p : \(featureCommand("screen.grid-floating"))
+        ctrl + shift + alt - t : \(featureCommand("screen.set-tiled-all-visible"))
+        # TILEPILOT_FEATURE screen.set-floating-all-visible
+        ctrl + shift + alt - f : \(featureCommand("screen.set-floating-all-visible"))
         # TILEPILOT_FEATURE screen.grid-auto-tiled
-        ctrl + shift + alt - o : \(featureCommand("screen.grid-auto-tiled"))
+        ctrl + shift + alt - b : \(featureCommand("screen.grid-auto-tiled"))
+        # TILEPILOT_FEATURE screen.grid-floating
+        ctrl + shift + alt - g : \(featureCommand("screen.grid-floating"))
         # TILEPILOT_FEATURE screen.rotate-layout
-        shift + alt - r : yabai -m space --rotate 90
+        ctrl + shift + alt - r : yabai -m space --rotate 90
         # TILEPILOT_FEATURE action.layout-stack
-        shift + alt - v : yabai -m space --layout stack
-        # TILEPILOT_FEATURE screen.layout-bsp-balance
-        ctrl + shift + alt - g : yabai -m space --layout bsp; yabai -m space --balance
+        ctrl + shift + alt - s : yabai -m space --layout stack
+        # TILEPILOT_FEATURE screen.pick-windows-to-tile
+        ctrl + shift + alt - p : \(featureCommand("screen.pick-windows-to-tile"))
+        # TILEPILOT_FEATURE screen.bring-floating-front
+        ctrl + shift + alt - u : \(featureCommand("screen.bring-floating-front"))
         # TILEPILOT_FEATURE screen.balance-current-desktop
         alt - 0 : yabai -m space --balance
-        # TILEPILOT_FEATURE action.toggle-float
-        ctrl + shift + alt - 0x32 : yabai -m window --toggle float
+
+        # TilePilot
+        # TILEPILOT_FEATURE app.open-tilepilot
+        ctrl + shift + alt + cmd - t : /usr/bin/open -a "TilePilot"
+        # TILEPILOT_FEATURE app.open-megamap
+        ctrl + shift + alt + cmd - m : \(featureCommand("app.open-megamap"))
+        # TILEPILOT_FEATURE app.toggle-work-area
+        ctrl + shift + alt + cmd - a : \(featureCommand("app.toggle-work-area"))
+        # TILEPILOT_FEATURE workset.cycle-current-desktop
+        ctrl + shift + alt + cmd - s : \(featureCommand("workset.cycle-current-desktop"))
+        # TILEPILOT_FEATURE app.keep-on-top-when-floating
+        ctrl + shift + alt + cmd - k : \(featureCommand("app.keep-on-top-when-floating"))
+        # TILEPILOT_FEATURE app.never-auto-tile
+        ctrl + shift + alt + cmd - n : \(featureCommand("app.never-auto-tile"))
 
         # Desktop Move (Experimental)
         shift + alt - 1 : yabai -m window --space 1; yabai -m space --focus 1

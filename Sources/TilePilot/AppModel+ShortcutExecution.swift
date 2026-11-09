@@ -220,20 +220,9 @@ func removeShortcut(for featureID: FeatureControlID) {
 
 func suggestShortcutAlternatives(for combo: String) -> [String] {
     let used = Set(shortcutEntries.map { normalizedShortcutCombo($0.combo) })
-    let pool = [
-        "ctrl + shift + alt - d",
-        "ctrl + shift + alt - e",
-        "ctrl + shift + alt - p",
-        "ctrl + shift + alt - o",
-        "ctrl + shift + alt - g",
-        "ctrl + shift + alt - f",
-        "ctrl + shift + alt - b",
-        "ctrl + shift + alt - n",
-        "ctrl + shift + alt - m",
-        "shift + alt - b",
-        "shift + alt - v",
-        "alt - 0",
-    ]
+    // Keys the release defaults leave free: Hyper + digit, then unused ⌃⇧⌥ letters.
+    let pool = (1...9).map { "ctrl + shift + alt + cmd - \($0)" }
+        + ["d", "e", "x", "y", "z", "c", "h", "q"].map { "ctrl + shift + alt - \($0)" }
     let normalizedCurrent = normalizedShortcutCombo(combo)
     return pool.filter { candidate in
         let normalizedCandidate = normalizedShortcutCombo(candidate)

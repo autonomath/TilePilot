@@ -401,7 +401,7 @@ struct ShortcutsDashboardView: View {
     }
 
     private func quickMenuFeatureRow(_ row: FeatureControlRow) -> some View {
-        let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo ?? row.defaultCombo
+        let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo
 
         return HStack(alignment: .center, spacing: 8) {
             if let featureID = row.featureID {
@@ -533,7 +533,7 @@ struct ShortcutsDashboardView: View {
     private func reorderPinnedItemTrailingText(for item: PinnedShortcutContextItem) -> String? {
         switch item {
         case .feature(let row):
-            let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo ?? row.defaultCombo
+            let comboRaw = row.shortcutEntry?.combo ?? row.assignedCombo
             guard let comboRaw, !comboRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             return model.displayShortcutComboSymbols(from: comboRaw)
         case .directional(_, let bindings):

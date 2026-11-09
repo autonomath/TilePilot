@@ -206,7 +206,7 @@ enum FeatureCapabilityGate: String, Codable, Sendable {
 
 enum FeatureShortcutBindingState: Sendable, Equatable {
     case assigned(combo: String)
-    case missing(defaultCombo: String?)
+    case missing
     case conflict(combo: String, conflictingFeatureTitle: String, suggestions: [String])
     case disabled(reason: String)
 }
@@ -229,7 +229,6 @@ struct FeatureControlRow: Identifiable, Sendable {
     let actionID: TilePilotActionID?
     let preferredCommand: String?
     let assignedCombo: String?
-    let defaultCombo: String?
     let bindingState: FeatureShortcutBindingState
     let isExperimental: Bool
     let disabledReason: String?

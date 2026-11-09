@@ -11,8 +11,31 @@ final class ReleaseDefaultsTests: XCTestCase {
         XCTAssertTrue(body.contains("alt - j : yabai -m window --focus west"))
         XCTAssertTrue(body.contains("shift + alt - j : yabai -m window --warp west"))
         XCTAssertTrue(body.contains("ctrl + alt - j : yabai -m window --resize left:-80:0"))
-        XCTAssertTrue(body.contains("shift + alt - v : yabai -m space --layout stack"))
+        XCTAssertTrue(body.contains("ctrl + shift + alt - j : yabai -m window --swap west"))
+        XCTAssertTrue(body.contains("ctrl + shift + alt - s : yabai -m space --layout stack"))
         XCTAssertTrue(body.contains("shift + alt - 1 : yabai -m window --space 1; yabai -m space --focus 1"))
+    }
+
+    func testDefaultsBindEachKeyOnce() {
+        let body = ReleaseDefaultsService().currentProfile().configState.managedSkhdSectionBody
+        let combos = body.split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+            .map { ShortcutComboIdentity.normalized(String($0.split(separator: ":", maxSplits: 1)[0])) }
+        XCTAssertEqual(Dictionary(grouping: combos, by: { $0 }).filter { $0.value.count > 1 }.keys.sorted(), [])
+    }
+
+    @MainActor
+    func testEveryMarkedDefaultIsAKnownFeature() {
+        let body = ReleaseDefaultsService().currentProfile().configState.managedSkhdSectionBody
+        let known = Set(AppModel().featureDefinitions.map(\.id.rawValue))
+        let lines = body.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let prefix = ShortcutEntry.managedFeatureMarkerPrefix
+        for (index, line) in lines.enumerated() where line.hasPrefix(prefix) {
+            let id = String(line.dropFirst(prefix.count))
+            XCTAssertTrue(known.contains(id), id)
+            XCTAssertTrue(lines[index + 1].contains(" : "), id)
+        }
     }
 
     func testConfigServiceUsesReleaseShortcutDefaults() {
@@ -24,7 +47,7 @@ final class ReleaseDefaultsTests: XCTestCase {
 
     func testDefaultsUseAKeySkhdCanParse() {
         let body = ReleaseDefaultsService().currentProfile().configState.managedSkhdSectionBody
-        XCTAssertTrue(body.contains("ctrl + shift + alt - 0x32 : yabai -m window --toggle float"))
+        XCTAssertTrue(body.contains("shift + alt - space : yabai -m window --toggle float"))
         XCTAssertEqual(ConfigService.repairedManagedSectionBody(body), body)
     }
 

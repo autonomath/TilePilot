@@ -130,7 +130,7 @@ func buildFeatureControlRows(from baseRows: [UnifiedControlRow]) -> [FeatureCont
         } else if let entry = row.shortcutEntry {
             bindingState = .assigned(combo: entry.combo)
         } else {
-            bindingState = .missing(defaultCombo: mappedDefinition?.defaultCombo)
+            bindingState = .missing
         }
         let candidate = FeatureControlRow(
             id: mappedDefinition.map { "feature-\($0.id.rawValue)" } ?? row.id,
@@ -144,7 +144,6 @@ func buildFeatureControlRows(from baseRows: [UnifiedControlRow]) -> [FeatureCont
             actionID: mappedDefinition?.actionID ?? row.actionID,
             preferredCommand: mappedDefinition?.preferredCommand,
             assignedCombo: row.shortcutEntry?.combo,
-            defaultCombo: mappedDefinition?.defaultCombo,
             bindingState: bindingState,
             isExperimental: mappedDefinition?.isExperimental ?? row.isExperimental,
             disabledReason: disabledReason
@@ -171,7 +170,7 @@ func buildFeatureControlRows(from baseRows: [UnifiedControlRow]) -> [FeatureCont
         if let disabledReason {
             bindingState = .disabled(reason: disabledReason)
         } else {
-            bindingState = .missing(defaultCombo: definition.defaultCombo)
+            bindingState = .missing
         }
         result.append(
             FeatureControlRow(
@@ -186,7 +185,6 @@ func buildFeatureControlRows(from baseRows: [UnifiedControlRow]) -> [FeatureCont
                 actionID: definition.actionID,
                 preferredCommand: definition.preferredCommand,
                 assignedCombo: nil,
-                defaultCombo: definition.defaultCombo,
                 bindingState: bindingState,
                 isExperimental: definition.isExperimental,
                 disabledReason: disabledReason
