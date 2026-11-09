@@ -9,6 +9,7 @@ DerivedData/
 
 .venv-icon/
 /dist
+/website/_site/
 
 # Local agent and tool state
 /.codex/

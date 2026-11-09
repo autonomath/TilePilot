@@ -24,6 +24,25 @@ DMG="dist/TilePilot-$VERSION.dmg"
 APP_PATHS=(Sources Tests Package.swift AGENTS.md scripts/package_dev_app.sh scripts/build_release_dmg.sh scripts/prepare_bundled_helpers.sh)
 gh_autonomath() { GH_CONFIG_DIR="$HOME/.config/gh-autonomath" gh "$@"; }
 
+# Applies one local commit. Files that drifted on public main take the local copy.
+apply_commit() {
+    local patch; patch="$(mktemp)"
+    git -C "$LOCAL" format-patch -1 --stdout --no-renames "$1" >"$patch"
+    git apply --index "$patch" 2>/dev/null && return
+    git -C "$LOCAL" diff-tree --no-commit-id --name-only --no-renames -r "$1" | while IFS= read -r path; do
+        git apply --index --include="$path" "$patch" 2>/dev/null && continue
+        echo "  $path: patch does not apply, using the local copy"
+        if git -C "$LOCAL" cat-file -e "$1:$path" 2>/dev/null; then
+            mkdir -p "$(dirname "$path")"
+            git -C "$LOCAL" show "$1:$path" >"$path"
+            [[ "$(git -C "$LOCAL" ls-tree "$1" -- "$path" | cut -c1-6)" == 100755 ]] && chmod +x "$path"
+            git add -- "$path"
+        else
+            git rm -q -- "$path"
+        fi
+    done
+}
+
 cd "$STAGING"
 git fetch -q origin --tags
 [[ -z "$(git status --porcelain)" ]] || fail "staging checkout has uncommitted changes"
@@ -47,7 +66,7 @@ for c in "${commits[@]}"; do git -C "$LOCAL" log -1 --format='  %h %s' "$c"; don
 # Nothing is public until the push, so undo staging commits on any earlier failure.
 trap 'git -C "$STAGING" reset -q --hard origin/main' EXIT
 for c in "${commits[@]}"; do
-    git -C "$LOCAL" format-patch -1 --stdout "$c" | git apply --index
+    apply_commit "$c"
     git commit -q -m "$(git -C "$LOCAL" log -1 --format=%B "$c")"
 done
 git -C "$LOCAL" fetch -q "$STAGING" +HEAD:refs/tmp/staging-head
