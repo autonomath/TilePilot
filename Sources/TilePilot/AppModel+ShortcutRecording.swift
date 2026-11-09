@@ -51,6 +51,11 @@ extension AppModel {
                 self.lastActionMessage = nil
                 return
             }
+            if ShortcutRecordingKey.blocksTyping(keyCode: event.keyCode, modifiers: event.modifierFlags) {
+                self.lastErrorMessage = "Add Control, Option, or Command. On its own, that key would stop typing in every app."
+                self.lastActionMessage = nil
+                return
+            }
             // Stop intercepting before an asynchronous save or configuration
             // reload. The key release has already been consumed by the session.
             self.stopShortcutRecording()

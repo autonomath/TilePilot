@@ -23,6 +23,12 @@ enum ShortcutRecordingKey {
         keyCode == 53 && modifiers.intersection([.control, .shift, .option, .command, .function]).isEmpty
     }
 
+    /// skhd swallows a bound key in every app, so a shortcut needs Control, Option, or Command
+    /// unless it is a function key, which types nothing.
+    static func blocksTyping(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        modifiers.intersection([.control, .option, .command]).isEmpty && literalKeys[keyCode]?.hasPrefix("f") != true
+    }
+
     private static func characterToken(keyCode: UInt16, characters: String?) -> String? {
         // skhd resolves character bindings through the current keyboard layout,
         // but excludes the keypad and accepts only one-byte characters.

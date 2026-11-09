@@ -65,6 +65,14 @@ final class ShortcutRecordingKeyTests: XCTestCase {
         XCTAssertEqual(combo(0, [.function, .control], "a"), "ctrl + fn - a")
     }
 
+    func testShortcutsThatWouldStopTypingAreRefused() {
+        XCTAssertTrue(ShortcutRecordingKey.blocksTyping(keyCode: 35, modifiers: [.shift]))       // Shift + P
+        XCTAssertTrue(ShortcutRecordingKey.blocksTyping(keyCode: 35, modifiers: []))
+        XCTAssertTrue(ShortcutRecordingKey.blocksTyping(keyCode: 123, modifiers: [.function]))   // Left arrow
+        XCTAssertFalse(ShortcutRecordingKey.blocksTyping(keyCode: 35, modifiers: [.shift, .command]))
+        XCTAssertFalse(ShortcutRecordingKey.blocksTyping(keyCode: 122, modifiers: [.function]))  // F1
+    }
+
     private func combo(_ keyCode: UInt16, _ modifiers: NSEvent.ModifierFlags, _ characters: String? = nil) -> String? {
         ShortcutRecordingKey.combo(keyCode: keyCode, modifiers: modifiers, unmodifiedCharacters: characters)
     }
