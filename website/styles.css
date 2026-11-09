@@ -421,6 +421,23 @@ kbd {
 .key-table dt { color: var(--dim); font-size: 14px; }
 .key-table kbd { font-size: 15px; padding: 3px 9px 4px; }
 .key-table dd { margin: 0; color: var(--text); }
+.key-table dd small { display: block; margin-top: 4px; font-size: 14.5px; line-height: 1.45; color: var(--dim); }
+.steps .soon { color: var(--float); }
+.ladder { list-style: none; margin: 30px 0 0; padding: 0; display: grid; gap: 12px; }
+.ladder li { display: grid; grid-template-columns: 74px 1fr; gap: 14px; align-items: baseline; color: var(--muted); font-size: 16px; line-height: 1.5; }
+.ladder kbd { justify-self: start; font-size: 15px; }
+.ladder b { color: var(--text); font-weight: 600; }
+.key-groups h3 { font-family: var(--display); font-stretch: 90%; font-size: 21px; letter-spacing: -0.015em; margin: 48px 0 8px; }
+.key-groups h3:first-child { margin-top: 0; }
+.key-why { color: var(--muted); font-size: 16px; margin: 0 0 16px; }
+.key-groups h3 + .key-table { margin-top: 14px; }
+.letter-sets { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 22px; }
+.letter-mods { margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+.letter-mods kbd { margin-right: 8px; font-size: 14px; }
+.letters { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.letters li { display: flex; align-items: center; gap: 12px; color: var(--muted); }
+.letters kbd { min-width: 32px; text-align: center; padding: 3px 0 4px; font-size: 15px; color: var(--tile); }
+.letters b { color: var(--text); font-weight: 700; }
 
 /* Trust */
 .trust { padding: 110px 0 60px; }
@@ -509,7 +526,7 @@ kbd {
 /* Work Area */
 .workarea { padding: 110px 0 20px; }
 .wa-head { max-width: 880px; }
-.wa-head .eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.wa-head .eyebrow, .keys-copy .eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .wa-head .lede { max-width: 720px; }
 .eyebrow .soon {
   padding: 2px 10px; border-radius: 999px; letter-spacing: 0.06em; color: var(--float);
@@ -615,6 +632,7 @@ kbd {
   .trust-list { grid-template-columns: 1fr; }
   .gallery { grid-template-columns: 1fr; }
   .key-table div { grid-template-columns: 1fr; gap: 6px; }
+  .letter-sets { grid-template-columns: 1fr; }
   .cluster { grid-template-columns: repeat(3, 68px); grid-template-rows: repeat(2, 68px); }
   .cap { font-size: 28px; }
   .tv { padding: 6px; border-radius: 14px; }

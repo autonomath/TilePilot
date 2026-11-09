@@ -117,15 +117,15 @@
           <div class="demo-actions" role="group" aria-label="Try a layout action">
             <button type="button" data-layout="float" aria-pressed="true">
               <span class="act">Float All Windows on This Desktop</span>
-              <kbd>⌃⌥⇧D</kbd>
+              <kbd>⌃⇧⌥F</kbd>
             </button>
             <button type="button" data-layout="tile" aria-pressed="false">
               <span class="act">Tile All Windows on This Desktop</span>
-              <kbd>⌃⌥⇧E</kbd>
+              <kbd>⌃⇧⌥T</kbd>
             </button>
             <button type="button" data-layout="grid" aria-pressed="false">
               <span class="act">Arrange Windows into a Floating Grid</span>
-              <kbd>⌃⌥⇧P</kbd>
+              <kbd>⌃⇧⌥G</kbd>
             </button>
             <button type="button" data-layout="template" aria-pressed="false">
               <span class="act">Apply a Template</span>
@@ -349,28 +349,68 @@
     <section id="keys" class="keys" aria-labelledby="keys-title">
       <div class="shell keys-inner">
         <div class="keys-copy">
-          <p class="eyebrow">Default shortcuts</p>
-          <h2 id="keys-title" class="section-title">The keys you'll learn first.</h2>
-          <p>New installs start with a small, consistent set. I, J, K, and L work like arrow keys, and the modifier decides what happens.</p>
+          <p class="eyebrow">Default shortcuts<span class="soon" data-until="v0.4.27">New in v0.4.27</span></p>
+          <h2 id="keys-title" class="section-title">Every key is where it is for a reason.</h2>
+          <p>Learn two ideas instead of a list. The key you press says where or what. The modifiers you hold say how much changes.</p>
+          <ol class="ladder">
+            <li><kbd>⌥</kbd><span><b>Look around.</b> Option alone moves your focus.</span></li>
+            <li><kbd>⇧⌥</kbd><span><b>Change this window.</b> Add Shift to move it, or to switch it between floating and tiled.</span></li>
+            <li><kbd>⌃⌥</kbd><span><b>Resize this window.</b> Control instead of Shift changes its size.</span></li>
+            <li><kbd>⌃⇧⌥</kbd><span><b>Rearrange.</b> Both at once move and resize together: two windows trade places, or the whole desktop changes layout.</span></li>
+            <li><kbd>⌃⇧⌥⌘</kbd><span><b>TilePilot.</b> Add Command too, often called Hyper, for TilePilot's own tools.</span></li>
+          </ol>
           <div class="cluster" aria-hidden="true">
             <span class="cap cap-i">I<small>up</small></span>
             <span class="cap cap-j">J<small>left</small></span>
             <span class="cap cap-k">K<small>down</small></span>
             <span class="cap cap-l">L<small>right</small></span>
           </div>
-          <p class="keys-foot">Change any shortcut or record your own in Actions &amp; Shortcuts.</p>
+          <p class="keys-foot">These are the defaults for new installs. An existing setup keeps its own keys. Change any shortcut or record your own in Actions &amp; Shortcuts. ⌃⇧⌥⌘ with 1 to 9 is left free for your templates and Work Sets.</p>
         </div>
-        <dl class="key-table">
-          <div><dt><kbd>⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Focus the window above, left, below, or right</dd></div>
-          <div><dt><kbd>⇧⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Move the focused window in that direction</dd></div>
-          <div><dt><kbd>⌃⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Grow the window toward that side</dd></div>
-          <div><dt><kbd>⌃⌥⇧E</kbd></dt><dd>Tile all windows on this desktop</dd></div>
-          <div><dt><kbd>⌃⌥⇧D</kbd></dt><dd>Float all windows on this desktop</dd></div>
-          <div><dt><kbd>⌃⌥⇧P</kbd></dt><dd>Arrange windows into a floating grid</dd></div>
-          <div><dt><kbd>⌃⌥⇧O</kbd></dt><dd>Retile into a balanced tiled layout</dd></div>
-          <div><dt><kbd>⌥0</kbd></dt><dd>Rebalance tiled window sizes</dd></div>
-          <div><dt><kbd>⇧⌥R</kbd></dt><dd>Rotate the tiled layout 90°</dd></div>
-        </dl>
+        <div class="key-groups">
+          <h3>I J K L point the way</h3>
+          <p class="key-why">They sit under your right hand in the same shape as the arrow keys, so you never reach for the arrows.</p>
+          <dl class="key-table">
+            <div><dt><kbd>⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Focus the window above, left, below, or right</dd></div>
+            <div><dt><kbd>⇧⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Move the window that way in the tiled layout</dd></div>
+            <div><dt><kbd>⌃⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Grow the window toward that side</dd></div>
+            <div><dt><kbd>⌃⇧⌥</kbd> + <kbd>I J K L</kbd></dt><dd>Trade places with the window on that side</dd></div>
+          </dl>
+          <h3>Big keys for what you do most</h3>
+          <dl class="key-table">
+            <div><dt><kbd>⇧⌥Space</kbd></dt><dd>Switch the window between floating and tiled<small>Shift because this window changes. Space because it's the biggest key, for the switch you'll flip most.</small></dd></div>
+            <div><dt><kbd>⌃⌥↩</kbd></dt><dd>Fill the Work Area with the floating window<small>Control because it's a resize. Return because it goes big, the same keys Rectangle and Magnet use to maximize.</small></dd></div>
+            <div><dt><kbd>⌥0</kbd></dt><dd>Even out the sizes of tiled windows<small>Zero size difference left. It's on Option alone because you'll press it after most changes.</small></dd></div>
+          </dl>
+          <h3>First letters for everything else</h3>
+          <p class="key-why">The letter starts the action's name. With a Caps Lock layer set to act as Hyper, the TilePilot keys become Caps Lock + letter.</p>
+          <div class="letter-sets">
+            <div>
+              <p class="letter-mods"><kbd>⌃⇧⌥</kbd> This desktop</p>
+              <ul class="letters">
+                <li><kbd>T</kbd><span><b>T</b>ile all windows</span></li>
+                <li><kbd>F</kbd><span><b>F</b>loat all windows</span></li>
+                <li><kbd>B</kbd><span><b>B</b>alanced retile</span></li>
+                <li><kbd>G</kbd><span>Floating <b>g</b>rid</span></li>
+                <li><kbd>R</kbd><span><b>R</b>otate 90°</span></li>
+                <li><kbd>S</kbd><span><b>S</b>tack layout</span></li>
+                <li><kbd>P</kbd><span><b>P</b>ick windows to tile</span></li>
+                <li><kbd>U</kbd><span>Floating windows <b>u</b>p front</span></li>
+              </ul>
+            </div>
+            <div>
+              <p class="letter-mods"><kbd>⌃⇧⌥⌘</kbd> TilePilot</p>
+              <ul class="letters">
+                <li><kbd>T</kbd><span>Open <b>T</b>ilePilot</span></li>
+                <li><kbd>M</kbd><span><b>M</b>egaMap</span></li>
+                <li><kbd>A</kbd><span>Work <b>A</b>rea on or off</span></li>
+                <li><kbd>S</kbd><span>Next Work <b>S</b>et</span></li>
+                <li><kbd>K</kbd><span><b>K</b>eep this app on top</span></li>
+                <li><kbd>N</kbd><span><b>N</b>ever auto-tile this app</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -411,7 +451,7 @@ alt - l : yabai -m window --focus east
             <li><b>Download the disk image</b> and drag TilePilot into Applications.</li>
             <li><b>Open TilePilot.</b> Guided Setup checks the helpers, permissions, and macOS settings it depends on.</li>
             <li><b>Start window control</b> when you're ready, and approve yabai and skhd when macOS asks for Accessibility access.</li>
-            <li><b>Press <kbd>⌃⌥⇧E</kbd></b> on a messy desktop and watch it tile.</li>
+            <li><b>Press <kbd>⌃⇧⌥T</kbd></b> on a messy desktop and watch it tile.<span class="soon" data-until="v0.4.27"> Until v0.4.27, press ⌃⇧⌥E.</span></li>
           </ol>
           <div class="cta-row">
             <a class="btn btn-primary" data-release="dmg" href="https://github.com/autonomath/TilePilot/releases/download/v0.4.26/TilePilot-v0.4.26.dmg">Download <span data-release="version">v0.4.26</span></a>
