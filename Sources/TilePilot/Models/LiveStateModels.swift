@@ -229,6 +229,8 @@ struct LiveStateSnapshot: Codable, Sendable, Equatable {
     let consecutiveMismatchSamples: Int
     let consecutiveHealthySamples: Int
     let lastErrorMessage: String?
+    /// Mission Control, App Exposé, or Show Desktop is showing windows away from their real frames.
+    var windowServerLooksTransformed = false
 }
 
 struct OverviewDisplayPreview: Identifiable, Sendable, Equatable {

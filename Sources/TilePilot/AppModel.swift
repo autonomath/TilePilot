@@ -1339,7 +1339,8 @@ final class AppModel: ObservableObject {
                 fallbackWindowTotal: poll.fallbackWindowTotal,
                 consecutiveMismatchSamples: consecutiveMismatchSamples,
                 consecutiveHealthySamples: consecutiveHealthySamples,
-                lastErrorMessage: poll.errorMessage
+                lastErrorMessage: poll.errorMessage,
+                windowServerLooksTransformed: poll.windowServerLooksTransformed
             )
         }
 

@@ -11,6 +11,7 @@ struct LiveStatePollResult: Sendable {
     let yabaiWindowTotal: Int?
     let fallbackWindowTotal: Int?
     let errorMessage: String?
+    var windowServerLooksTransformed = false
 }
 
 final class YabaiStateService: @unchecked Sendable {
@@ -90,7 +91,8 @@ final class YabaiStateService: @unchecked Sendable {
                 fallbackDisplays: fallbackDisplays,
                 yabaiWindowTotal: parsed.windows.count,
                 fallbackWindowTotal: fallbackDisplays.isEmpty ? nil : fallbackTotal,
-                errorMessage: nil
+                errorMessage: nil,
+                windowServerLooksTransformed: parsed.windowServerLooksTransformed
             )
         } catch {
             return LiveStatePollResult(
@@ -149,7 +151,7 @@ final class YabaiStateService: @unchecked Sendable {
         timestamp: Date,
         screenDescriptors: [ScreenDescriptor],
         onScreenWindowDescriptors: [Int: OnScreenWindowDescriptor]
-    ) throws -> (displays: [DisplayState], spaces: [SpaceState], windows: [WindowState]) {
+    ) throws -> (displays: [DisplayState], spaces: [SpaceState], windows: [WindowState], windowServerLooksTransformed: Bool) {
         let displayRows = try jsonArray(from: displaysJSON)
         let spaceRows = try jsonArray(from: spacesJSON)
         let windowRows = try jsonArray(from: windowsJSON)
@@ -162,6 +164,8 @@ final class YabaiStateService: @unchecked Sendable {
             return (id: id, frame: frame)
         }
 
+        // yabai's frames come from Accessibility and stay put during Show Desktop and Mission Control.
+        var frameSamples: [(windowServer: CGRect, accessibility: CGRect)] = []
         let windows: [WindowState] = windowRows.compactMap { row in
             guard let id = int(from: row["id"]),
                   let pid = int(from: row["pid"]),
@@ -174,6 +178,10 @@ final class YabaiStateService: @unchecked Sendable {
             }
             let yabaiFrame = yabaiFrame(from: row["frame"]) ?? .zero
             let onScreenDescriptor = onScreenWindowDescriptors[id]
+            if let onScreenDescriptor, yabaiFrame.width > 0, yabaiFrame.height > 0,
+               bool(from: row["has-ax-reference"]) ?? true {
+                frameSamples.append((onScreenDescriptor.bounds, yabaiFrame))
+            }
             let frame = preferredWindowFrame(
                 forWindowID: id,
                 yabaiFrame: yabaiFrame,
@@ -273,7 +281,7 @@ final class YabaiStateService: @unchecked Sendable {
         }
         .sorted { $0.id < $1.id }
 
-        return (displays, spaces, windows)
+        return (displays, spaces, windows, WorkAreaGeometry.windowServerLooksTransformed(frameSamples))
     }
 
     private func isInternalTilePilotOverlayWindow(_ row: [String: Any]) -> Bool {

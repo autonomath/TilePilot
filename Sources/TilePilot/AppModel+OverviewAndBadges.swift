@@ -203,7 +203,8 @@ extension AppModel {
             applyWindowBadgeState([], hoveredWindowID: nil, forcePublish: forceRepair)
             return
         }
-        guard snapshot.source == .yabai, !snapshot.degraded else {
+        // Outlines would follow windows Show Desktop pushes off a display and show up on its neighbour.
+        guard snapshot.source == .yabai, !snapshot.degraded, !snapshot.windowServerLooksTransformed else {
             lastWindowBadgeRefreshSignature = nil
             applyWindowBadgeState([], hoveredWindowID: nil, forcePublish: forceRepair)
             return
