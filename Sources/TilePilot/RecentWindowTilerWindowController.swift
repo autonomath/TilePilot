@@ -3,16 +3,17 @@ import Combine
 import SwiftUI
 
 private final class RecentWindowTilerPanel: NSPanel {
-    var onDefaultAction: (() -> Void)?
+    /// Handles a key press without Command, Option or Control; returns false to pass it on.
+    var onKey: ((UInt16) -> Bool)?
 
-    override func keyDown(with event: NSEvent) {
-        let isReturn = event.keyCode == 36
-        let isKeypadEnter = event.keyCode == 76
-        if isReturn || isKeypadEnter {
-            onDefaultAction?()
+    // Caught before dispatch, so a focused button or the mode control can't swallow them.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown,
+           event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+           onKey?(event.keyCode) == true {
             return
         }
-        super.keyDown(with: event)
+        super.sendEvent(event)
     }
 }
 
@@ -29,7 +30,9 @@ final class RecentWindowTilerWindowController: NSWindowController, NSWindowDeleg
 
         let panel = RecentWindowTilerPanel(
             contentRect: NSRect(x: 0, y: 0, width: defaultContentWidth, height: defaultContentHeight),
-            styleMask: [.titled, .closable, .resizable, .utilityWindow],
+            // Non-activating: macOS won't activate TilePilot for a shortcut, so the picker takes
+            // keyboard focus without it, in front of the app you were using.
+            styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -40,8 +43,17 @@ final class RecentWindowTilerWindowController: NSWindowController, NSWindowDeleg
         panel.collectionBehavior = [.moveToActiveSpace]
         panel.contentMinSize = NSSize(width: 500, height: 320)
         panel.contentViewController = NSHostingController(rootView: RecentWindowTilerPickerView(model: model))
-        panel.onDefaultAction = { [weak model] in
-            model?.applyRecentWindowTilerSelection()
+        panel.onKey = { [weak model] keyCode in
+            guard let model else { return false }
+            switch keyCode {
+            case 36, 76: model.applyRecentWindowTilerSelection() // Return, keypad Enter
+            case 49: model.toggleRecentWindowTilerHighlightedSelection() // Space
+            case 125: model.moveRecentWindowTilerHighlight(by: 1) // Down arrow
+            case 126: model.moveRecentWindowTilerHighlight(by: -1) // Up arrow
+            case 53: model.dismissRecentWindowTiler() // Esc
+            default: return false
+            }
+            return true
         }
 
         super.init(window: panel)

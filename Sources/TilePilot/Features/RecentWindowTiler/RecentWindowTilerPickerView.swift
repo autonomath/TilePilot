@@ -25,47 +25,53 @@ struct RecentWindowTilerPickerView: View {
                     )
 
                     let idealListHeight = listHeight(for: state)
-                    ScrollView {
-                        LazyVStack(spacing: 4) {
-                            ForEach(Array(state.candidates.enumerated()), id: \.element.windowID) { index, candidate in
-                                VStack(spacing: 4) {
-                                    if shouldShowOtherMonitorDivider(index: index, candidates: state.candidates) {
-                                        RecentWindowTilerMonitorDivider()
-                                    }
-
-                                    RecentWindowTilerCandidateRow(
-                                        order: index + 1,
-                                        candidate: candidate,
-                                        mode: state.mode,
-                                        isSelected: state.effectiveSelectedWindowIDs.contains(candidate.windowID),
-                                        isEnabled: candidate.isSelectable(in: state.mode),
-                                        onFocus: {
-                                            model.focusRecentWindowTilerCandidate(windowID: candidate.windowID)
-                                        },
-                                        onClose: {
-                                            model.closeRecentWindowTilerCandidate(windowID: candidate.windowID)
+                    ScrollViewReader { scrollProxy in
+                        ScrollView {
+                            LazyVStack(spacing: 4) {
+                                ForEach(Array(state.candidates.enumerated()), id: \.element.windowID) { index, candidate in
+                                    VStack(spacing: 4) {
+                                        if shouldShowOtherMonitorDivider(index: index, candidates: state.candidates) {
+                                            RecentWindowTilerMonitorDivider()
                                         }
-                                    ) {
-                                        model.toggleRecentWindowTilerSelection(windowID: candidate.windowID)
-                                    }
-                                    .onDrag {
-                                        draggedWindowID = candidate.windowID
-                                        return NSItemProvider(object: "\(candidate.windowID)" as NSString)
-                                    }
-                                    .onDrop(
-                                        of: [UTType.utf8PlainText.identifier, UTType.plainText.identifier],
-                                        delegate: RecentWindowTilerCandidateDropDelegate(
-                                            targetWindowID: candidate.windowID,
-                                            draggedWindowID: $draggedWindowID,
-                                            model: model
+
+                                        RecentWindowTilerCandidateRow(
+                                            order: index + 1,
+                                            candidate: candidate,
+                                            mode: state.mode,
+                                            isSelected: state.effectiveSelectedWindowIDs.contains(candidate.windowID),
+                                            isHighlighted: candidate.windowID == state.currentHighlightedWindowID,
+                                            isEnabled: candidate.isSelectable(in: state.mode),
+                                            onFocus: {
+                                                model.focusRecentWindowTilerCandidate(windowID: candidate.windowID)
+                                            },
+                                            onClose: {
+                                                model.closeRecentWindowTilerCandidate(windowID: candidate.windowID)
+                                            }
+                                        ) {
+                                            model.toggleRecentWindowTilerSelection(windowID: candidate.windowID)
+                                        }
+                                        .onDrag {
+                                            draggedWindowID = candidate.windowID
+                                            return NSItemProvider(object: "\(candidate.windowID)" as NSString)
+                                        }
+                                        .onDrop(
+                                            of: [UTType.utf8PlainText.identifier, UTType.plainText.identifier],
+                                            delegate: RecentWindowTilerCandidateDropDelegate(
+                                                targetWindowID: candidate.windowID,
+                                                draggedWindowID: $draggedWindowID,
+                                                model: model
+                                            )
                                         )
-                                    )
+                                    }
                                 }
                             }
+                            .padding(.vertical, 1)
                         }
-                        .padding(.vertical, 1)
+                        .frame(minHeight: min(idealListHeight, rowHeight), idealHeight: idealListHeight, maxHeight: .infinity)
+                        .onChange(of: state.currentHighlightedWindowID) { windowID in
+                            if let windowID { scrollProxy.scrollTo(windowID) }
+                        }
                     }
-                    .frame(minHeight: min(idealListHeight, rowHeight), idealHeight: idealListHeight, maxHeight: .infinity)
 
                     HStack {
                         Text("\(state.selectedCount) selected")
@@ -665,6 +671,7 @@ private struct RecentWindowTilerCandidateRow: View {
     let candidate: RecentWindowTilerCandidate
     let mode: RecentWindowTilerMode
     let isSelected: Bool
+    let isHighlighted: Bool
     let isEnabled: Bool
     let onFocus: () -> Void
     let onClose: () -> Void
@@ -740,6 +747,12 @@ private struct RecentWindowTilerCandidateRow: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(isSelected ? Color.blue.opacity(0.32) : Color.secondary.opacity(0.12), lineWidth: 1)
         )
+        .overlay {
+            if isHighlighted {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+            }
+        }
         .overlay(alignment: .leading) {
             if isSelected {
                 Capsule()

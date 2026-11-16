@@ -193,6 +193,13 @@ struct RecentWindowTilerPresentationState: Equatable, Sendable {
     var templateOptions: [RecentWindowTilerTemplateOption]
     var selectedTemplateID: UUID?
     var templateSlotWindowIDs: [Int?]
+    /// Row the arrow keys move; Space toggles it.
+    var highlightedWindowID: Int? = nil
+
+    /// The highlighted row, or the first row when none is set or that window is gone.
+    var currentHighlightedWindowID: Int? {
+        candidates.contains { $0.windowID == highlightedWindowID } ? highlightedWindowID : candidates.first?.windowID
+    }
 
     var selectedTemplateOption: RecentWindowTilerTemplateOption? {
         guard let selectedTemplateID else { return nil }

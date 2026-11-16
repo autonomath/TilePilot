@@ -797,6 +797,7 @@ extension AppModel {
               candidate.isSelectable(in: state.mode) else {
             return
         }
+        state.highlightedWindowID = windowID
         if state.selectedWindowIDs.contains(windowID) {
             state.selectedWindowIDs.remove(windowID)
             if state.mode == .template {
@@ -810,6 +811,20 @@ extension AppModel {
         }
         persistRecentWindowTilerPreferredSelectionCount(state.selectedCount)
         recentWindowTilerState = state
+    }
+
+    func moveRecentWindowTilerHighlight(by offset: Int) {
+        guard var state = recentWindowTilerState,
+              let index = state.candidates.firstIndex(where: { $0.windowID == state.currentHighlightedWindowID }) else {
+            return
+        }
+        state.highlightedWindowID = state.candidates[min(max(index + offset, 0), state.candidates.count - 1)].windowID
+        recentWindowTilerState = state
+    }
+
+    func toggleRecentWindowTilerHighlightedSelection() {
+        guard let windowID = recentWindowTilerState?.currentHighlightedWindowID else { return }
+        toggleRecentWindowTilerSelection(windowID: windowID)
     }
 
     private func removeRecentWindowTilerCandidate(windowID: Int) {
@@ -907,7 +922,8 @@ extension AppModel {
             displayFrame: displayFrame,
             templateOptions: templateOptions,
             selectedTemplateID: selectedTemplateID,
-            templateSlotWindowIDs: templateSlotWindowIDs
+            templateSlotWindowIDs: templateSlotWindowIDs,
+            highlightedWindowID: existingState.highlightedWindowID
         )
         lastErrorMessage = nil
     }

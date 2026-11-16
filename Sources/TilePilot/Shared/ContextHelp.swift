@@ -165,6 +165,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
         case .windowPicker:
             return [
                 .init("The list is front-to-back order on this desktop; click rows to include or skip them", systemImage: "checkmark.circle"),
+                .init("Keyboard: ↑ ↓ pick a row, Space includes or skips it, Return applies, Esc cancels", systemImage: "keyboard"),
                 .init("Numbers are placement order; drag rows or preview tiles to change it", systemImage: "list.number"),
                 .init("Floating Grid places windows into exact slots and leaves them floating", systemImage: "rectangle.grid.2x2"),
                 .init("Template uses the slots of a saved template that fits this display", systemImage: "rectangle.3.offgrid"),
