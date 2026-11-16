@@ -339,7 +339,7 @@ extension AppModel {
                 capabilityGate: .yabaiRuntime,
                 commandMatchers: ["yabai -m window --focus west"],
                 matchAllCommandMatchers: false,
-                preferredCommand: "yabai -m window --focus west",
+                preferredCommand: "yabai -m window --focus west || " + tilePilotFeatureCommand("action.focus-left"),
                 actionID: .focusWest,
                 isExperimental: false
             ),
@@ -352,7 +352,7 @@ extension AppModel {
                 capabilityGate: .yabaiRuntime,
                 commandMatchers: ["yabai -m window --focus east"],
                 matchAllCommandMatchers: false,
-                preferredCommand: "yabai -m window --focus east",
+                preferredCommand: "yabai -m window --focus east || " + tilePilotFeatureCommand("action.focus-right"),
                 actionID: .focusEast,
                 isExperimental: false
             ),
@@ -365,7 +365,7 @@ extension AppModel {
                 capabilityGate: .yabaiRuntime,
                 commandMatchers: ["yabai -m window --focus north"],
                 matchAllCommandMatchers: false,
-                preferredCommand: "yabai -m window --focus north",
+                preferredCommand: "yabai -m window --focus north || " + tilePilotFeatureCommand("action.focus-up"),
                 actionID: .focusNorth,
                 isExperimental: false
             ),
@@ -378,7 +378,7 @@ extension AppModel {
                 capabilityGate: .yabaiRuntime,
                 commandMatchers: ["yabai -m window --focus south"],
                 matchAllCommandMatchers: false,
-                preferredCommand: "yabai -m window --focus south",
+                preferredCommand: "yabai -m window --focus south || " + tilePilotFeatureCommand("action.focus-down"),
                 actionID: .focusSouth,
                 isExperimental: false
             ),

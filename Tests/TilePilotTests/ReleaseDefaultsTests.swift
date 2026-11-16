@@ -8,7 +8,7 @@ final class ReleaseDefaultsTests: XCTestCase {
 
         XCTAssertTrue(body.contains("alt - 1 : /usr/bin/open -g \"tilepilot://desktop/1\""))
         XCTAssertTrue(body.contains("alt - 9 : /usr/bin/open -g \"tilepilot://desktop/9\""))
-        XCTAssertTrue(body.contains("alt - j : yabai -m window --focus west"))
+        XCTAssertTrue(body.contains("alt - j : yabai -m window --focus west || /usr/bin/open -g \"tilepilot://feature/action.focus-left\""))
         XCTAssertTrue(body.contains("shift + alt - j : yabai -m window --warp west"))
         XCTAssertTrue(body.contains("ctrl + alt - j : yabai -m window --resize left:-80:0"))
         XCTAssertTrue(body.contains("ctrl + shift + alt - j : yabai -m window --swap west"))

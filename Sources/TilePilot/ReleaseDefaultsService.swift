@@ -1,7 +1,7 @@
 import Foundation
 
 final class ReleaseDefaultsService: @unchecked Sendable {
-    static let currentProfileVersion = "v0.4.24-defaults.3"
+    static let currentProfileVersion = "v0.4.24-defaults.4"
 
     private let fileManager = FileManager.default
 
@@ -124,10 +124,10 @@ enum DefaultShortcutProfile {
         # Control-Shift-Option changes the whole desktop, Hyper opens TilePilot.
 
         # Focus
-        alt - j : yabai -m window --focus west
-        alt - l : yabai -m window --focus east
-        alt - i : yabai -m window --focus north
-        alt - k : yabai -m window --focus south
+        alt - j : yabai -m window --focus west || \(featureCommand("action.focus-left"))
+        alt - l : yabai -m window --focus east || \(featureCommand("action.focus-right"))
+        alt - i : yabai -m window --focus north || \(featureCommand("action.focus-up"))
+        alt - k : yabai -m window --focus south || \(featureCommand("action.focus-down"))
 
         # Window Placement
         shift + alt - j : yabai -m window --warp west

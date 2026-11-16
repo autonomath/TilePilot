@@ -256,6 +256,7 @@ extension AppModel {
             let result = await doctorService.runSupportCommand(command)
             appendCommandLog(from: result)
             if !result.isSuccess {
+                if await focusNeighborByPosition(for: actionID) { break }
                 actionsLastErrorMessage = TilePilotActionCatalog.meta(for: actionID).title + " didn’t work."
                 if !result.stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     actionsLastErrorMessage = TilePilotActionCatalog.failureMessage(for: actionID, commandResult: result)
@@ -278,6 +279,29 @@ extension AppModel {
         actionsLastErrorMessage = nil
         lastActionMessage = actionsLastActionMessage
         lastErrorMessage = nil
+    }
+
+    /// yabai only finds a neighbour among tiled windows; floating ones go by where they sit.
+    private func focusNeighborByPosition(for actionID: TilePilotActionID) async -> Bool {
+        let direction: DirectionalShortcutDirection
+        switch actionID {
+        case .focusWest: direction = .left
+        case .focusEast: direction = .right
+        case .focusNorth: direction = .up
+        case .focusSouth: direction = .down
+        default: return false
+        }
+        await refreshLiveState()
+        guard let windows = (latestLiveStateSnapshot ?? liveStateSnapshot)?.windows,
+              let current = windows.first(where: \.focused) else { return false }
+        let visible = windows.filter { $0.isVisible && !$0.isMinimized && !$0.isHidden }.sorted(by: workSetWindowSort)
+        guard let targetID = DirectionalFocusPlanner.target(
+                  from: current.id,
+                  toward: direction,
+                  among: visible.map { ($0.id, CGRect(x: $0.frameX, y: $0.frameY, width: $0.frameW, height: $0.frameH)) }
+              ),
+              let target = visible.first(where: { $0.id == targetID }) else { return false }
+        return await focusWindowWithRestore(windowID: targetID, knownWindow: target)
     }
 
     private func liveStateSignature() -> String? {

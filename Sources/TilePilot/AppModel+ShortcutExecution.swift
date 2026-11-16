@@ -107,7 +107,8 @@ func runFeatureControl(_ featureID: FeatureControlID, source: FeatureRunSource, 
         toggleAllWorkAreas()
         return
     }
-    if let entry = resolvedRow?.shortcutEntry {
+    // A line that opens this feature's own link would only come back here; run the action instead.
+    if let entry = resolvedRow?.shortcutEntry, !entry.command.contains(tilePilotFeatureURL(featureID)) {
         runShortcut(entry)
         return
     }

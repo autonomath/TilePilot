@@ -4611,7 +4611,7 @@ extension AppModel {
         return window
     }
 
-    private func focusWindowWithRestore(windowID: Int, knownWindow: WindowState) async -> Bool {
+    func focusWindowWithRestore(windowID: Int, knownWindow: WindowState) async -> Bool {
         let focus = await doctorService.runSupportCommand(
             yabaiCommand(["-m", "window", "--focus", String(windowID)], timeout: 1.5)
         )
