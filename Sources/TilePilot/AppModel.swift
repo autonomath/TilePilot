@@ -493,6 +493,8 @@ final class AppModel: ObservableObject {
     var workAreaLastSnapshotSource: StateSourceQuality?
     var workAreaPaddingApplyInProgress = false
     var workAreaEditApplyTask: Task<Void, Never>?
+    var windowEventRefreshTask: Task<Void, Never>?
+    var lastWindowEventRefreshAt = Date.distantPast
     var workAreaFitBatchExpiryTask: Task<Void, Never>?
     private(set) var overviewDisplayPreviews: [OverviewDisplayPreview] = []
     private(set) var overviewDisplaySections: [OverviewDisplaySection] = []
@@ -806,6 +808,34 @@ final class AppModel: ObservableObject {
 
     func publishLatestLiveStateForCurrentTab(force: Bool = false) {
         publishLiveStateSnapshotIfNeeded(latestLiveStateSnapshot ?? liveStateSnapshot, force: force)
+    }
+
+    /// Refreshes once a burst of window events settles, instead of waiting for the next poll.
+    /// Apps announce a window before it is on screen and a close before it is gone, and nothing
+    /// announces the end of those animations, so later looks pick that up.
+    func refreshLiveStateSoon() {
+        windowEventRefreshTask?.cancel()
+        // An app that keeps sending events (popups while typing) gets at most two refreshes a second.
+        let sinceLast = Int(Date().timeIntervalSince(lastWindowEventRefreshAt) * 1000)
+        let firstDelay = max(150, 500 - sinceLast)
+        windowEventRefreshTask = Task { [weak self] in
+            // App Nap would stretch the short waits below.
+            let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep, reason: "Window event")
+            defer { ProcessInfo.processInfo.endActivity(activity) }
+            for (look, delay) in [firstDelay, 150, 600].enumerated() {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard let self else { return }
+                while self.isRefreshingLiveState, !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(50))
+                }
+                guard !Task.isCancelled else { return }
+                // Only the first look counts toward the limit; the follow-ups belong to the same burst.
+                if look == 0 {
+                    self.lastWindowEventRefreshAt = Date()
+                }
+                await self.refreshLiveState()
+            }
+        }
     }
 
     func refreshLiveState() async {

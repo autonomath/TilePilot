@@ -46,7 +46,13 @@ enum AccessibilityWindowFrames {
         return result
     }
 
-    private static func frame(of window: AXUIElement) -> CGRect? {
+    static func windowID(of window: AXUIElement) -> Int? {
+        var windowID = CGWindowID(0)
+        guard let getWindow, getWindow(window, &windowID) == .success else { return nil }
+        return Int(windowID)
+    }
+
+    static func frame(of window: AXUIElement) -> CGRect? {
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionRef) == .success,

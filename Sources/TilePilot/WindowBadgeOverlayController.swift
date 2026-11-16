@@ -50,9 +50,19 @@ final class WindowBadgeOverlayController {
     private var pendingSignature: OverlayUpdateSignature?
     private var appliedSignature: OverlayUpdateSignature?
     private var scheduledUpdate: DispatchWorkItem?
+    private let windowEvents = WindowEventObserver()
+    /// Frames reported by window events, trusted briefly over the slower polled state.
+    private var liveFrames: [Int: (frame: CGRect, at: Date)] = [:]
+    private static let liveFrameTrustSeconds = 0.5
 
     init(model: AppModel) {
         self.model = model
+        windowEvents.onFrameChange = { [weak self] windowID, frame in
+            self?.followWindow(windowID, to: frame)
+        }
+        windowEvents.onWindowsChange = { [weak self] in
+            self?.windowsChanged()
+        }
         bind()
     }
 
@@ -143,6 +153,30 @@ final class WindowBadgeOverlayController {
                 self?.invalidateAndReapplyOverlays()
             }
             .store(in: &cancellables)
+
+        // Also covers apps that are not observed yet, such as one that just launched.
+        for name in [NSWorkspace.didActivateApplicationNotification, NSWorkspace.activeSpaceDidChangeNotification] {
+            NSWorkspace.shared.notificationCenter.publisher(for: name)
+                .receive(on: RunLoop.main)
+                .sink { [weak self] _ in
+                    self?.windowsChanged()
+                }
+                .store(in: &cancellables)
+        }
+    }
+
+    /// Moves the outline right away; the refresh then brings the rest of the state up to date.
+    private func followWindow(_ windowID: Int, to frame: CGRect) {
+        liveFrames[windowID] = (frame, Date())
+        outlinePanels[windowID]?.setFrame(convertTopOriginRectToAppKit(frame).integral, display: true)
+        model.refreshLiveStateSoon()
+    }
+
+    private func windowsChanged() {
+        guard model.showWindowBadgeOverlay || model.showWindowOutlineOverlay else { return }
+        // Restack now with what is known, then again with fresh state.
+        invalidateAndReapplyOverlays()
+        model.refreshLiveStateSoon()
     }
 
     private func scheduleOverlayUpdate(with badges: [WindowBadgeState]) {
@@ -161,14 +195,7 @@ final class WindowBadgeOverlayController {
             self?.applyOverlayUpdate(self?.pendingBadges ?? [])
         }
         scheduledUpdate = work
-        let delay: TimeInterval
-        switch model.overlayRefreshPolicy {
-        case .full:
-            delay = 0.05
-        case .reduced:
-            delay = 0.40
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
     }
 
     private func invalidateAndReapplyOverlays() {
@@ -186,6 +213,8 @@ final class WindowBadgeOverlayController {
         pendingSignature = nil
         appliedSignature = signature
         model.incrementOverlayPanelUpdates()
+        windowEvents.observe(pids: signature.showBadges || signature.showOutlines ? observedPIDs(for: badges) : [])
+        liveFrames = liveFrames.filter { Date().timeIntervalSince($0.value.at) < Self.liveFrameTrustSeconds }
         let targetIDs = Set(signature.outlineTargets.map(\.windowID))
         let badgeTargetIDs = Set(signature.badgeTargets.map(\.windowID))
         model.setHasVisibleWindowBadgePanels(!targetIDs.isEmpty || !badgeTargetIDs.isEmpty)
@@ -203,10 +232,12 @@ final class WindowBadgeOverlayController {
 
         if signature.showOutlines {
             removeStalePanels(from: &outlinePanels, keepIDs: targetIDs)
+            // One front-to-back list per pass; most passes repair nothing.
+            let windowStack = (NSWindow.windowNumbers(options: [.allApplications]) ?? []).map(\.intValue)
             for badge in signature.outlineTargets {
                 let panel = outlinePanels[badge.windowID] ?? createPanel(ignoresMouseEvents: true, level: .normal)
                 outlinePanels[badge.windowID] = panel
-                updateOutlinePanel(panel: panel, with: badge)
+                updateOutlinePanel(panel: panel, with: badge, windowStack: windowStack)
             }
         } else {
             closeAllPanels(from: &outlinePanels)
@@ -305,6 +336,8 @@ final class WindowBadgeOverlayController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
+        // The default order-in animation delays a new border by about 100 ms.
+        panel.animationBehavior = .none
         panel.ignoresMouseEvents = ignoresMouseEvents
         panel.hidesOnDeactivate = false
         panel.isExcludedFromWindowsMenu = true
@@ -362,7 +395,13 @@ final class WindowBadgeOverlayController {
         panel.orderFront(nil)
     }
 
-    private func updateOutlinePanel(panel: BadgePanel, with badge: WindowBadgeState) {
+    /// True when `panel` sits right above `target` in a front-to-back window list.
+    nonisolated static func isDirectlyAbove(panel: Int, target: Int, in frontToBack: [Int]) -> Bool {
+        guard let index = frontToBack.firstIndex(of: target), index > 0 else { return false }
+        return frontToBack[index - 1] == panel
+    }
+
+    private func updateOutlinePanel(panel: BadgePanel, with badge: WindowBadgeState, windowStack: [Int]) {
         let targetWindowRect = resolvedGlobalRect(for: badge)
         let hostScreen = bestScreen(for: targetWindowRect)
         let scale = max(1.0, hostScreen?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1.0)
@@ -381,16 +420,31 @@ final class WindowBadgeOverlayController {
         outlineView.frame = NSRect(origin: .zero, size: outlineRect.size)
         outlineView.update(strokeColor: strokeColor, lineWidth: lineWidth)
         panel.ignoresMouseEvents = true
-        panel.setFrame(outlineRect, display: true)
-        if let windowNumber = targetWindowNumber(for: badge, targetWindowRect: targetWindowRect) {
-            panel.order(.above, relativeTo: Int(windowNumber))
-        } else {
-            panel.orderFront(nil)
+        if panel.frame != outlineRect {
+            panel.setFrame(outlineRect, display: true)
+        }
+        // yabai window IDs are window-server window numbers.
+        if !windowStack.contains(badge.windowID) {
+            if !panel.isVisible {
+                panel.orderFront(nil)
+            }
+        } else if !Self.isDirectlyAbove(panel: panel.windowNumber, target: badge.windowID, in: windowStack) {
+            panel.order(.above, relativeTo: badge.windowID)
         }
     }
 
     private func resolvedGlobalRect(for badge: WindowBadgeState) -> CGRect {
-        convertTopOriginRectToAppKit(badge.frame)
+        convertTopOriginRectToAppKit(liveFrames[badge.windowID]?.frame ?? badge.frame)
+    }
+
+    private func observedPIDs(for badges: [WindowBadgeState]) -> Set<pid_t> {
+        // The frontmost app may have no window yet; observing it catches its first one.
+        var pids = Set(badges.map { pid_t($0.pid) })
+        if let frontmost = NSWorkspace.shared.frontmostApplication {
+            pids.insert(frontmost.processIdentifier)
+        }
+        pids.remove(ProcessInfo.processInfo.processIdentifier)
+        return pids
     }
 
     private func bestScreen(for rect: CGRect) -> NSScreen? {
@@ -425,41 +479,5 @@ final class WindowBadgeOverlayController {
             width: rect.width,
             height: rect.height
         )
-    }
-
-    private func targetWindowNumber(for badge: WindowBadgeState, targetWindowRect: CGRect) -> CGWindowID? {
-        guard let rawInfo = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]],
-              !rawInfo.isEmpty else {
-            return nil
-        }
-
-        var bestNumber: CGWindowID?
-        var bestScore: CGFloat = .greatestFiniteMagnitude
-
-        for entry in rawInfo {
-            guard let ownerPID = entry[kCGWindowOwnerPID as String] as? Int,
-                  ownerPID == badge.pid,
-                  let layer = entry[kCGWindowLayer as String] as? Int,
-                  layer == 0,
-                  let number = entry[kCGWindowNumber as String] as? UInt32,
-                  let boundsDict = entry[kCGWindowBounds as String] as? NSDictionary else {
-                continue
-            }
-            guard let cgRect = CGRect(dictionaryRepresentation: boundsDict) else { continue }
-
-            // CGWindow bounds are top-origin; convert to AppKit coordinates before scoring.
-            let rect = convertTopOriginRectToAppKit(cgRect)
-            if rect.isEmpty { continue }
-            let dx = abs(rect.minX - targetWindowRect.minX)
-            let dy = abs(rect.minY - targetWindowRect.minY)
-            let dw = abs(rect.width - targetWindowRect.width)
-            let dh = abs(rect.height - targetWindowRect.height)
-            let score = (dx * 2.0) + (dy * 2.0) + dw + dh
-            if score < bestScore {
-                bestScore = score
-                bestNumber = CGWindowID(number)
-            }
-        }
-        return bestNumber
     }
 }
