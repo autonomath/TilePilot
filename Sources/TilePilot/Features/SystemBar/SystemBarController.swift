@@ -13,6 +13,8 @@ final class SystemBarController: NSObject, NSMenuDelegate {
         let appKitFrame: CGRect
         /// The real menu bar of the mirrored display, in top-left coordinates.
         let menuBarFrame: CGRect?
+        /// Magnification of the bar's contents; the layout's bar is already this much taller.
+        let scale: CGFloat
     }
 
     final class SystemBarPanel: NSPanel {
@@ -235,11 +237,13 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 if bar.panel.frame != request.appKitFrame {
                     bar.panel.setFrame(request.appKitFrame, display: true)
                 }
+                bar.view.scale = request.scale
                 if !bar.panel.isVisible {
                     bar.panel.orderFrontRegardless()
                 }
             } else {
                 let (panel, view) = makePanel(frame: request.appKitFrame)
+                view.scale = request.scale
                 let key = request.key
                 view.onClick = { [weak self] slot, _, secondary in
                     self?.handleClick(barKey: key, slot: slot, secondary: secondary)
@@ -546,7 +550,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 metrics.append(SystemBarIconMetric(width: own.width, rightOffset: own.rightOffset, group: 1_000))
             }
         }
-        let plan = SystemBarLayoutPlanner.plan(barWidth: bar.layout.bar.width, menuWidths: menuWidths, icons: metrics)
+        let plan = SystemBarLayoutPlanner.plan(barWidth: bar.view.bounds.width, menuWidths: menuWidths, icons: metrics)
         activeBackgroundRect = backgroundSampleRect(menuWidths: menuWidths)
         var content = SystemBarContent(titles: titles, icons: shown, iconRenderings: [:], plan: plan)
         fillImages(of: &content, bar: bar)
@@ -673,7 +677,7 @@ final class SystemBarController: NSObject, NSMenuDelegate {
                 size = previous.size
                 top = previous.top
             }
-            renderings[index] = rendering(for: item, barHeight: bar.layout.bar.height, matchingImage: image, size: size, top: top)
+            renderings[index] = rendering(for: item, barHeight: bar.view.bounds.height, matchingImage: image, size: size, top: top)
         }
         content.iconRenderings = renderings
         brightenedIconNames = brightened

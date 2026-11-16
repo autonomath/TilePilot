@@ -341,6 +341,18 @@ struct WorkAreaDashboardView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                Picker("Size", selection: Binding(
+                    get: { model.systemBarScale },
+                    set: { model.setSystemBarScale($0) }
+                )) {
+                    Text("Standard").tag(1.0)
+                    Text("Large").tag(1.25)
+                    Text("Larger").tag(1.5)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .disabled(!barOn)
+
                 Toggle("Also show icons from other displays", isOn: Binding(
                     get: { model.systemBarOtherDisplayIconsEnabled },
                     set: { model.setSystemBarOtherDisplayIconsEnabled($0) }

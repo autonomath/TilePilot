@@ -39,7 +39,7 @@ extension AppModel {
         return WorkAreaGeometry.systemBarLayout(
             workArea: workArea,
             visibleFrame: visible,
-            barHeight: systemBarHeight(for: display)
+            barHeight: systemBarHeight(for: display) * systemBarScale
         )
     }
 
@@ -87,6 +87,12 @@ extension AppModel {
         systemBarOtherDisplayIconsEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: AppModel.systemBarOtherDisplayIconsDefaultsKey)
         systemBarController.includeOtherDisplayIcons = enabled
+    }
+
+    func setSystemBarScale(_ scale: Double) {
+        systemBarScale = min(2, max(1, scale))
+        UserDefaults.standard.set(systemBarScale, forKey: AppModel.systemBarScaleDefaultsKey)
+        scheduleWorkAreaApply(delayMilliseconds: 0)
     }
 
     /// Turns the menu bar on or off (nil toggles) for every saved Work Area. Used by the TilePilot
@@ -190,7 +196,8 @@ extension AppModel {
                     key: display.uuid?.uppercased() ?? "display-\(display.id)",
                     layout: layout,
                     appKitFrame: WorkAreaGeometry.appKitRect(fromTopLeft: layout.bar, primaryScreenMaxY: primaryMaxY),
-                    menuBarFrame: systemBarRealMenuBarFrame(for: display)
+                    menuBarFrame: systemBarRealMenuBarFrame(for: display),
+                    scale: systemBarScale
                 )
             )
         }

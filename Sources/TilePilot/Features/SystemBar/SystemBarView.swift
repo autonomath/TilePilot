@@ -68,6 +68,11 @@ final class SystemBarView: NSView {
         didSet { if openSlotIndex != oldValue { needsDisplay = true } }
     }
 
+    /// Draws at the real menu bar's size, magnified this much to fill the frame.
+    var scale: CGFloat = 1 {
+        didSet { if scale != oldValue { setFrameSize(frame.size) } }
+    }
+
     /// Called with the slot, the event, and whether it is a secondary click.
     var onClick: ((SystemBarSlot, NSEvent, Bool) -> Void)?
 
@@ -110,6 +115,7 @@ final class SystemBarView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
+        setBoundsSize(NSSize(width: newSize.width / scale, height: newSize.height / scale))
         updateIslands()
     }
 
@@ -134,11 +140,12 @@ final class SystemBarView: NSView {
         }
         let barWidth = bounds.width
         backdropViews = rects.map { rect in
-            let effect = NSVisualEffectView(frame: convert(rect, to: container))
+            let frame = convert(rect, to: container)
+            let effect = NSVisualEffectView(frame: frame)
             effect.material = .titlebar
             effect.blendingMode = .behindWindow
             effect.state = .active
-            let local = NSRect(origin: .zero, size: rect.size)
+            let local = NSRect(origin: .zero, size: frame.size)
             let roundsLeft = rect.minX > 0.5
             let roundsRight = rect.maxX < barWidth - 0.5
             effect.maskImage = NSImage(size: rect.size, flipped: false) { _ in

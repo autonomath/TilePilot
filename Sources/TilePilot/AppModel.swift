@@ -74,6 +74,7 @@ final class AppModel: ObservableObject {
     static let workAreasDefaultsKey = "TilePilot.workAreas"
     static let systemBarMatchingIconsDefaultsKey = "TilePilot.systemBarMatchingIcons"
     static let systemBarOtherDisplayIconsDefaultsKey = "TilePilot.systemBarOtherDisplayIcons"
+    static let systemBarScaleDefaultsKey = "TilePilot.systemBarScale"
     nonisolated static let activeWorkSetIDsByScopeDefaultsKey = "TilePilot.activeWorkSetIDsByScope"
     static let showWindowBadgeOverlayDefaultsKey = "TilePilot.showWindowBadgeOverlay"
     static let showWindowOutlineOverlayDefaultsKey = "TilePilot.showWindowOutlineOverlay"
@@ -246,6 +247,8 @@ final class AppModel: ObservableObject {
     @Published var workAreaSessionAllowedWindowIDs: Set<Int> = []
     @Published var systemBarMatchingIconsEnabled: Bool = (UserDefaults.standard.object(forKey: AppModel.systemBarMatchingIconsDefaultsKey) as? Bool) ?? true
     @Published var systemBarOtherDisplayIconsEnabled: Bool = UserDefaults.standard.bool(forKey: AppModel.systemBarOtherDisplayIconsDefaultsKey)
+    /// How much bigger than the real menu bar the Work Area menu bar is drawn (1 = same size).
+    @Published var systemBarScale: Double = min(2, max(1, (UserDefaults.standard.object(forKey: AppModel.systemBarScaleDefaultsKey) as? Double) ?? 1))
     @Published var desktopTilingPreferencesBySpaceIndex: [Int: Bool] = AppModel.loadDesktopTilingPreferencesBySpaceIndex()
     @Published var workSetBackdropPresentations: [WorkSetScopeKey: WorkSetBackdropPresentation] = [:]
     @Published var recentWindowTilerBackdropPresentations: [WorkSetScopeKey: WorkSetBackdropPresentation] = [:]
