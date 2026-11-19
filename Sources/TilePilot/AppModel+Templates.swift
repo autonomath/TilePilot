@@ -160,6 +160,22 @@ extension AppModel {
         return template.displayShapeKey.fitNotice(width: area.width, height: area.height)
     }
 
+    /// Reshapes the template to the area it applies into; slots keep their fractions, so the layout stretches to fill it.
+    func stretchWindowLayoutTemplateToDisplay(_ id: UUID) {
+        guard let index = windowLayoutTemplates.firstIndex(where: { $0.id == id }),
+              let snapshot = latestLiveStateSnapshot ?? liveStateSnapshot,
+              let target = preferredTemplateTarget(for: windowLayoutTemplates[index], in: snapshot) else { return }
+        let area = placementFrame(for: target.display)
+        guard let shapeKey = DisplayShapeKey.from(width: area.width, height: area.height) else { return }
+        windowLayoutTemplates[index] = windowLayoutTemplates[index].with(
+            sourceDisplayName: target.display.name,
+            displayShapeKey: shapeKey
+        )
+        persistWindowLayoutTemplates()
+        lastActionMessage = "Stretched \(windowLayoutTemplates[index].name) to fit \(target.display.name)."
+        lastErrorMessage = nil
+    }
+
     var overviewTemplateImportDisplayOptions: [TemplateImportDisplayOption] {
         currentOverviewTemplateImportPreviewDisplays().compactMap { display in
             guard let desktop = currentOverviewTemplateImportSource(displayID: display.id)?.desktop else { return nil }

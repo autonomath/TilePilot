@@ -276,9 +276,18 @@ struct TemplatesDashboardView: View {
             }
 
             if let fitNotice {
-                Label(fitNotice, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                HStack(spacing: 8) {
+                    Label(fitNotice, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button("Stretch to Fit") {
+                        model.stretchWindowLayoutTemplateToDisplay(template.id)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
         }
     }
