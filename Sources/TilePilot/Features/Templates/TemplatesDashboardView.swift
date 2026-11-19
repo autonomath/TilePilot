@@ -245,7 +245,8 @@ struct TemplatesDashboardView: View {
     }
 
     private func templateHeader(for template: WindowLayoutTemplate) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let fitNotice = model.templateDisplayFitNotice(template)
+        return VStack(alignment: .leading, spacing: 12) {
             Text(template.name)
                 .font(.title3.weight(.semibold))
 
@@ -256,8 +257,8 @@ struct TemplatesDashboardView: View {
 
                 if let disabledReason = model.templateApplyDisabledReason(template) {
                     templateStatusChip(shortTemplateStatusLabel(for: disabledReason), systemImage: "exclamationmark.triangle.fill", tint: .orange)
-                } else if model.templateNeedsDisplayAutoFit(template) {
-                    templateStatusChip("Auto-Fit Display", systemImage: "arrow.down.right.and.arrow.up.left", tint: .blue)
+                } else if fitNotice != nil {
+                    templateStatusChip("Display Mismatch", systemImage: "exclamationmark.triangle.fill", tint: .orange)
                 } else {
                     templateStatusChip("Matching Display", systemImage: "checkmark.circle.fill", tint: .green)
                 }
@@ -272,6 +273,12 @@ struct TemplatesDashboardView: View {
                 Spacer(minLength: 0)
 
                 ContextHelpButton(topic: .templates)
+            }
+
+            if let fitNotice {
+                Label(fitNotice, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
     }

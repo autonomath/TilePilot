@@ -410,7 +410,7 @@ extension AppModel {
             id: featureID,
             group: .templates,
             title: "Apply Template: \(template.name)",
-            description: "Applies this floating window template to the current desktop and auto-fits it when the display shape is slightly different.",
+            description: "Applies this floating window template to the current desktop. On a display of another shape, the layout shrinks to keep its shape.",
             backend: .tilePilotAction,
             capabilityGate: .yabaiRuntime,
             commandMatchers: [tilePilotFeatureURL(featureID)],

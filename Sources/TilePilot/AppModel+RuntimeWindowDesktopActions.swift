@@ -1849,6 +1849,10 @@ extension AppModel {
         }
 
         var issues: [String] = []
+        let placement = placementFrame(for: display)
+        if let fitNotice = template.displayShapeKey.fitNotice(width: placement.width, height: placement.height) {
+            issues.append(fitNotice)
+        }
         if result.emptyConstrainedSlotCount > 0 {
             issues.append("Left \(result.emptyConstrainedSlotCount) constrained slot(s) empty.")
         }

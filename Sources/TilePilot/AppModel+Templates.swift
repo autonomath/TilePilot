@@ -152,9 +152,12 @@ extension AppModel {
         return nil
     }
 
-    func templateNeedsDisplayAutoFit(_ template: WindowLayoutTemplate) -> Bool {
-        guard let option = templateTargetDisplayOption(for: template) else { return false }
-        return !template.displayShapeKey.matches(width: option.frameWidth, height: option.frameHeight)
+    /// Compares with the area the apply fits into (Work Area or whole display), so it agrees with the result.
+    func templateDisplayFitNotice(_ template: WindowLayoutTemplate) -> String? {
+        guard let snapshot = latestLiveStateSnapshot ?? liveStateSnapshot,
+              let target = preferredTemplateTarget(for: template, in: snapshot) else { return nil }
+        let area = placementFrame(for: target.display)
+        return template.displayShapeKey.fitNotice(width: area.width, height: area.height)
     }
 
     var overviewTemplateImportDisplayOptions: [TemplateImportDisplayOption] {

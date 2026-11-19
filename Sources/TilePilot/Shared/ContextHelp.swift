@@ -151,7 +151,7 @@ enum ContextHelpTopic: String, CaseIterable, Identifiable {
             return [
                 .init("Slots with app rules fill first; Any App slots take the focused window, then the rest in desktop order", systemImage: "list.number"),
                 .init("Slots can overlap; the layer order decides which window ends up in front", systemImage: "square.3.stack.3d"),
-                .init("When the display shape is close, the template fits itself to it", systemImage: "arrow.down.right.and.arrow.up.left"),
+                .init("On a display of another shape, the layout shrinks to keep its shape and leaves empty bands", systemImage: "arrow.down.right.and.arrow.up.left"),
                 .init("Work Sets save which windows belong together; a Work Set can use a template as its layout", systemImage: "square.stack.3d.up"),
             ]
         case .workSets:

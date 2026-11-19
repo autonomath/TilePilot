@@ -27,6 +27,17 @@ struct DisplayShapeKey: Codable, Hashable, Sendable {
         return abs((width / height) - aspectRatio) <= Self.matchTolerance
     }
 
+    /// What applying slots drawn for this shape inside a width × height area does, or nil when the shapes match.
+    func fitNotice(width: Double, height: Double) -> String? {
+        guard width > 1, height > 1, !matches(width: width, height: height) else { return nil }
+        let target = width / height
+        let shapes = "(\(description) vs \(String(format: "%.2f", target)) here)"
+        if target < aspectRatio {
+            return "Made for a wider screen \(shapes): the layout shrinks to \(Int((target / aspectRatio * 100).rounded()))% height, leaving empty bands above and below."
+        }
+        return "Made for a narrower screen \(shapes): the layout shrinks to \(Int((aspectRatio / target * 100).rounded()))% width, leaving empty bands left and right."
+    }
+
     var description: String {
         String(format: "%.2f", aspectRatio)
     }

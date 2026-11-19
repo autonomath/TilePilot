@@ -12,6 +12,14 @@ final class TemplateModelsTests: XCTestCase {
         XCTAssertFalse(key?.matches(width: 1512, height: 982) == true)
     }
 
+    func testFitNoticeDescribesTheShrink() {
+        let key = DisplayShapeKey.from(width: 3840, height: 2160)!
+
+        XCTAssertNil(key.fitNotice(width: 2560, height: 1440))
+        XCTAssertTrue(key.fitNotice(width: 1800, height: 1169)?.contains("87% height, leaving empty bands above and below") == true)
+        XCTAssertTrue(key.fitNotice(width: 5120, height: 1440)?.contains("50% width, leaving empty bands left and right") == true)
+    }
+
     func testWindowLayoutTemplateSortsTopToBottomThenLeftToRight() {
         let lowerLeft = WindowLayoutSlot(normalizedX: 0.05, normalizedY: 0.55, normalizedWidth: 0.3, normalizedHeight: 0.3)
         let topRight = WindowLayoutSlot(normalizedX: 0.55, normalizedY: 0.08, normalizedWidth: 0.3, normalizedHeight: 0.3)
