@@ -279,7 +279,7 @@ extension AppModel {
             return explicitFocused?.id
         }()
 
-        let badges = sortedSelected.map { window in
+        let badges = Self.mainWindowPerApp(sortedSelected, focusedID: effectiveFocusedID).map { window in
             WindowBadgeState(
                 windowID: window.id,
                 pid: window.pid,
@@ -297,6 +297,25 @@ extension AppModel {
         }
         applyWindowBadgeState(badges, hoveredWindowID: nil, forcePublish: forceRepair)
         lastWindowBadgeRefreshSignature = currentWindowBadgeRefreshSignature(contentSignature: contentSignature)
+    }
+
+    /// One window per app gets an outline, so helper windows (Codex's floating browser and its
+    /// full-screen overlay, popups) don't get their own: a standard window before dialogs and
+    /// panels, then the focused one, then the frontmost.
+    nonisolated static func mainWindowPerApp(_ windows: [WindowState], focusedID: Int?) -> [WindowState] {
+        func rank(_ window: WindowState) -> (Int, Int, Int, Double) {
+            (
+                window.subrole == "AXStandardWindow" ? 0 : 1,
+                window.id == focusedID ? 0 : 1,
+                window.windowServerOrderIndex ?? .max,
+                -window.frameW * window.frameH
+            )
+        }
+        var chosen: [Int: WindowState] = [:]
+        for window in windows where chosen[window.pid].map({ rank(window) < rank($0) }) ?? true {
+            chosen[window.pid] = window
+        }
+        return windows.filter { chosen[$0.pid]?.id == $0.id }
     }
 
     private func effectiveBadgeFloatingState(for window: WindowState, in snapshot: LiveStateSnapshot) -> Bool {
