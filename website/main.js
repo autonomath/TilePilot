@@ -247,11 +247,11 @@
     browse: 'Each group lists its actions by section. The check marks what the key does now.',
     search: 'Search looks through every group at once: actions, apps, macOS controls, and your shortcuts.',
   };
-  const buttons = Array.from(figure.querySelectorAll('button[data-view]'));
-  const images = Array.from(figure.querySelectorAll('img[data-view]'));
+  const buttons = Array.from(figure.querySelectorAll('button[data-show]'));
+  const images = Array.from(figure.querySelectorAll('.zoom[data-view]'));
   for (const button of buttons) {
     button.addEventListener('click', () => {
-      const view = button.dataset.view;
+      const view = button.dataset.show;
       for (const b of buttons) b.setAttribute('aria-pressed', String(b === button));
       for (const img of images) img.hidden = img.dataset.view !== view;
       caption.textContent = captions[view];
@@ -267,4 +267,26 @@
     video.pause();
     video.controls = true;
   }
+})();
+
+// Screenshot viewer: a click shows the full-size image over the page; a click, ×, or Esc closes it.
+(() => {
+  const viewer = document.getElementById('viewer');
+  if (!viewer || typeof viewer.showModal !== 'function') return;
+  const big = viewer.querySelector('img');
+  let opener = null;
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.zoom');
+    if (!button) return;
+    const img = button.querySelector('img');
+    big.src = img.currentSrc || img.src;
+    big.alt = img.alt;
+    opener = button;
+    viewer.showModal();
+  });
+  viewer.addEventListener('click', () => viewer.close());
+  viewer.addEventListener('close', () => {
+    big.removeAttribute('src');
+    if (opener) opener.focus();
+  });
 })();
