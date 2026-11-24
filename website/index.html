@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TilePilot — Tiling windows for macOS, with a GUI that teaches the keys</title>
-  <meta name="description" content="TilePilot is a free Mac app that makes yabai and skhd tiling approachable. Tile or float windows, apply exact layout templates, save Work Sets, and learn keyboard shortcuts from a native interface.">
+  <meta name="description" content="TilePilot is a free Mac app that makes yabai and skhd tiling approachable. Tile or float windows, apply exact layout templates, save Work Sets, and turn Tab or the right mouse button into a second keyboard of one-key shortcuts.">
   <meta name="theme-color" content="#0a111d">
   <link rel="canonical" href="https://autonomath.github.io/TilePilot/">
   <link rel="icon" type="image/png" sizes="64x64" href="assets/icon-64.png">
@@ -16,7 +16,7 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="TilePilot">
   <meta property="og:title" content="TilePilot — Tile your Mac like i3. Learn it like a Mac app.">
-  <meta property="og:description" content="A free macOS app for tiling, floating layouts, templates, Work Sets, and learnable keyboard shortcuts, built on yabai and skhd.">
+  <meta property="og:description" content="A free macOS app for tiling, floating layouts, templates, Work Sets, keyboard layers, and learnable shortcuts, built on yabai and skhd.">
   <meta property="og:url" content="https://autonomath.github.io/TilePilot/">
   <meta property="og:image" content="https://autonomath.github.io/TilePilot/assets/og.png">
   <meta property="og:image:width" content="1200">
@@ -30,7 +30,7 @@
     "name": "TilePilot",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "macOS 13 or later on Apple silicon",
-    "description": "A native macOS app that makes yabai and skhd window tiling approachable, with floating layout templates, Work Sets, and a shortcut learning surface.",
+    "description": "A native macOS app that makes yabai and skhd window tiling approachable, with floating layout templates, Work Sets, keyboard layers, and a shortcut learning surface.",
     "softwareVersion": "0.4.29",
     "downloadUrl": "https://github.com/autonomath/TilePilot/releases/download/v0.4.29/TilePilot-v0.4.29.dmg",
     "url": "https://autonomath.github.io/TilePilot/",
@@ -49,6 +49,7 @@
         <span>TilePilot</span>
       </a>
       <nav class="nav" aria-label="Primary">
+        <a href="#layers">Keyboard Layers</a>
         <a href="#work-area">Work Area</a>
         <a href="#features">Features</a>
         <a href="#keys">Shortcuts</a>
@@ -64,7 +65,7 @@
     <section class="hero">
       <div class="shell">
         <div class="hero-copy">
-          <a class="announce" href="#work-area"><span class="new-tag">New</span>A Work Area for big screens, with the menu bar right above your windows</a>
+          <a class="announce" href="#layers"><span class="new-tag">New</span>Keyboard Layers: hold Tab or the right mouse button for a second set of shortcuts</a>
           <p class="eyebrow">Free · macOS 13 or later · Apple silicon</p>
           <h1>Tile your Mac like i3.<br><em>Learn it like a Mac app.</em></h1>
           <p class="lede">TilePilot is a native app built on yabai and skhd. Tile, float, and arrange windows from a clear interface while you learn the shortcuts. Once the keys become habit, you can leave the mouse alone.</p>
@@ -161,10 +162,71 @@
       </div>
     </section>
 
+    <section id="layers" class="layers" aria-labelledby="layers-title">
+      <div class="shell">
+        <div class="layers-head">
+          <p class="eyebrow"><span class="new-tag">New</span>Keyboard Layers</p>
+          <h2 id="layers-title" class="section-title">Hold a key you already have.<br>Get a second keyboard.</h2>
+          <p class="lede">Tap Tab and it types a Tab. Hold Tab and press C, and Chrome opens. A layer turns Tab, Caps Lock, backtick, backslash, or the right mouse button into a trigger for your own one-key shortcuts, and the trigger keeps doing its usual job.</p>
+        </div>
+
+        <div class="layers-grid">
+          <ul class="triggers">
+            <li>
+              <p class="trigger-key"><kbd>Tab</kbd><span>+</span><kbd>C</kbd></p>
+              <h3>Open what you use most</h3>
+              <p>Apps, websites, files, and folders, each one key away. A tapped Tab still types a Tab, and Shift+Tab and ⌘Tab work as usual.</p>
+            </li>
+            <li>
+              <p class="trigger-key"><kbd class="kbd-mouse">Right button</kbd><span>+</span><kbd>A</kbd></p>
+              <h3>Point, then act</h3>
+              <p>Hold the right mouse button and keys act on the window under the pointer: snap it, center it, close it, or send it to the other display. A plain right-click still opens the menu, and right-drags still work.</p>
+            </li>
+            <li>
+              <p class="trigger-key"><kbd>&#96;</kbd><span>+</span><kbd>1</kbd></p>
+              <h3>A Hyper key on any trigger</h3>
+              <p>Turn on Hyper and every key you haven't listed sends ⌃⌥⇧⌘ + that key, so the same trigger also drives Raycast and your other tools.</p>
+            </li>
+          </ul>
+          <figure class="shot"><a href="assets/shots/keyboard-layers.webp"><img src="assets/shots/keyboard-layers.webp" width="1120" height="752" loading="lazy" decoding="async" alt="TilePilot Keyboard Layers tab with three layers. Tab opens Chrome, Terminal, Mail, and a GitHub link, types a quick reply, and plays or pauses music. The right mouse button snaps, centers, minimizes, or closes the window under the pointer. Backtick switches desktops and sends Hyper for other keys."></a></figure>
+        </div>
+
+        <div class="builder">
+          <div class="builder-copy feature-text">
+            <p class="tab-label">Key window</p>
+            <h3>Build a key in one window.</h3>
+            <p>Click Add Key, or hold the right button and press a key the layer doesn't know yet, and the Key window opens. Browse nine groups or search them all at once, pick an action, and the key works right away.</p>
+            <ul>
+              <li><b>Windows, Desktops, Layouts.</b> Snap to halves, thirds, and quarters, swap and resize, switch desktops, apply a Template or Work Set.</li>
+              <li><b>Apps and Open.</b> Open, hide, or quit apps, and open a link, file, or folder.</li>
+              <li><b>macOS.</b> Mission Control, Spotlight, screenshots, media, volume, brightness, and Lock Screen.</li>
+              <li><b>Keys &amp; Text and Automation.</b> Press another shortcut, type a block of text, or run an Apple Shortcut, a shell command, or one of your skhd shortcuts.</li>
+            </ul>
+          </div>
+          <figure class="shot builder-shot" id="builder-shot">
+            <div class="shot-switch" role="group" aria-label="Key window views">
+              <button type="button" data-view="browse" aria-pressed="true">Browse</button>
+              <button type="button" data-view="search" aria-pressed="false">Search</button>
+            </div>
+            <img data-view="browse" src="assets/shots/key-window.webp" width="760" height="544" loading="lazy" decoding="async" alt="TilePilot Key window for Right Click + A, with nine action groups in a sidebar and Snap Left Half checked in the Windows group.">
+            <img data-view="search" src="assets/shots/key-search.webp" width="760" height="544" loading="lazy" decoding="async" alt="TilePilot Key window searching for screen, with matches grouped under Windows, Apps, and macOS." hidden>
+            <figcaption id="builder-caption">Each group lists its actions by section. The check marks what the key does now.</figcaption>
+          </figure>
+        </div>
+
+        <ul class="layer-promises">
+          <li><b>Off until you turn it on.</b> New layers start off, and TilePilot reads no keys until one is on.</li>
+          <li><b>Typing stays typing.</b> Keys a layer doesn't list type as usual, and password fields always get plain keys.</li>
+          <li><b>Games keep the right button.</b> Close the Key window without an action and that key works as usual with the right button from then on.</li>
+          <li><b>Caps Lock stays shared.</b> A Caps Lock layer steps aside while Raycast's Hyper Key or Karabiner already uses Caps Lock.</li>
+        </ul>
+      </div>
+    </section>
+
     <section id="work-area" class="workarea" aria-labelledby="workarea-title">
       <div class="shell">
         <div class="wa-head">
-          <p class="eyebrow"><span class="new-tag">New</span>Work Area and menu bar</p>
+          <p class="eyebrow">Work Area and menu bar</p>
           <h2 id="workarea-title" class="section-title">A giant display that feels like a normal one.</h2>
           <p class="lede">On a TV or a very wide screen, the corners are far away and the menu bar hugs the top edge. Draw a Work Area and TilePilot keeps every window inside it. Turn on its menu bar and the app menus and menu bar icons sit right above your windows.</p>
         </div>
@@ -247,32 +309,17 @@
           <div class="feature-text">
             <p class="tab-label">Pick Windows to Tile</p>
             <h3>Tile just the windows you're working with.</h3>
-            <p>When the whole desktop is too much, open the picker. It lists this desktop's windows in front-to-back order and preselects your usual count, so the last few windows you used are ready to go.</p>
+            <p>When the whole desktop is too much, open the picker with <kbd>⌃⇧⌥P</kbd>. It lists this desktop's windows in front-to-back order and preselects your usual count, so the last few windows you used are ready to go.</p>
             <ul>
-              <li>Click rows to include or skip windows, and drag to set their order.</li>
-              <li>Preview the final placement with numbered spots before anything moves.</li>
-              <li>Place them in a floating grid that fills spare cells, or in a saved Template.</li>
+              <li>Click a row to add or skip a window, and the preview rearranges at once.</li>
+              <li>Drag rows or preview tiles to choose which window gets which spot.</li>
+              <li>A floating grid fills spare cells by stretching a window instead of leaving a hole.</li>
+              <li>Switch to Template, choose one from the menu, and the picker fills its slots with windows that match each slot's apps.</li>
             </ul>
           </div>
-          <figure class="shot shot-mock" aria-label="Illustration of the Pick Windows to Tile picker">
-            <div class="picker" aria-hidden="true">
-              <p class="picker-title">Pick Windows to Tile</p>
-              <p class="picker-sub">Click to select. Drag rows to change placement order.</p>
-              <div class="picker-seg"><span class="on">Floating Grid</span><span>Template</span></div>
-              <div class="picker-preview">
-                <span class="p1"><b>1</b></span><span class="p2"><b>2</b></span><span class="p3"><b>3</b></span><span class="p4"><b>4</b></span><span class="p5"><b>5</b></span>
-              </div>
-              <ol class="picker-rows">
-                <li class="sel"><b>1</b><span>Editor<small>roadmap.md</small></span><em>Floating</em></li>
-                <li class="sel"><b>2</b><span>Browser<small>Docs · Getting started</small></span><em>Floating</em></li>
-                <li class="sel"><b>3</b><span>Terminal<small>make test</small></span><em>Floating</em></li>
-                <li class="sel"><b>4</b><span>Notes<small>Weekly plan</small></span><em>Floating</em></li>
-                <li class="sel"><b>5</b><span>Music</span><em>Floating</em></li>
-                <li><b>6</b><span>Calculator</span><em>Floating</em></li>
-              </ol>
-              <div class="picker-foot"><span>5 selected</span><span class="ghost">Cancel</span><span class="go">Tile Selected Windows</span></div>
-            </div>
-            <figcaption>Illustration of the picker's layout.</figcaption>
+          <figure class="shot shot-video">
+            <video src="assets/shots/picker.mp4" poster="assets/shots/picker.webp" width="548" height="668" autoplay muted loop playsinline preload="metadata" aria-label="Recording of the Pick Windows to Tile picker. Selecting windows rearranges the preview grid. Switching to Template and choosing templates from the menu fills their slots, and windows are dragged to new spots."></video>
+            <figcaption>Recorded in TilePilot. Add, remove, or drag a window and the preview rearranges. Pick a Template and its slots fill.</figcaption>
           </figure>
         </article>
 
@@ -311,11 +358,12 @@
             <p>Every action is named for where your windows end up, such as "Tile All Windows on This Desktop." Run it from the app, see its shortcut next to it, and record your own when the default doesn't suit you.</p>
             <ul>
               <li>Search every control and shortcut in one list.</li>
-              <li>Pin favorites to the menu bar icon's right-click menu.</li>
-              <li>Test a shortcut before you rely on it.</li>
+              <li>Record a shortcut by pressing it. TilePilot refuses one that would stop a key from typing.</li>
+              <li>Test a shortcut before you rely on it, and pin favorites to the menu bar icon's right-click menu.</li>
+              <li>Want single keys instead of chords? Put the action on a <a href="#layers">Keyboard Layer</a>.</li>
             </ul>
           </div>
-          <figure class="shot"><a href="assets/shots/actions.webp"><img src="assets/shots/actions.webp" width="1120" height="752" loading="lazy" decoding="async" alt="TilePilot Actions and Shortcuts tab listing pinned right-click menu actions with their keyboard shortcuts."></a></figure>
+          <figure class="shot"><a href="assets/shots/actions.webp"><img src="assets/shots/actions.webp" width="1120" height="752" loading="lazy" decoding="async" alt="TilePilot Actions and Shortcuts tab with a search field, pinned right-click menu actions and their shortcuts, and Record Shortcut and Test buttons."></a></figure>
         </article>
 
         <article class="feature flip">
@@ -365,7 +413,7 @@
             <span class="cap cap-k">K<small>down</small></span>
             <span class="cap cap-l">L<small>right</small></span>
           </div>
-          <p class="keys-foot">These are the defaults for new installs. An existing setup keeps its own keys. Change any shortcut or record your own in Actions &amp; Shortcuts. ⌃⇧⌥⌘ with 1 to 9 is left free for your templates and Work Sets.</p>
+          <p class="keys-foot">These are the defaults for new installs. An existing setup keeps its own keys. Change any shortcut or record your own in Actions &amp; Shortcuts. ⌃⇧⌥⌘ with 1 to 9 is left free for your templates and Work Sets. Rather press one key? A <a href="#layers">Keyboard Layer</a> puts any action on Tab + a letter.</p>
         </div>
         <div class="key-groups">
           <h3>I J K L point the way</h3>
@@ -441,7 +489,7 @@ alt - l : yabai -m window --focus east
         </div>
         <ul class="trust-list">
           <li><h3>Edits only its own block</h3><p>TilePilot changes yabairc and skhdrc only between its markers. The Config Files tab keeps backups you can restore.</p></li>
-          <li><h3>Asks before it starts anything</h3><p>The window-control helpers start when you choose to start them. That is the moment macOS asks for Accessibility approval.</p></li>
+          <li><h3>Asks before it starts anything</h3><p>The window-control helpers start when you choose to start them. That is the moment macOS asks for Accessibility approval. Keyboard Layers stay off, and read no keys, until you turn one on.</p></li>
           <li><h3>No SIP changes</h3><p>TilePilot works without turning off System Integrity Protection or loading yabai's scripting addition.</p></li>
           <li><h3>Screenshots stay in memory</h3><p>MegaMap's desktop screenshots and the mirrored menu bar's icon images live only for the current session. Screen Recording is needed only if you want them.</p></li>
           <li><h3>Updates you can see</h3><p>At most twice a day it checks GitHub Releases for a newer version and links you to the release page. It never downloads or installs on its own.</p></li>
@@ -510,7 +558,15 @@ alt - l : yabai -m window --focus east
           </details>
           <details>
             <summary>Which permissions does it need?</summary>
-            <p>yabai and skhd need Accessibility, which macOS requests when you start window control. TilePilot itself uses Accessibility for the mirrored menu bar. Screen Recording is only for MegaMap's real screenshots and matching menu bar icons. Start at Login is optional.</p>
+            <p>yabai and skhd need Accessibility, which macOS requests when you start window control. TilePilot itself uses Accessibility for Keyboard Layers and the mirrored menu bar. Screen Recording is only for MegaMap's real screenshots and matching menu bar icons. Start at Login is optional.</p>
+          </details>
+          <details>
+            <summary>What is a keyboard layer?</summary>
+            <p>A second set of shortcuts behind a key you already have. Hold the trigger (Tab, Caps Lock, backtick, backslash, or the right mouse button) and press another key to run its action. Tap the trigger alone and it does what it always did. Each trigger has its own keys, so Tab + C and Caps Lock + C can do different things.</p>
+          </details>
+          <details>
+            <summary>Will a layer get in the way of typing or games?</summary>
+            <p>A listed key acts the moment you press it while holding the trigger, however fast you type. Everything else types as usual, including Shift+Tab, ⌘Tab, and anything in a password field. With the right mouse button, a click still opens the context menu and a drag still drags, and a key you choose to leave alone works with the right button as it always did.</p>
           </details>
           <details>
             <summary>What is a Work Area?</summary>

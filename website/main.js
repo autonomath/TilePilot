@@ -237,3 +237,34 @@
   apply(reduceMotion ? 'bar' : 'whole');
   start();
 })();
+
+// Key window shots: switch between browsing a group and searching every group.
+(() => {
+  const figure = document.getElementById('builder-shot');
+  if (!figure) return;
+  const caption = document.getElementById('builder-caption');
+  const captions = {
+    browse: 'Each group lists its actions by section. The check marks what the key does now.',
+    search: 'Search looks through every group at once: actions, apps, macOS controls, and your shortcuts.',
+  };
+  const buttons = Array.from(figure.querySelectorAll('button[data-view]'));
+  const images = Array.from(figure.querySelectorAll('img[data-view]'));
+  for (const button of buttons) {
+    button.addEventListener('click', () => {
+      const view = button.dataset.view;
+      for (const b of buttons) b.setAttribute('aria-pressed', String(b === button));
+      for (const img of images) img.hidden = img.dataset.view !== view;
+      caption.textContent = captions[view];
+    });
+  }
+})();
+
+// Recordings play on their own unless the visitor prefers reduced motion.
+(() => {
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const video of document.querySelectorAll('video[autoplay]')) {
+    video.removeAttribute('autoplay');
+    video.pause();
+    video.controls = true;
+  }
+})();
